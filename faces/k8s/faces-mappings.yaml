@@ -1,0 +1,181 @@
+---
+apiVersion: getambassador.io/v3alpha1
+kind: Mapping
+metadata:
+  name: gui-mapping
+spec:
+  hostname: faces.example.com
+  prefix: /
+  service: faces-gui.faces
+  rewrite: /
+  # timeout_ms: 1000
+  # cors:
+  #   credentials: true
+  #   headers:
+  #   - Origin
+  #   - X-Requested-With
+  #   - X-Custom-Header
+  #   - Content-Type
+  #   - Content-Language
+  #   - Content-Length
+  #   - Accept
+  #   - Authorization
+  #   - authorization
+  #   - Cache-Control
+  #   - Pragma
+  #   methods:
+  #   - GET
+  #   - POST
+  #   - OPTIONS
+  #   origins:
+  #   - "*"
+---
+apiVersion: getambassador.io/v3alpha1
+kind: Mapping
+metadata:
+  name: quote-mapping
+spec:
+  hostname: faces.example.com
+  prefix: /quote/
+  service: quote.faces
+  # timeout_ms: 1000
+  cors:
+    credentials: true
+    headers:
+    - Origin
+    - X-Requested-With
+    - X-Custom-Header
+    - Content-Type
+    - Content-Language
+    - Content-Length
+    - Accept
+    - Authorization
+    - authorization
+    - Cache-Control
+    - Pragma
+    methods:
+    - GET
+    - POST
+    - OPTIONS
+    origins:
+    - "*"
+---
+apiVersion: getambassador.io/v3alpha1
+kind: Mapping
+metadata:
+  name: shape-mapping
+spec:
+  hostname: faces.example.com
+  prefix: /shape/
+  service: shape.faces
+  # timeout_ms: 1000
+  cors:
+    credentials: true
+    headers:
+    - Origin
+    - X-Requested-With
+    - X-Custom-Header
+    - Content-Type
+    - Content-Language
+    - Content-Length
+    - Accept
+    - Authorization
+    - authorization
+    - Cache-Control
+    - Pragma
+    methods:
+    - GET
+    - POST
+    - OPTIONS
+    origins:
+    - "*"
+---
+apiVersion: getambassador.io/v3alpha1
+kind: Mapping
+metadata:
+  name: smiley-mapping
+spec:
+  hostname: faces.example.com
+  prefix: /smiley/
+  service: smiley.faces
+  # timeout_ms: 1000
+  cors:
+    credentials: true
+    headers:
+    - Origin
+    - X-Requested-With
+    - X-Custom-Header
+    - Content-Type
+    - Content-Language
+    - Content-Length
+    - Accept
+    - Authorization
+    - authorization
+    - Cache-Control
+    - Pragma
+    methods:
+    - GET
+    - POST
+    - OPTIONS
+    origins:
+    - "*"
+---
+apiVersion: getambassador.io/v3alpha1
+kind: Mapping
+metadata:
+  name: color-mapping
+spec:
+  hostname: faces.example.com
+  prefix: /color/
+  service: color.faces
+  # timeout_ms: 1000
+  cors:
+    credentials: true
+    headers:
+    - Origin
+    - X-Requested-With
+    - X-Custom-Header
+    - Content-Type
+    - Content-Language
+    - Content-Length
+    - Accept
+    - Authorization
+    - authorization
+    - Cache-Control
+    - Pragma
+    methods:
+    - GET
+    - POST
+    - OPTIONS
+    origins:
+    - "*"
+---
+apiVersion: getambassador.io/v3alpha1
+kind: Mapping
+metadata:
+  name: composite-mapping
+spec:
+  hostname: faces.example.com
+  prefix: /composite/
+  service: composite.faces
+  # timeout_ms: 1000
+  cors:
+    credentials: true
+    headers:
+    - Origin
+    - X-Requested-With
+    - X-Custom-Header
+    - Content-Type
+    - Content-Language
+    - Content-Length
+    - Accept
+    - Authorization
+    - authorization
+    - Cache-Control
+    - Pragma
+    methods:
+    - GET
+    - POST
+    - OPTIONS
+    origins:
+    - "*"

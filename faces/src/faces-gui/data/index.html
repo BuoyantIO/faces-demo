@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<HTML><HEAD>
+	<Title>Faces</Title>
+
+	<style>
+		h1 {
+			font-family: sans-serif;
+		}
+
+		.green {
+			color: green;
+		}
+
+		.red {
+			color: red;
+		}
+
+		.blue {
+			color: blue;
+		}
+
+		.grey {
+			color: gray;
+		}
+
+		.key {
+			font-family: sans-serif;
+			font-size: 32px;
+			font-weight: bold;
+			display: inline-block;
+		}
+
+		.key-cell {
+			display: inline-block;
+			border: 2px solid grey;
+			border-radius: 8px;
+			height: 60px;
+			width: 60px;
+			margin: 2px;
+			font-size: 48px;
+			text-align: center;
+			vertical-align: middle;
+		}
+
+		.margin-left {
+			margin-left: 1em;
+		}
+
+		.inline-block {
+			display: inline-block;
+		}
+
+		.float-left {
+			float: left;
+		}
+
+		.cell {
+			display: inline-block;
+			border: 2px solid grey;
+			border-radius: 16px;
+			height: 120px;
+			width: 120px;
+			margin: 2px;
+			text-align: center;
+			vertical-align: middle;
+		}
+
+		.cell-smiley {
+			background: transparent;
+			text-align: center;
+			font-size: 96px;
+		}
+
+		.cell-shape {
+			display: inline-block;
+			height: 120px;
+			width: 120px;
+		}
+
+		.cell-quote {
+			display: inline-block;
+			vertical-align: top;
+		}
+
+		.cell-quote-text {
+			vertical-align: top;
+			margin: 1px;
+		}
+
+		.qtext {
+			position: relative;
+			font-size: 14px;
+			color: black;
+			width: 215px;
+			margin: 5px;
+		}
+
+		.qtext-concat {
+			position: relative;
+			display: inline-block;
+			word-wrap: break-word;
+			overflow: hidden;
+			max-height: 4.8em; /* (Number of lines you want visible) * (line-height) */
+			line-height: 1.2em;
+			text-align: left;
+		}
+
+		.qtext.ellipsis::after {
+			content: "...";
+			position: absolute;
+			right: -12px; 
+			bottom: 4px;
+		}
+
+		.marker {
+			display: inline-block;
+			border: 1px solid black;
+			width: 50px;
+			height: 50px;
+			margin: 2px;
+		}
+
+		.bg-green {
+			background-color: green;
+		}
+
+		.bg-red {
+			background-color: red;
+		}
+
+		.bg-blue {
+			background-color: blue;
+		}
+
+		.bg-grey {
+			background-color: gray;
+		}
+
+		.inline {
+			display: inline;
+		}
+
+		.margins {
+			margin-left: .5em;
+			margin-right:  0.5em;
+		}
+
+		.vert-margins {
+			margin-top: .5em;
+			margin-bottom: .5em;
+		}
+
+		.roundedButton {
+			border-radius: 7px;
+			width: 5em; 
+		}
+
+		.log {
+			border-top: 1px solid gray;
+			padding-top: .3em;
+		}
+	</style>
+</HEAD><BODY>
+
+<H1>Faces</H1>
+
+<input id="btnToggle" type="button" value="Init..." class="roundedButton margins" />
+<div id="timer" class="inline margins"></div>
+
+<div id="main">
+	<div id="column1" class="inline-block float-left">
+		<div id="cells" class="vert-margins"></div>
+	</div>
+	<div id="column2" class="inline-block margins">
+		<div id="key" class="vert-margins margin-left">
+		</div>
+	</div>
+</div>
+
+<div id="xhr"></div>
+
+<!-- <div id="log" class="log"><div> -->
+
+<script>
+
+//////// Utilities
+//
+// Sucking in all of jQuery is massive overkill, but the $() shorthand
+// is really nice, so...
+function $(id) {
+	return document.getElementById(id)
+}
+
+// getCookie (from MDN) clearly demonstrates why we can't have nice things.
+
+function getCookie(name) {
+    // Split cookie string and get all individual name=value pairs in an array
+    var cookieArr = document.cookie.split(";");
+    
+    // Loop through the array elements
+    for(var i = 0; i < cookieArr.length; i++) {
+        var cookiePair = cookieArr[i].split("=");
+        
+        /* Removing whitespace at the beginning of the cookie name
+        and compare it with the given string */
+        if(name == cookiePair[0].trim()) {
+            // Decode the cookie value and return
+            return decodeURIComponent(cookiePair[1]);
+        }
+    }
+    
+    // Return null if not found
+    return null;
+}
+
+//////// Logger
+//
+// Logger is a simple logging class. It logs datestamped text to
+// the console and to its div (where it's colored for semantics).
+
+class Logger {
+	constructor(logdiv) {
+		// this.logdiv = logdiv	// not an ID, the div itself
+		this.info("Startup")
+	}
+
+	// logmsg does most of the heavy lifting.
+	logmsg(color, msg) {
+		let now = new Date().toISOString()
+		console.log(`${now} ${msg}`)
+		// this.logdiv.innerHTML = `<span class="${color}">${now}: ${msg}</span><br/>` + this.logdiv.innerHTML
+	}
+
+	// success, fail, and info are wrappers around logmsg to avoid
+	// having to always pass the color by hand.
+
+	success(msg) {
+		this.logmsg("green", msg)
+	}
+
+	fail(msg) {
+		this.logmsg("red", msg)
+	}
+
+	info(msg) {
+		this.logmsg("grey", msg)
+	}
+}
+
+//////// Switch
+//
+// Switch is a class to manage an on/off button. Very fancy, I know.
+
+class Switch {
+	constructor(button) {
+		this.button = button	// not an ID, the button itself
+		this.button.onclick = () => { this.toggle() }
+		this.start()
+	}
+
+	toggle() {
+		if (this.active) {
+			this.stop()
+		}
+		else {
+			this.start()
+		}
+	}
+
+	start() {
+		this.active = true
+		this.button.value = "Stop"
+	}
+
+	stop() {
+		this.active = false
+		this.button.value = "Start"
+	}
+}
+
+
+//////// Cell
+//
+// Cell is a class that represents a single cell in the grid. A cell
+// contains a colored shape on a colored background, plus a quote of the
+// moment.
+
+class Cell {
+	static smilies = {
+		"confused": "&#x1F615;",
+		"cursing":  "&#x1F92C;",
+		"kaboom":   "&#x1F92F;",
+		"sleeping": "&#x1F634;",
+		"smiling":  "&#x1F603;",
+		"thinking": "&#x1F914;",
+		"tongue":   "&#x1F61B;",
+		"upset":    "&#x1F62C;",
+		"yay":      "&#x1F389;",
+	};
+
+	constructor(logger, sw, fetchURL, enclosingDiv, row, col) {
+		this.logger = logger
+		this.sw = sw
+		this.fetchURL = fetchURL
+		this.count = 0
+
+		this.row = row
+		this.col = col
+
+		let cellDiv = document.createElement("div")
+		cellDiv.id = `cell-${row}-${col}`
+		cellDiv.className = "cell"
+		cellDiv.style.background = "grey"
+		cellDiv.style.opacity = 0.5
+
+		let smileySpan = document.createElement("span")
+		smileySpan.id = `smiley-${row}-${col}`
+		smileySpan.className = "cell-smiley"
+		cellDiv.appendChild(smileySpan)
+
+		enclosingDiv.appendChild(cellDiv)
+
+		this.lastUpdated = new Date().getTime()
+		this.sentAt = {}
+
+		setTimeout(() => { 
+			setInterval(() => { 
+				if (!this.sw.active) {
+					// Nothing to do...
+					return
+				}
+				this.run()
+			}, 3000)
+			this.run()
+		}, row * col * 200)
+
+		this.run()
+	}
+
+	// Helpers to save on keystrokes
+	info (msg)		{ this.logger.info(msg) }
+	success (msg)	{ this.logger.success(msg) }
+	fail (msg)		{ this.logger.fail(msg) }
+
+	name ()         { return `${this.row}-${this.col}-${this.count}` }
+
+	// Run can be called manually, but it's most useful when used as the
+	// callable of a Timer.
+	run () {
+		// this.info("Setting up XHR...")
+
+		let xhr = new XMLHttpRequest();
+		let xhrName = this.name()
+		let sentAt = new Date().getTime()
+		this.count++;
+
+		xhr.addEventListener("load", () => {
+			// This is the success case: our XHR succeeded, and we should
+			// have a JSON quote dictionary as a response. It has several
+			// attributes, but the only one we're interested in is the quote
+			// of the moment itself.
+			//
+			// Start by figuring out how long it took to get the response...
+			let now = new Date()
+			let latency = now - sentAt
+
+			// ...then figure out what we got.
+			let smiley = undefined
+			let bgColor = "grey"
+			let errors = "unknown"
+			let borderColor = "grey"
+
+			// ...then check the status code.
+			if (xhr.status == 504) {
+				smiley = Cell.smilies.sleeping
+				bgColor = "pink"
+				errors = "overall timeout"
+			}
+			else if (xhr.status != 200) {
+				smiley = Cell.smilies.confused
+				bgColor = "red"
+				errors = `overall ${xhr.status}`
+			}
+			else {
+				// Parse JSON!
+				try {
+					let obj = JSON.parse(xhr.responseText)
+					smiley = obj.smiley
+					bgColor = obj.color
+
+					if (obj.errors != undefined) {
+						errors = obj.errors.join(",")
+						borderColor = "red"
+					}
+					else {
+						errors = "success!"
+					}
+				}
+				catch (e) {
+					// Whoops, something went wrong. If it's a SyntaxError, that
+					// probably means we got bad JSON. Otherwise, it's... who knows?
+					borderColor = "red"
+					smiley = Cell.smilies.confused
+					bgColor = "red"
+
+					if (e instanceof SyntaxError) {
+						errors = "parse error"
+					}
+					else {
+						errors = "unknown error"
+					}
+				}
+			}
+
+			// FINALLY: show 'em what we got.
+			// let msg = `[${xhrName}] XHR result (${latency}ms): ${errors} -- ${text}`
+			// this.success(msg);
+
+			let nowISO = now.toISOString()
+
+			$(`smiley-${this.row}-${this.col}`).innerHTML = smiley
+			$(`cell-${this.row}-${this.col}`).style.opacity = 1.0
+			$(`cell-${this.row}-${this.col}`).style.background = bgColor
+			$(`cell-${this.row}-${this.col}`).style.borderColor = borderColor
+			this.lastUpdated = now.getTime()
+		})
+
+		xhr.addEventListener("error", () => {
+			// This is the failure case: something went wrong. A really
+			// annoying thing about XHR is that we don't get anything useful
+			// about _what_ went wrong, but, well, c'est la vie.
+			//
+			// Start, again, with the latency...
+			let now = new Date()
+			let latency = now - sentAt
+
+			// ...and then just show that something failed.
+			let msg = `[${xhrName}] XHR error (${latency}ms)`
+			this.fail(msg);
+
+			$(`smiley-${this.row}-${this.col}`).innerHTML = Cell.smilies.confused
+			$(`cell-${this.row}-${this.col}`).style.opacity = 1.0
+			$(`cell-${this.row}-${this.col}`).style.background = "red"
+			$(`cell-${this.row}-${this.col}`).style.borderColor = "grey"
+
+			this.lastUpdated = now.getTime()
+		})
+
+		// Here's where we actually prep and send the request...
+		//
+		// This business with appending the date as a query-string is because
+		// Safari (at least) just _refuses_ to pay attention to the Cache-Control
+		// header we add below, and we _really_ don't want this to be cached.
+		//
+		// Safari is why we can't have nice things.
+		let now = new Date().toISOString()
+		xhr.open("GET", `${this.fetchURL}?row=${this.row}&col=${this.col}&now=${now}`);
+	    xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+
+		// We must send credentials...
+		xhr.withCredentials = true
+
+		// ...and we really want to be sure that the browser turns on CORS for
+		// this, so we use a custom header to force preflighting.
+		xhr.setRequestHeader("X-Custom-Header", "custom")
+
+		// OK -- save the time we sent the request, and off we go.
+		// this.info(`[${xhrName}] sending XHR`)
+		xhr.send();
+	}
+}
+
+class Key {
+	constructor(keyDiv) {
+		let keyEntries = [
+			[ "smiling",  "green", "grey", "24px", "Success!" ],
+			[ "sleeping", "pink",  "grey", "",     "Timeout" ],
+			[ "kaboom",   "red",   "grey", "",     "Ratelimit" ],
+			[ "confused", "red",   "grey", "24px", "Composite error" ],
+			[ "smiling",  "grey",  "red",  "",     "Color error" ],
+			[ "cursing",  "green", "red",  "24px", "Face error" ],
+			[ "-",        "-",     "-",    "",     "Slow service" ]
+		]
+
+		for (let i = 0; i < keyEntries.length; i++) {
+			let [ smileyName, bgColor, borderColor, margin, text ] = keyEntries[i]
+
+			if (smileyName != "-") {
+				let smiley = Cell.smilies[smileyName]
+				let style = `background: ${bgColor}; border: 2px solid ${borderColor};`
+
+				if (margin) {
+					style += ` margin-bottom: ${margin};`
+				}
+
+				let keyEntry = document.createElement("div")
+				keyEntry.id = `key-${i}`
+				keyEntry.className = "key float-left"
+				keyEntry.innerHTML = `
+					<div id="key-cell-${i}" class="key-cell" style="${style}">
+						<span id="key-smiley-${i}">${smiley}</span>
+					</div>
+					<span>${text}</span>
+				`
+				keyDiv.appendChild(keyEntry)
+			}
+			else {
+				let keyEntry = document.createElement("div")
+				keyEntry.id = `key-${i}`
+				keyEntry.className = "key float-left"
+				keyEntry.innerHTML = `
+					<div id="key-cell-${i}" class="key-cell" style="background: transparent; border: 2px dashed grey;">
+						<span id="key-smiley-${i}">&nbsp;</span>
+					</div>
+					<span>${text}</span>
+				`
+				keyDiv.appendChild(keyEntry)
+			}
+
+			keyDiv.appendChild(document.createElement("br"))
+		}
+	}
+}
+
+class CellFader {
+	constructor(logger, sw, cells) {
+		this.logger = logger
+		this.sw = sw
+		this.cells = cells
+		this.count = 0
+		this.maxSolid = 2500
+		this.maxVisible = 4000
+
+		setInterval(() => { this.run() }, 200)
+	}
+
+	run() {
+		if (!this.sw.active) {
+			// Nothing to do...
+			return
+		}
+
+		this.count++
+
+		for (let cell of this.cells) {
+			if (cell.lastUpdated == 0) {
+				// if ((this.count < 10) && (cell == this.cells[0])) {
+				// 	this.logger.info("Fader: never updated")
+				// }
+				continue
+			}
+
+			let now = new Date().getTime()
+			let age = now - cell.lastUpdated
+
+			let opacity = 1.0
+
+			if (age > this.maxVisible) {
+				opacity = 0.0
+			}
+			else if (age > this.maxSolid) {
+				opacity = (this.maxVisible - age) / (this.maxVisible - this.maxSolid)
+			}
+
+			$(`cell-${cell.row}-${cell.col}`).style.opacity = opacity
+
+			// if ((this.count < 10) && (cell == this.cells[0])) {
+			// 	this.logger.info(`Fader: age ${age}ms -> ${opacity}`)
+			// }
+		}
+	}
+}
+
+//////// Markers
+//
+// Markers is a class that updates a div with colored squares to provide
+// hints about what happened over time.
+
+class Markers {
+	constructor(markerdiv, rowlength) {
+		this.markerdiv = markerdiv	// not an ID, the div itself
+		this.rowlength = rowlength	// how many markers per row?
+		this.currentrow = 0 		// how many markers are on the current row?
+	}
+
+	mark(shape, fgColor, bgColor) {
+		this.markerdiv.innerHTML += `
+			<div class="bg-${bgColor} marker">
+				<svg width="50" height="50" xmlns="http://www.w3.org/2000/svg">
+				    <g transform="rotate(0 25 25)">
+					    <polygon points="${shape}" fill="${fgColor}" stroke="black"></polygon>
+				    </g>
+				</svg>
+			</div>`
+
+		this.currentrow++
+
+		if (this.currentrow >= this.rowlength) {
+			$("markers").innerHTML += "<br />"
+			this.currentrow = 0
+		}
+	}
+}
+
+//////// XHR
+//
+// Fetcher is our real test class: fetch from the composite service and render the response
+// in the UI.
+
+class Fetcher {
+	constructor(logger, markers, xhrdiv, fetchURL) {
+		this.logger = logger		// Logger object
+		this.markers = markers		// Markers object
+		this.xhrdiv = xhrdiv		// Div (not the ID, the div!) to update with XHR results
+		this.fetchURL = fetchURL	// URL to fetch
+
+		this.count = 0				// How many requests have we done?
+		this.lastXSRF = undefined	// Last XSRF value we saw		
+		this.sentAt = undefined		// When we last sent a request
+	}
+
+	// Helpers to save on keystrokes
+	info (msg)		{ this.logger.info(msg) }
+	success (msg)	{ this.logger.success(msg) }
+	fail (msg)		{ this.logger.fail(msg) }
+
+	// Run can be called manually, but it's most useful when used as the
+	// callable of a Timer.
+	run () {
+		// this.info("Setting up XHR...")
+
+		let xhr = new XMLHttpRequest();
+
+		xhr.addEventListener("load", () => {
+			// This is the success case: our XHR succeeded, and we should
+			// have a JSON quote dictionary as a response. It has several
+			// attributes, but the only one we're interested in is the quote
+			// of the moment itself.
+			//
+			// Start by figuring out how long it took to get the response...
+			let now = new Date()
+			let latency = now - this.sentAt
+
+			// ...then figure out what we got.
+			let text = undefined
+			let shape = undefined
+			let fgColor = undefined	// color of the shape, as opposed to color of the background
+
+			// ...then check the status code.
+			if (xhr.status == 504) {
+				text = `Timeout after ${latency}ms`
+				shape = "19.000,49.000 31.000,49.000 31.000,1.000 19.000,1.000"
+				fgColor = "pink"
+			}
+			else if (xhr.status != 200) {
+				text = `Unknown status ${xhr.status} after ${latency}ms`
+				shape = "19.000,49.000 31.000,49.000 31.000,1.000 19.000,1.000"
+				fgColor = "red"
+			}
+			else {
+				// Parse JSON!
+				try {
+					let obj = JSON.parse(xhr.responseText)
+					text = obj.quote
+					shape = obj.shape
+					fgColor = obj.color
+				}
+				catch (e) {
+					// Whoops, something went wrong. If it's a SyntaxError, that
+					// probably means we got bad JSON. Otherwise, it's... who knows?
+					if (e instanceof SyntaxError) {
+						text = `Could not parse QotM: ${e.message}\n${xhr.responseText}`
+						shape = "19.000,49.000 31.000,49.000 31.000,1.000 19.000,1.000"
+						fgColor = "red"
+					}
+					else {
+						text = `Missing QotM? ${e.message}`
+						shape = "19.000,49.000 31.000,49.000 31.000,1.000 19.000,1.000"
+						fgColor = "red"
+					}
+				}
+			}
+
+			// OK, build up messages to show the user, and while we're at it,
+			// check to see if we have a new session now. We can't actually see
+			// the real auth token (that's marked HTTPOnly), but we can see the
+			// XSRF-protection cookie, and it changes whenever the auth token does.
+			let decoration = `${latency}ms`
+
+			let bgColor = "green"
+			let curXSRF = getCookie("ambassador_xsrf.keycloak-multi.default")
+
+			if (curXSRF != this.lastXSRF) {
+				bgColor = "blue"
+				decoration += ", new session token"
+				this.lastXSRF = curXSRF
+			}
+
+			// FINALLY: show 'em what we got.
+			let msg = `[${this.count}] XHR success (${decoration}): ${text}`
+			// this.success(msg);
+
+			let nowISO = now.toISOString()
+			this.xhrdiv.innerHTML = `<span class="${bgColor}"><p>${nowISO}: ${msg}</p></span>`
+			this.markers.mark(shape, fgColor, bgColor)
+		})
+
+		xhr.addEventListener("error", () => {
+			// This is the failure case: something went wrong. A really
+			// annoying thing about XHR is that we don't get anything useful
+			// about _what_ went wrong, but, well, c'est la vie.
+			//
+			// Start, again, with the latency...
+			let now = new Date()
+			let latency = now - this.sentAt
+
+			// ...and then just show that something failed.
+			let msg = `[${this.count}] XHR error (${latency}ms)`
+			// this.fail(msg);
+
+			let nowISO = now.toISOString()
+			this.xhrdiv.innerHTML = `<span class="red"><p>${nowISO}: Failed!</p></span>`
+			this.markers.mark("red")
+		})
+
+		// Here's where we actually prep and send the request...
+		this.count++
+
+		// This business with appending the date as a query-string is because
+		// Safari (at least) just _refuses_ to pay attention to the Cache-Control
+		// header we add below, and we _really_ don't want this to be cached.
+		//
+		// Safari is why we can't have nice things.
+		let now = new Date().toISOString()
+		xhr.open("GET", `${this.fetchURL}?now=${now}`);
+	    xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+
+		// We must send credentials...
+		xhr.withCredentials = true
+
+		// ...and we really want to be sure that the browser turns on CORS for
+		// this, so we use a custom header to force preflighting.
+		xhr.setRequestHeader("X-Custom-Header", "custom")
+
+		// OK -- save the time we sent the request, and off we go.
+		// this.info("Sending XHR...")
+		this.sentAt = new Date()
+		xhr.send();
+
+		// this.info(`[${this.count}] XHR sent`)
+	}
+}
+
+
+
+//////// Mainline
+//
+// When the page loads, we set up the world and fire up a timer to get things
+// moving.
+window.onload = () => {
+	let logger = new Logger($("log"))
+
+	logger.info(`Page loaded`)
+
+	let sw = new Switch($("btnToggle"))
+
+	let cells = []
+
+	for (row = 0; row < 5; row++) {
+		for (col = 0; col < 5; col++) {
+			let cell = new Cell(logger, sw, "composite/", $("cells"), row, col)
+			cells.push(cell)
+		}
+		$("cells").innerHTML += "<br/>"
+	}
+
+	key = new Key($("key"))
+
+	let fader = new CellFader(logger, sw, cells)
+
+	// let markers = new Markers($("markers"), 16)
+	// let q = new Fetcher(logger, markers, $("xhr"), "composite/")
+
+	// let timer = new Timer($("timer"), $("btnToggle"), 2, () => {
+	// 	q.run()
+	// })
+}
+
+</script>
+</BODY>

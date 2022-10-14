@@ -1,0 +1,28 @@
+---
+apiVersion: getambassador.io/v3alpha1
+kind: Mapping
+metadata:
+  name: viz-example-mapping
+spec:
+  prefix: /
+  hostname: viz.example.com
+  service: web.linkerd-viz.svc.cluster.local:8084
+  host_rewrite: web.linkerd-viz.svc.cluster.local:8084
+  remove_request_headers:
+  - Origin
+  allow_upgrade:
+  - websocket
+---
+apiVersion: getambassador.io/v3alpha1
+kind: Mapping
+metadata:
+  name: viz-civo-mapping
+spec:
+  prefix: /
+  hostname: viz.civo.59s.io
+  service: web.linkerd-viz.svc.cluster.local:8084
+  host_rewrite: web.linkerd-viz.svc.cluster.local:8084
+  remove_request_headers:
+  - Origin
+  allow_upgrade:
+  - websocket

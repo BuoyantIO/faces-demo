@@ -1,0 +1,129 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: composite
+  namespace: faces
+spec:
+  type: ClusterIP
+  selector:
+    service: composite
+  ports:
+  - port: 80
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: composite
+  namespace: faces
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      service: composite
+  template:
+    metadata:
+      labels:
+        service: composite
+    spec:
+      containers:
+      - name: composite
+        image: dwflynn/faces-service:0.2.1
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8000
+        env:
+        - name: FACES_SERVICE
+          value: "composite"
+        - name: ERROR_FRACTION
+          value: "20"
+        # - name: DELAY_BUCKETS
+        #   value: "0,5,10,15,20,50,200,500,1500"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: smiley
+  namespace: faces
+spec:
+  type: ClusterIP
+  selector:
+    service: smiley
+  ports:
+  - port: 80
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smiley
+  namespace: faces
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      service: smiley
+  template:
+    metadata:
+      labels:
+        service: smiley
+    spec:
+      containers:
+      - name: smiley
+        image: dwflynn/faces-service:0.2.1
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8000
+        env:
+        - name: FACES_SERVICE
+          value: "smiley"
+        - name: ERROR_FRACTION
+          value: "20"
+        - name: DELAY_BUCKETS
+          value: "0,5,10,15,20,50,200,500,1500"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: color
+  namespace: faces
+spec:
+  type: ClusterIP
+  selector:
+    service: color
+  ports:
+  - port: 80
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: color
+  namespace: faces
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      service: color
+  template:
+    metadata:
+      labels:
+        service: color
+    spec:
+      containers:
+      - name: color
+        image: dwflynn/faces-service:0.2.1
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8000
+        env:
+        - name: FACES_SERVICE
+          value: "color"
+        - name: ERROR_FRACTION
+          value: "20"
+        - name: DELAY_BUCKETS
+          value: "0,5,10,15,20,50,200,500,1500"

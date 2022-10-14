@@ -1,0 +1,3 @@
+#!/bin/sh
+
+python3 -m http.server --directory /application/data 8080
