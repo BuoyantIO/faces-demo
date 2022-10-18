@@ -187,16 +187,18 @@ class SmileyServer(BaseServer):
         self.standard_response({"smiley": Smileys["Smiling"]})
 
 
-class CompositeServer(BaseServer):
-    # The composite server is a bit more complicated. It makes requests to the
-    # color service and the shape service _and_ the quote service, and coalesces
-    # the responses into a single response.
+class FaceServer(BaseServer):
+    # The face server is a bit more complicated. It makes requests to the
+    # color service and the smiley service, and coalesces the results into a
+    # single response.
     # 
     # We have defaults for all the services.
 
     defaults = {
         "color": "grey",
+        "color-504": "pink",
         "smiley": Smileys["Cursing"],
+        "smiley-504": Smileys["Sleeping"],
         "shape": """M14,15 m-5,-5 l10,10 m0,-10 l-10,10
                     M36,15 m-5,-5 l10,10 m0,-10 l-10,10
                     M10,34.5 c0,-7.5 30,-7.5 30,0""",
@@ -206,38 +208,31 @@ class CompositeServer(BaseServer):
     def do_GET(self):
         start = time.time()
 
-        cstat, color = self.make_request("color", "color")
-        sstat, smiley = self.make_request("smiley", "smiley")
-        # qstat, quote = self.make_request("quote", "quote")
-
-        end = time.time()
-
-        latency_ms = delta_ms(start, end)
-
+        rdict = {}
         errors = []
 
-        if cstat != 200:
-            color = self.defaults["color"]
-            errors.append(f"color: {cstat}")
+        for svc, key in [ ( "color", "color" ), ( "smiley", "smiley" ) ]:
+            stat, value = self.make_request(svc, key)
 
-        if sstat != 200:
-            smiley = self.defaults["smiley"]
-            errors.append(f"smiley: {sstat}")
+            if stat != 200:
+                errors.append(f"{svc}: {stat}")
 
-        # if qstat != 200:
-        #     quote = self.defaults["quote"]
-        #     errors.append(f"quote: {qstat}")
+                for errkey in [ f"{svc}-{stat}", f"{svc}-{stat // 100}xx", svc ]:
+                    errval = self.defaults.get(errkey, None)
 
-        rdict = {
-            "color": color,
-            "smiley": smiley,
-            # "quote": quote,
-        }
+                    if errval is not None:
+                        value = errval
+                        break
+
+            rdict[key] = value
+
+        end = time.time()
+        latency_ms = delta_ms(start, end)
 
         if errors:
             rdict["errors"] = errors
 
-        print(f"composite ({latency_ms}): errors {errors}")
+        print(f"face ({latency_ms}): errors {errors}")
 
         self.standard_response(rdict)
 
@@ -287,7 +282,7 @@ if __name__ == '__main__':
         "shape": ShapeServer,
         "quote": QuoteServer,
         "smiley": SmileyServer,
-        "composite": CompositeServer,
+        "face": FaceServer,
     }
 
     server_class = servers.get(server_type, None)

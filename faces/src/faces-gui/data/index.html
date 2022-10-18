@@ -63,7 +63,19 @@
 			margin: 2px;
 			text-align: center;
 			vertical-align: middle;
+            position: relative;
 		}
+
+        .cell-count {
+            position: absolute;
+			background: white;
+			border-radius: 16px 0px 16px 0px;
+			width: 2em;
+			bottom: 0px;
+			right: 0px;
+			color: black;
+			z-index: 999;
+        }
 
 		.cell-smiley {
 			background: transparent;
@@ -255,6 +267,7 @@ class Switch {
 	constructor(button) {
 		this.button = button	// not an ID, the button itself
 		this.button.onclick = () => { this.toggle() }
+		this.cells = undefined
 		this.start()
 	}
 
@@ -264,6 +277,13 @@ class Switch {
 		}
 		else {
 			this.start()
+			
+			if (this.cells != undefined) {
+				for (let cell of this.cells) {
+					// console.log(`start cell ${cell.row}-${cell.col}`)
+					cell.reschedule(0)
+				}
+			}
 		}
 	}
 
@@ -303,6 +323,7 @@ class Cell {
 		this.sw = sw
 		this.fetchURL = fetchURL
 		this.count = 0
+		this.pending = false
 
 		this.row = row
 		this.col = col
@@ -318,23 +339,19 @@ class Cell {
 		smileySpan.className = "cell-smiley"
 		cellDiv.appendChild(smileySpan)
 
+		let cellCountDiv = document.createElement("div")
+		cellCountDiv.id = `cell-count-${row}-${col}`
+		cellCountDiv.className = "cell-count"
+		cellDiv.appendChild(cellCountDiv)
+
 		enclosingDiv.appendChild(cellDiv)
 
 		this.lastUpdated = new Date().getTime()
 		this.sentAt = {}
 
-		setTimeout(() => { 
-			setInterval(() => { 
-				if (!this.sw.active) {
-					// Nothing to do...
-					return
-				}
-				this.run()
-			}, 3000)
-			this.run()
-		}, row * col * 200)
+		this.interval = 2000	// ms
 
-		this.run()
+		setTimeout(() => { this.run() }, row * col * 200)
 	}
 
 	// Helpers to save on keystrokes
@@ -344,9 +361,28 @@ class Cell {
 
 	name ()         { return `${this.row}-${this.col}-${this.count}` }
 
+	reschedule (latency) {
+		if (!this.sw.active) {
+			return
+		}
+
+		if (this.pending) {
+			return
+		}
+
+		let toWait = this.interval - latency
+		if (toWait < 0) {
+			toWait = 0
+		}
+
+		this.pending = true
+		setTimeout(() => { this.run() }, toWait)
+	}
+
 	// Run can be called manually, but it's most useful when used as the
 	// callable of a Timer.
 	run () {
+		this.pending = false
 		// this.info("Setting up XHR...")
 
 		let xhr = new XMLHttpRequest();
@@ -364,6 +400,8 @@ class Cell {
 			let now = new Date()
 			let latency = now - sentAt
 
+			this.lastUpdated = now.getTime()
+
 			// ...then figure out what we got.
 			let smiley = undefined
 			let bgColor = "grey"
@@ -372,11 +410,31 @@ class Cell {
 
 			// ...then check the status code.
 			if (xhr.status == 504) {
-				smiley = Cell.smilies.sleeping
-				bgColor = "pink"
+				// 504 is a timeout. Bump the counter in the cell.
+				let currCountText = $(`cell-count-${this.row}-${this.col}`).innerHTML
+				let count = 0
+
+				if (currCountText != "") {
+					count = parseInt(currCountText)
+				}
+
+				count++
+
+				$(`cell-count-${this.row}-${this.col}`).innerHTML = count
+
+				// smiley = Cell.smilies.sleeping
+				// bgColor = "pink"
 				errors = "overall timeout"
+
+				this.reschedule(latency)
+				return
 			}
-			else if (xhr.status != 200) {
+
+			// For literally any other status code, we can reset the timeout
+			// counter.
+			$(`cell-count-${this.row}-${this.col}`).innerHTML = ""
+
+			if (xhr.status != 200) {
 				smiley = Cell.smilies.confused
 				bgColor = "red"
 				errors = `overall ${xhr.status}`
@@ -416,13 +474,16 @@ class Cell {
 			// let msg = `[${xhrName}] XHR result (${latency}ms): ${errors} -- ${text}`
 			// this.success(msg);
 
-			let nowISO = now.toISOString()
+			$(`cell-${this.row}-${this.col}`).style.opacity = 0.0
 
-			$(`smiley-${this.row}-${this.col}`).innerHTML = smiley
-			$(`cell-${this.row}-${this.col}`).style.opacity = 1.0
-			$(`cell-${this.row}-${this.col}`).style.background = bgColor
-			$(`cell-${this.row}-${this.col}`).style.borderColor = borderColor
-			this.lastUpdated = now.getTime()
+			setTimeout(() => {
+				$(`smiley-${this.row}-${this.col}`).innerHTML = smiley
+				$(`cell-${this.row}-${this.col}`).style.opacity = 1.0
+				$(`cell-${this.row}-${this.col}`).style.background = bgColor
+				$(`cell-${this.row}-${this.col}`).style.borderColor = borderColor
+			}, 50)
+
+			this.reschedule(latency)
 		})
 
 		xhr.addEventListener("error", () => {
@@ -433,17 +494,22 @@ class Cell {
 			// Start, again, with the latency...
 			let now = new Date()
 			let latency = now - sentAt
+			this.lastUpdated = now.getTime()
 
 			// ...and then just show that something failed.
 			let msg = `[${xhrName}] XHR error (${latency}ms)`
 			this.fail(msg);
 
-			$(`smiley-${this.row}-${this.col}`).innerHTML = Cell.smilies.confused
-			$(`cell-${this.row}-${this.col}`).style.opacity = 1.0
-			$(`cell-${this.row}-${this.col}`).style.background = "red"
-			$(`cell-${this.row}-${this.col}`).style.borderColor = "grey"
+			$(`cell-${this.row}-${this.col}`).style.opacity = 0.0
 
-			this.lastUpdated = now.getTime()
+			setTimeout(() => {
+				$(`smiley-${this.row}-${this.col}`).innerHTML = Cell.smilies.confused
+				$(`cell-${this.row}-${this.col}`).style.opacity = 1.0
+				$(`cell-${this.row}-${this.col}`).style.background = "red"
+				$(`cell-${this.row}-${this.col}`).style.borderColor = "grey"
+			}, 50)
+
+			this.reschedule(latency)
 		})
 
 		// Here's where we actually prep and send the request...
@@ -474,11 +540,11 @@ class Key {
 	constructor(keyDiv) {
 		let keyEntries = [
 			[ "smiling",  "green", "grey", "24px", "Success!" ],
+			[ "confused", "red",   "grey", "",     "Face service error" ],
 			[ "sleeping", "pink",  "grey", "",     "Timeout" ],
-			[ "kaboom",   "red",   "grey", "",     "Ratelimit" ],
-			[ "confused", "red",   "grey", "24px", "Composite error" ],
-			[ "smiling",  "grey",  "red",  "",     "Color error" ],
-			[ "cursing",  "green", "red",  "24px", "Face error" ],
+			[ "kaboom",   "red",   "grey", "24px", "Ratelimit" ],
+			[ "smiling",  "grey",  "red",  "",     "Color service error" ],
+			[ "cursing",  "green", "red",  "24px", "Smiley service error" ],
 			[ "-",        "-",     "-",    "",     "Slow service" ]
 		]
 
@@ -522,14 +588,14 @@ class Key {
 	}
 }
 
-class CellFader {
+class CellWatcher {
 	constructor(logger, sw, cells) {
 		this.logger = logger
 		this.sw = sw
 		this.cells = cells
 		this.count = 0
-		this.maxSolid = 2500
-		this.maxVisible = 4000
+		this.maxSolid = 2000
+		this.maxVisible = 2500
 
 		setInterval(() => { this.run() }, 200)
 	}
@@ -540,18 +606,26 @@ class CellFader {
 			return
 		}
 
+		let now = new Date().getTime()
+
 		this.count++
 
 		for (let cell of this.cells) {
 			if (cell.lastUpdated == 0) {
-				// if ((this.count < 10) && (cell == this.cells[0])) {
-				// 	this.logger.info("Fader: never updated")
-				// }
 				continue
 			}
 
-			let now = new Date().getTime()
 			let age = now - cell.lastUpdated
+			let cellCount = 0
+			let cellCountDiv = $(`cell-count-${cell.row}-${cell.col}`)
+
+			if (cellCountDiv != null) {
+				let cellCountText = cellCountDiv.innerHTML
+
+				if (cellCountText != "") {
+					cellCount = parseInt(cellCountText)
+				}
+			}
 
 			let opacity = 1.0
 
@@ -561,12 +635,18 @@ class CellFader {
 			else if (age > this.maxSolid) {
 				opacity = (this.maxVisible - age) / (this.maxVisible - this.maxSolid)
 			}
+			else {
+				if (cellCount > 0) {
+					opacity = 0.5
+				}
+			}
+
+			if (cellCount > 4) {
+				$(`smiley-${cell.row}-${cell.col}`).innerHTML = Cell.smilies.sleeping
+				$(`cell-${cell.row}-${cell.col}`).style.background = "pink"
+			}
 
 			$(`cell-${cell.row}-${cell.col}`).style.opacity = opacity
-
-			// if ((this.count < 10) && (cell == this.cells[0])) {
-			// 	this.logger.info(`Fader: age ${age}ms -> ${opacity}`)
-			// }
 		}
 	}
 }
@@ -604,7 +684,7 @@ class Markers {
 
 //////// XHR
 //
-// Fetcher is our real test class: fetch from the composite service and render the response
+// Fetcher is our real test class: fetch from the face service and render the response
 // in the UI.
 
 class Fetcher {
@@ -766,9 +846,9 @@ window.onload = () => {
 
 	let cells = []
 
-	for (row = 0; row < 5; row++) {
-		for (col = 0; col < 5; col++) {
-			let cell = new Cell(logger, sw, "composite/", $("cells"), row, col)
+	for (row = 0; row < 4; row++) {
+		for (col = 0; col < 4; col++) {
+			let cell = new Cell(logger, sw, `../face/cell/`, $("cells"), row, col)
 			cells.push(cell)
 		}
 		$("cells").innerHTML += "<br/>"
@@ -776,10 +856,12 @@ window.onload = () => {
 
 	key = new Key($("key"))
 
-	let fader = new CellFader(logger, sw, cells)
+	let watcher = new CellWatcher(logger, sw, cells)
+
+	sw.cells = cells
 
 	// let markers = new Markers($("markers"), 16)
-	// let q = new Fetcher(logger, markers, $("xhr"), "composite/")
+	// let q = new Fetcher(logger, markers, $("xhr"), `../face/cell/`)
 
 	// let timer = new Timer($("timer"), $("btnToggle"), 2, () => {
 	// 	q.run()

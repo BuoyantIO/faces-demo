@@ -3,7 +3,7 @@ apiVersion: linkerd.io/v1alpha2
 kind: ServiceProfile
 metadata:
   creationTimestamp: null
-  name: composite.faces.svc.cluster.local
+  name: face.faces.svc.cluster.local
   namespace: faces
 spec:
   routes:

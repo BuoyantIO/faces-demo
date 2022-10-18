@@ -2,12 +2,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: composite
+  name: face
   namespace: faces
 spec:
   type: ClusterIP
   selector:
-    service: composite
+    service: face
   ports:
   - port: 80
     targetPort: http
@@ -15,20 +15,20 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: composite
+  name: face
   namespace: faces
 spec:
   replicas: 1
   selector:
     matchLabels:
-      service: composite
+      service: face
   template:
     metadata:
       labels:
-        service: composite
+        service: face
     spec:
       containers:
-      - name: composite
+      - name: face
         image: DEV_REGISTRY/faces-service:FACES_SERVICE_VERSION
         imagePullPolicy: Always
         ports:
@@ -36,7 +36,7 @@ spec:
           containerPort: 8000
         env:
         - name: FACES_SERVICE
-          value: "composite"
+          value: "face"
         - name: ERROR_FRACTION
           value: "20"
         # - name: DELAY_BUCKETS
