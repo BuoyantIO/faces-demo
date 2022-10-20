@@ -128,8 +128,8 @@ yaml: k8s/faces-gui.yaml k8s/faces.yaml
 
 deploy: images k8s/faces-gui.yaml k8s/faces.yaml
 	kubectl create namespace faces || true
-	kubectl apply -n faces -f k8s
-	# @echo "You should now be able to open http://faces.example.com/ in your browser."
+	linkerd inject k8s | kubectl apply -n faces -f -
+	# @echo "You should now be able to open http://localhost/faces/ in your browser."
 
 # Sometimes we have a file-target that we want Make to always try to
 # re-generate (such as compiling a Go program; we would like to let
