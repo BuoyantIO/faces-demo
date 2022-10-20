@@ -22,6 +22,7 @@ import json
 import os
 import random
 import requests
+import threading
 import time
 
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
@@ -116,14 +117,71 @@ def delta_ms(start_time, end_time):
     return int(((end_time - start_time) * 1000) + .5)
 
 
+class RateCounter:
+    """
+    RateCounter counts events in an N-second window and averages them. It does this
+    by maintaining a (thread-safe) set of buckets, one per second, and providing a way
+    to increment the bucket's counters.
+    """
+
+    def __init__(self, number_of_buckets):
+        self.number_of_buckets = number_of_buckets
+        self.first_bucket = None
+        self.buckets = [0] * number_of_buckets
+        self.lock = threading.Lock()
+
+    def __str__(self) -> str:
+        with self.lock:
+            return f"RateCounter@{self.first_bucket}: {self.buckets}"
+
+    def current_rate(self):
+        """
+        Returns the current rate as a float.
+        """
+        with self.lock:
+            return sum(self.buckets) / self.number_of_buckets
+
+    def mark(self, now=None):
+        """
+        Mark that a request has happened.
+        """
+
+        if not now:
+            now = time.time()
+
+        with self.lock:
+            if not self.first_bucket:
+                self.first_bucket = now
+            
+            bucket = now - self.first_bucket
+
+            if bucket >= self.number_of_buckets:
+                # We've moved past the end of the buckets, so slide the whole
+                # window over.
+                number_past = bucket - self.number_of_buckets + 1
+
+                self.first_bucket += number_past
+
+                if number_past >= self.number_of_buckets:
+                    self.buckets = [0] * self.number_of_buckets
+                else:
+                    self.buckets = self.buckets[number_past:] + [0] * number_past
+
+                bucket = now - self.first_bucket
+
+            self.buckets[bucket] += 1
+
+
 class BaseServer(BaseHTTPRequestHandler):
     delay_buckets = []
     error_fraction = 0
+    max_rate = 0.0
 
     @classmethod
     def setup_from_environment(cls, *args, **kwargs):
         delay_buckets = os.environ.get("DELAY_BUCKETS", None)
         error_fraction = int(os.environ.get("ERROR_FRACTION", 0))
+        max_rate = float(os.environ.get("MAX_RATE", 0.0))
 
         if delay_buckets:
             for bucket_str in delay_buckets.split(","):
@@ -143,6 +201,16 @@ class BaseServer(BaseHTTPRequestHandler):
         cls.error_fraction = min(max(error_fraction, 0), 100)
 
         print(f"{cls.__name__}: error_fraction env {error_fraction} => {cls.error_fraction}")
+
+        cls.max_rate = max(max_rate, 0.0)
+
+        print(f"{cls.__name__}: max_rate env {max_rate} => {cls.max_rate}")
+
+        if cls.max_rate >= 0.1:
+            print(f"{cls.__name__}: max_rate is {cls.max_rate} requests per second, setting up rate counter")
+            cls.rate_counter = RateCounter(10)
+        else:
+            cls.rate_counter = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -213,9 +281,14 @@ class FaceServer(BaseServer):
 
     defaults = {
         "color": "grey",
-        "color-504": "pink",
         "smiley": Smileys["Cursing"],
+
+        "color-504": "pink",
         "smiley-504": Smileys["Sleeping"],
+
+        "color-ratelimit": "pink",
+        "smiley-ratelimit": Smileys["Kaboom"],
+
         "shape": """M14,15 m-5,-5 l10,10 m0,-10 l-10,10
                     M36,15 m-5,-5 l10,10 m0,-10 l-10,10
                     M10,34.5 c0,-7.5 30,-7.5 30,0""",
@@ -228,20 +301,39 @@ class FaceServer(BaseServer):
         rdict = {}
         errors = []
 
-        for svc, key in [ ( "color", "color" ), ( "smiley", "smiley" ) ]:
-            stat, value = self.make_request(svc, key)
+        if self.path == "/rl":
+            self.standard_response({"rl": self.__class__.rate_counter.current_rate()})
+            return
 
-            if stat != 200:
-                errors.append(f"{svc}: {stat}")
+        rate = 0.0
+        ratestr = None
 
-                for errkey in [ f"{svc}-{stat}", f"{svc}-{stat // 100}xx", svc ]:
-                    errval = self.defaults.get(errkey, None)
+        if self.__class__.rate_counter:
+            self.__class__.rate_counter.mark(int(start))
+            rate = self.__class__.rate_counter.current_rate()
+            ratestr = ", %.1f RPS" % rate
 
-                    if errval is not None:
-                        value = errval
-                        break
+        if rate >= self.__class__.max_rate:
+            rdict = {
+                "color": self.__class__.defaults["color-ratelimit"],
+                "smiley": self.__class__.defaults["smiley-ratelimit"],
+            }
+            errors.append("ratelimit")
+        else:
+            for svc, key in [ ( "color", "color" ), ( "smiley", "smiley" ) ]:
+                stat, value = self.make_request(svc, key)
 
-            rdict[key] = value
+                if stat != 200:
+                    errors.append(f"{svc}: {stat}")
+
+                    for errkey in [ f"{svc}-{stat}", f"{svc}-{stat // 100}xx", svc ]:
+                        errval = self.defaults.get(errkey, None)
+
+                        if errval is not None:
+                            value = errval
+                            break
+
+                rdict[key] = value
 
         end = time.time()
         latency_ms = delta_ms(start, end)
@@ -249,7 +341,7 @@ class FaceServer(BaseServer):
         if errors:
             rdict["errors"] = errors
 
-        print(f"face ({latency_ms}): errors {errors}")
+        print(f"face ({latency_ms}{ratestr}): errors {errors} rdict {rdict}")
 
         self.standard_response(rdict)
 

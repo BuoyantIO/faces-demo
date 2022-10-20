@@ -29,7 +29,7 @@ spec:
     spec:
       containers:
       - name: face
-        image: dwflynn/faces-service:0.3.0
+        image: dwflynn/faces-service:0.4.4
         imagePullPolicy: Always
         ports:
         - name: http
@@ -72,7 +72,7 @@ spec:
     spec:
       containers:
       - name: smiley
-        image: dwflynn/faces-service:0.3.0
+        image: dwflynn/faces-service:0.4.4
         imagePullPolicy: Always
         ports:
         - name: http
@@ -115,7 +115,7 @@ spec:
     spec:
       containers:
       - name: color
-        image: dwflynn/faces-service:0.3.0
+        image: dwflynn/faces-service:0.4.4
         imagePullPolicy: Always
         ports:
         - name: http

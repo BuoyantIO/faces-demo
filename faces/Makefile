@@ -18,7 +18,7 @@
 SHELL=bash
 
 FACES_GUI_VERSION=0.3.0
-FACES_SERVICE_VERSION=0.3.0
+FACES_SERVICE_VERSION=0.4.4
 
 help:
 	@echo "'make images' will build the Docker images for the Faces GUI"
