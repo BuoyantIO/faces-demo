@@ -1,0 +1,68 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ratelimit-example
+  namespace: default
+spec:
+  selector:
+    app: ratelimit-example
+  ports:
+    - name: http
+      port: 5000
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ratelimit-example
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ratelimit-example
+  template:
+    metadata:
+      labels:
+        app: ratelimit-example
+    spec:
+      containers:
+      - name: ratelimit-example
+        image: docker.io/danielbryantuk/ratelimit-example:v4
+        imagePullPolicy: Always
+        ports:
+          - name: http
+            containerPort: 5000
+        resources:
+          limits:
+            memory: "64Mi"
+            cpu: "250m"
+---
+apiVersion: getambassador.io/v3alpha1
+kind: RateLimitService
+metadata:
+  name: ratelimit-example
+spec:
+  service: "ratelimit-example.default:5000"
+  protocol_version: v3 # Required in emissary-ingress v3.0.0+
+  domain: emissary # override defaul "ratelimt" domain see docs for details
+  failure_mode_deny: true # forces 500 response if unable to talk with RateLimitService
+
+# Example Mapping with Rate Limiting using a simple 1rps rate limiter
+# ---
+# apiVersion: getambassador.io/v3alpha1
+# kind: Mapping
+# metadata:
+#   name: face-mapping
+# spec:
+#   hostname: "*"
+#   prefix: /face/
+#   service: face.faces
+#   timeout_ms: 0
+#   labels:
+#     emissary:
+#       - request_label_group:
+#         - x-emissary-test-allow:
+#           generic_key:
+#              key: mykey
+#              value: myvalue
