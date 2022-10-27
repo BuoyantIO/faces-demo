@@ -1,0 +1,56 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ratelimit
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ratelimit
+  namespace: ratelimit
+spec:
+  selector:
+    app: ratelimit
+  ports:
+    - name: http
+      port: 5000
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ratelimit
+  namespace: ratelimit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ratelimit
+  template:
+    metadata:
+      labels:
+        app: ratelimit
+    spec:
+      containers:
+      - name: ratelimit
+        image: docker.io/danielbryantuk/ratelimit-example:v6
+        imagePullPolicy: Always
+        ports:
+          - name: http
+            containerPort: 5000
+        resources:
+          limits:
+            memory: "64Mi"
+            cpu: "250m"
+---
+apiVersion: getambassador.io/v3alpha1
+kind: RateLimitService
+metadata:
+  name: ratelimit
+  namespace: ratelimit
+spec:
+  service: "ratelimit.ratelimit:5000"
+  protocol_version: v3 # Required in emissary-ingress v3.0.0+
+  domain: emissary # override defaul "ratelimt" domain see docs for details
+  # failure_mode_deny: true # forces 500 response if unable to talk with RateLimitService

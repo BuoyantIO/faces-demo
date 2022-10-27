@@ -1,4 +1,4 @@
-#!/bin/env bash
+#!/usr/bin/env bash
 #
 # SPDX-FileCopyrightText: 2022 Buoyant Inc.
 # SPDX-License-Identifier: Apache-2.0
@@ -50,13 +50,13 @@ linkerd check
 
 #@wait
 #@clear
-# Next up: install Emissary-ingress 3.2.0 as the ingress. This is mostly following
+# Next up: install Emissary-ingress 3.1.0 as the ingress. This is mostly following
 # the quickstart, but we force every Deployment to one replica to reduce the load
 # on k3d.
 
 #### EMISSARY_INSTALL_START
-EMISSARY_CRDS=https://app.getambassador.io/yaml/emissary/3.2.0/emissary-crds.yaml
-EMISSARY_INGRESS=https://app.getambassador.io/yaml/emissary/3.2.0/emissary-emissaryns.yaml
+EMISSARY_CRDS=https://app.getambassador.io/yaml/emissary/3.1.0/emissary-crds.yaml
+EMISSARY_INGRESS=https://app.getambassador.io/yaml/emissary/3.1.0/emissary-emissaryns.yaml
 
 kubectl create namespace emissary && \
 curl --proto '=https' --tlsv1.2 -sSfL $EMISSARY_CRDS | \
@@ -85,8 +85,4 @@ kubectl apply -f emissary-yaml
 # Install its ServiceProfiles and Mappings too: all of these things are in
 # the k8s directory.
 
-#### FACES_INSTALL_START
-kubectl create ns faces
-
-linkerd inject k8s | kubectl apply -f -
-#### FACES_INSTALL_END
+$SHELL reset.sh

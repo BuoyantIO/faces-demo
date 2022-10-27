@@ -39,4 +39,8 @@ k3d cluster create $CLUSTER \
 
 #@wait
 #@HIDE
-$SHELL $SETUP
+
+# if [ -f images.tar ]; then k3d image import -c ${CLUSTER} images.tar; fi
+# #@wait
+
+# $SHELL $SETUP

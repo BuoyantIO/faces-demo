@@ -1,0 +1,15 @@
+---
+apiVersion: getambassador.io/v3alpha1
+kind: Mapping
+metadata:
+  name: smiley-mapping
+  namespace: faces
+spec:
+  hostname: "*"
+  prefix: /smiley/
+  service: smiley.faces
+  timeout_ms: 0
+  retry_policy:
+    retry_on: 5xx
+    num_retries: 1
+
