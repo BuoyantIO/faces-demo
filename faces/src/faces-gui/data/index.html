@@ -195,6 +195,8 @@
 <H1>Faces</H1>
 
 <input id="btnToggle" type="button" value="Init..." class="roundedButton margins" />
+<input id="btnCounters" type="button" value="Init..." class="roundedButton margins" />
+
 <div id="timer" class="inline margins"></div>
 
 <div id="main">
@@ -277,11 +279,11 @@ class Logger {
 	}
 }
 
-//////// Switch
+//////// StartStop
 //
-// Switch is a class to manage an on/off button. Very fancy, I know.
+// StartStop is a class to manage an on/off button. Very fancy, I know.
 
-class Switch {
+class StartStop {
 	constructor(button) {
 		this.button = button	// not an ID, the button itself
 		this.button.onclick = () => { this.toggle() }
@@ -316,6 +318,42 @@ class Switch {
 	}
 }
 
+//////// CounterSwitch
+//
+// CounterSwitch is a class to manage an on/off button. Very fancy, I know.
+
+class CounterSwitch {
+	constructor(button, startLabel, stopLabel, onstart, onstop) {
+		this.button = button	// not an ID, the button itself
+		this.button.onclick = () => { this.toggle() }
+		this.startLabel = startLabel
+		this.stopLabel = stopLabel
+		this.onstart = () => { onstart(this) }
+		this.onstop = () => { onstop(this) }
+		this.start()
+	}
+
+	toggle() {
+		if (this.active) {
+			this.stop()
+		}
+		else {
+			this.start()
+		}
+	}
+
+	start() {
+		this.active = true
+		this.button.value = this.startLabel
+		this.onstart()
+	}
+
+	stop() {
+		this.active = false
+		this.button.value = this.stopLabel
+		this.onstop()
+	}
+}
 
 //////// Cell
 //
@@ -369,7 +407,10 @@ class Cell {
 
 		this.interval = 2000	// ms
 
-		setTimeout(() => { this.run() }, row * col * 200)
+		let rowInterval = Math.floor(this.interval / 4)
+		let colInterval = Math.floor(this.interval / 16)
+
+		setTimeout(() => { this.run() }, (row * rowInterval) + (col * colInterval))
 	}
 
 	// Helpers to save on keystrokes
@@ -425,10 +466,11 @@ class Cell {
 			let bgColor = "grey"
 			let errors = "unknown"
 			let borderColor = "grey"
+			let text = xhr.responseText
 
 			// ...then check the status code.
-			if (xhr.status == 504) {
-				// 504 is a timeout. Bump the counter in the cell.
+			if ((xhr.status == 504) || (xhr.status == 429)) {
+				// 504 is a timeout; 429 is a ratelimit. Bump the counter in the cell.
 				let currCountText = $(`cell-count-${this.row}-${this.col}`).innerHTML
 				let count = 0
 
@@ -452,12 +494,7 @@ class Cell {
 			// counter.
 			$(`cell-count-${this.row}-${this.col}`).innerHTML = ""
 
-			if (xhr.status != 200) {
-				smiley = Cell.smilies.confused
-				bgColor = "red"
-				errors = `overall ${xhr.status}`
-			}
-			else {
+			if (xhr.status == 200) {
 				// Parse JSON!
 				try {
 					let obj = JSON.parse(xhr.responseText)
@@ -486,6 +523,20 @@ class Cell {
 						errors = "unknown error"
 					}
 				}
+			}
+			else if (Math.floor(xhr.status / 100) == 5) {
+				// 5yz. Server error.
+				smiley = Cell.smilies.confused
+				bgColor = "red"
+				errors = "server error"
+			}
+
+			if (smiley == undefined) {
+				smiley = Cell.smilies.upset
+			}
+
+			if (bgColor == undefined) {
+				bgColor = "purple"
 			}
 
 			// FINALLY: show 'em what we got.
@@ -560,7 +611,7 @@ class Key {
 			[ "smiling",  "green", "grey", "24px", "Success!" ],
 			[ "confused", "red",   "grey", "",     "Face service error" ],
 			[ "sleeping", "pink",  "grey", "",     "Timeout" ],
-			[ "kaboom",   "red",   "grey", "24px", "Ratelimit" ],
+			[ "kaboom",   "red",   "grey", "24px", "Service overwhelmed" ],
 			[ "smiling",  "grey",  "red",  "",     "Color service error" ],
 			[ "cursing",  "green", "red",  "24px", "Smiley service error" ],
 			[ "-",        "-",     "-",    "",     "Slow service" ]
@@ -653,15 +704,16 @@ class CellWatcher {
 			else if (age > this.maxSolid) {
 				opacity = (this.maxVisible - age) / (this.maxVisible - this.maxSolid)
 			}
-			else {
-				if (cellCount > 0) {
-					opacity = 0.5
-				}
-			}
+			// else {
+			// 	if (cellCount > 0) {
+			// 		opacity = 0.5
+			// 	}
+			// }
 
 			if (cellCount > 4) {
 				$(`smiley-${cell.row}-${cell.col}`).innerHTML = Cell.smilies.sleeping
 				$(`cell-${cell.row}-${cell.col}`).style.background = "pink"
+				opacity = 0.2
 			}
 
 			$(`cell-${cell.row}-${cell.col}`).style.opacity = opacity
@@ -748,7 +800,7 @@ class Fetcher {
 			if (xhr.status == 504) {
 				text = `Timeout after ${latency}ms`
 				shape = "19.000,49.000 31.000,49.000 31.000,1.000 19.000,1.000"
-				fgColor = "pink"
+				fgColor = "cyan"
 			}
 			else if (xhr.status != 200) {
 				text = `Unknown status ${xhr.status} after ${latency}ms`
@@ -851,6 +903,8 @@ class Fetcher {
 
 
 
+
+
 //////// Mainline
 //
 // When the page loads, we set up the world and fire up a timer to get things
@@ -860,7 +914,24 @@ window.onload = () => {
 
 	logger.info(`Page loaded`)
 
-	let sw = new Switch($("btnToggle"))
+	let sw = new StartStop($("btnToggle"))
+	let enableCounters = new CounterSwitch(
+		$("btnCounters"), "Hide", "Show",
+		() => {
+			for (let rule of document.styleSheets[0].cssRules) {
+				if (rule.selectorText == ".cell-count") {
+					rule.style.opacity = 1
+				}
+			}
+		},
+		() => {
+			for (let rule of document.styleSheets[0].cssRules) {
+				if (rule.selectorText == ".cell-count") {
+					rule.style.opacity = 0
+				}
+			}
+		}		
+	)
 
 	let cells = []
 

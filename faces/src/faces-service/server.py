@@ -305,20 +305,23 @@ class FaceServer(BaseServer):
             self.standard_response({"rl": self.__class__.rate_counter.current_rate()})
             return
 
-        rate = 0.0
-        ratestr = None
+        ratestr = ""
+        ratelimited = False
 
         if self.__class__.rate_counter:
             self.__class__.rate_counter.mark(int(start))
             rate = self.__class__.rate_counter.current_rate()
             ratestr = ", %.1f RPS" % rate
 
-        if rate >= self.__class__.max_rate:
-            rdict = {
-                "color": self.__class__.defaults["color-ratelimit"],
-                "smiley": self.__class__.defaults["smiley-ratelimit"],
-            }
-            errors.append("ratelimit")
+            if rate >= self.__class__.max_rate:
+                ratelimited = True
+
+        if ratelimited:
+                rdict = {
+                    "color": self.__class__.defaults["color-ratelimit"],
+                    "smiley": self.__class__.defaults["smiley-ratelimit"],
+                }
+                errors.append("ratelimit")
         else:
             for svc, key in [ ( "color", "color" ), ( "smiley", "smiley" ) ]:
                 stat, value = self.make_request(svc, key)
