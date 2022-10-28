@@ -85,4 +85,8 @@ kubectl apply -f emissary-yaml
 # Install its ServiceProfiles and Mappings too: all of these things are in
 # the k8s directory.
 
-$SHELL reset.sh
+#### FACES_INSTALL_START
+kubectl create ns faces
+
+linkerd inject k8s/01-base | kubectl apply -f -
+#### FACES_INSTALL_END
