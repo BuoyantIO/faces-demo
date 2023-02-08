@@ -152,7 +152,7 @@ class RateCounter:
         with self.lock:
             if not self.first_bucket:
                 self.first_bucket = now
-            
+
             bucket = now - self.first_bucket
 
             if bucket >= self.number_of_buckets:
@@ -276,7 +276,7 @@ class FaceServer(BaseServer):
     # The face server is a bit more complicated. It makes requests to the
     # color service and the smiley service, and coalesces the results into a
     # single response.
-    # 
+    #
     # We have defaults for all the services.
 
     defaults = {
