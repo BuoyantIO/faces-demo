@@ -17,25 +17,26 @@
 
 SHELL=bash
 
-FACES_GUI_VERSION=0.5.0
-FACES_SERVICE_VERSION=0.5.0
+FACES_GUI_VERSION=0.6.0
+FACES_SERVICE_VERSION=0.6.0
 
 BASEDIR=k8s/01-base
 
 help:
 	@echo "'make images' will build the Docker images for the Faces GUI"
-	@echo "(version $(FACES_GUI_VERSION) and the Faces service (version $(FACES_SERVICE_VERSION))."
+	@echo "(version $(FACES_GUI_VERSION)) and the Faces service (version $(FACES_SERVICE_VERSION))."
 	@echo "Make sure you update the versions in the Makefile when you change"
 	@echo "the images, or Kubernetes might get confused. You will need to"
 	@echo "have the DEV_REGISTRY variable set when doing this."
 	@echo ""
-	@echo "'make yaml' will build `$(BASEDIR)/faces-gui.yaml` and `$(BASEDIR)/faces.yaml`,"
-	@echo "suitable for feeding to kubectl apply. These will create Kubernetes"
-	@echo "Services and Deployments for the Faces GUI and its microservices."
-	@echo "No namespace is stamped into the YAML, so you can use whatever"
-	@echo "namespace you like when you apply it."
+	@echo "'make yaml' will build $(BASEDIR)/faces-gui.yaml and"
+	@echo "$(BASEDIR)/faces.yaml, suitable for feeding to kubectl apply."
+	@echo "These will create Kubernetes Services and Deployments for the"
+	@echo "Faces GUI and its microservices. No namespace is stamped into"
+	@echo "the YAML, so you can use whatever namespace you like when you"
+	@echo "apply it."
 	@echo ""
-	@echo "'make deploy' will build and apply the `k8s` YAML into the `faces`"
+	@echo "'make deploy' will build and apply the k8s YAML into the faces"
 	@echo "namespace. This should be safe to do repeatedly."
 	@echo ""
 	@echo "You can also 'make clean' to remove all the Docker-image stuff,"
@@ -67,15 +68,15 @@ oci/python.img: | oci
 oci/faces-gui.layer: oci src/faces-gui/data/index.html src/faces-gui/start
 	ocibuild layer dir --prefix application src/faces-gui > oci/faces-gui.layer
 
-oci/faces-gui.img: oci/python.img oci/faces-gui.layer
-	ocibuild image build \
-		--base oci/python.img \
-		--config.Entrypoint /application/start \
-		--tag $(DEV_REGISTRY)/faces-gui:$(FACES_GUI_VERSION) \
-		oci/faces-gui.layer \
-		> oci/faces-gui.img
-	docker load -i oci/faces-gui.img
-	docker push $(DEV_REGISTRY)/faces-gui:$(FACES_GUI_VERSION)
+# oci/faces-gui.img: oci/python.img oci/faces-gui.layer
+# 	ocibuild image build \
+# 		--base oci/python.img \
+# 		--config.Entrypoint /application/start \
+# 		--tag $(DEV_REGISTRY)/faces-gui:$(FACES_GUI_VERSION) \
+# 		oci/faces-gui.layer \
+# 		> oci/faces-gui.img
+# 	docker load -i oci/faces-gui.img
+# 	docker push $(DEV_REGISTRY)/faces-gui:$(FACES_GUI_VERSION)
 
 PYTHON_LAYERS = \
 	oci/urllib3-1.26.12-py2.py3-none-any.layer \
@@ -101,6 +102,17 @@ oci/squashed-python.layer: $(PYTHON_LAYERS)
 
 oci/faces-service.layer: oci src/faces-service/server.py
 	ocibuild layer dir --prefix faces-service src/faces-service > oci/faces-service.layer
+
+oci/faces-gui.img: oci/python.img oci/faces-service.layer oci/squashed-python.layer oci/faces-gui.layer
+	ocibuild image build \
+		--base oci/python.img \
+		--config.Entrypoint /faces-service/server.py \
+		--config.Env.append FACES_SERVICE=gui \
+		--tag $(DEV_REGISTRY)/faces-gui:$(FACES_GUI_VERSION) \
+		oci/squashed-python.layer oci/faces-service.layer oci/faces-gui.layer \
+		> oci/faces-gui.img
+	docker load -i oci/faces-gui.img
+	docker push $(DEV_REGISTRY)/faces-gui:$(FACES_SERVICE_VERSION)
 
 oci/faces-service.img: oci/python.img oci/faces-service.layer oci/squashed-python.layer
 	ocibuild image build \

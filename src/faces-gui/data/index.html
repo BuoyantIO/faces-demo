@@ -3,15 +3,15 @@
 	<!--
 	SPDX-FileCopyrightText: 2022 Buoyant Inc.
 	SPDX-License-Identifier: Apache-2.0
-	
+
 	Copyright 2022 Buoyant Inc.
-	
+
 	Licensed under the Apache License, Version 2.0 (the "License"); you may
 	not use this file except in compliance with the License.  You may obtain
 	a copy of the License at
-	
+
 	     http:#www.apache.org/licenses/LICENSE-2.0
-	
+
 	Unless required by applicable law or agreed to in writing, software
 	distributed under the License is distributed on an "AS IS" BASIS,
 	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -138,7 +138,7 @@
 		.qtext.ellipsis::after {
 			content: "...";
 			position: absolute;
-			right: -12px; 
+			right: -12px;
 			bottom: 4px;
 		}
 
@@ -182,7 +182,7 @@
 
 		.roundedButton {
 			border-radius: 7px;
-			width: 5em; 
+			width: 5em;
 		}
 
 		.log {
@@ -190,12 +190,13 @@
 			padding-top: .3em;
 		}
 	</style>
-</HEAD><BODY>
+</HEAD><BODY style="background-color: %%{color}">
 
 <H1>Faces</H1>
 
 <input id="btnToggle" type="button" value="Init..." class="roundedButton margins" />
 <input id="btnCounters" type="button" value="Init..." class="roundedButton margins" />
+<div id="userDiv" class="inline margins"></div>
 
 <div id="timer" class="inline margins"></div>
 
@@ -228,11 +229,11 @@ function $(id) {
 function getCookie(name) {
     // Split cookie string and get all individual name=value pairs in an array
     var cookieArr = document.cookie.split(";");
-    
+
     // Loop through the array elements
     for(var i = 0; i < cookieArr.length; i++) {
         var cookiePair = cookieArr[i].split("=");
-        
+
         /* Removing whitespace at the beginning of the cookie name
         and compare it with the given string */
         if(name == cookiePair[0].trim()) {
@@ -240,7 +241,7 @@ function getCookie(name) {
             return decodeURIComponent(cookiePair[1]);
         }
     }
-    
+
     // Return null if not found
     return null;
 }
@@ -284,9 +285,10 @@ class Logger {
 // StartStop is a class to manage an on/off button. Very fancy, I know.
 
 class StartStop {
-	constructor(button) {
+	constructor(button, userControl) {
 		this.button = button	// not an ID, the button itself
 		this.button.onclick = () => { this.toggle() }
+		this.userControl = userControl
 		this.cells = undefined
 		this.start()
 	}
@@ -297,7 +299,7 @@ class StartStop {
 		}
 		else {
 			this.start()
-			
+
 			if (this.cells != undefined) {
 				for (let cell of this.cells) {
 					// console.log(`start cell ${cell.row}-${cell.col}`)
@@ -316,6 +318,29 @@ class StartStop {
 		this.active = false
 		this.button.value = "Start"
 	}
+}
+
+//////// UserController
+//
+// UserController is a class to (totally insecurely) manage the username.
+
+class UserController {
+	constructor(logger, userDiv, initialUser, onchange) {
+		this.userDiv = userDiv	// not an ID, the div itself
+		// this.button.onclick = () => { this.toggle() }
+		this.user = initialUser
+		this.start()
+	}
+
+	start() {
+		this.userDiv.innerHTML = `<span class="grey">User: ${this.user}</span>`
+	}
+
+	// stop() {
+	// 	this.active = false
+	// 	this.button.value = this.stopLabel
+	// 	this.onstop()
+	// }
 }
 
 //////// CounterSwitch
@@ -591,6 +616,7 @@ class Cell {
 		let now = new Date().toISOString()
 		xhr.open("GET", `${this.fetchURL}?row=${this.row}&col=${this.col}&now=${now}`);
 	    xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+	    xhr.setRequestHeader("X-Faces-User", this.sw.userControl.user);
 
 		// We must send credentials...
 		xhr.withCredentials = true
@@ -765,7 +791,7 @@ class Fetcher {
 		this.fetchURL = fetchURL	// URL to fetch
 
 		this.count = 0				// How many requests have we done?
-		this.lastXSRF = undefined	// Last XSRF value we saw		
+		this.lastXSRF = undefined	// Last XSRF value we saw
 		this.sentAt = undefined		// When we last sent a request
 	}
 
@@ -910,11 +936,21 @@ class Fetcher {
 // When the page loads, we set up the world and fire up a timer to get things
 // moving.
 window.onload = () => {
+	let initialUser = "%%{user}";
 	let logger = new Logger($("log"))
 
-	logger.info(`Page loaded`)
+	logger.info(`Page loaded; user ${initialUser}`)
+	logger.info(`User-Agent: %%{user_agent}`)
 
-	let sw = new StartStop($("btnToggle"))
+	let userControl = new UserController(
+		logger, $("userDiv"), initialUser,
+		(user) => {
+			logger.info(`User changed to ${user}`)
+		}
+	)
+
+	let sw = new StartStop($("btnToggle"), userControl)
+
 	let enableCounters = new CounterSwitch(
 		$("btnCounters"), "Hide", "Show",
 		() => {
@@ -930,7 +966,7 @@ window.onload = () => {
 					rule.style.opacity = 0
 				}
 			}
-		}		
+		}
 	)
 
 	let cells = []

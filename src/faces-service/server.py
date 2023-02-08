@@ -26,15 +26,19 @@ import threading
 import time
 
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+from string import Template
 
 HOST_NAME = ""
 PORT_NUMBER = 8000
 
 Smileys = {
-    "Smiling":  "&#x1F603;",
-    "Sleeping": "&#x1F634;",
-    "Cursing":  "&#x1F92C;",
-    "Kaboom":   "&#x1F92F;",
+    "Smiling":     "&#x1F603;",
+    "Sleeping":    "&#x1F634;",
+    "Cursing":     "&#x1F92C;",
+    "Kaboom":      "&#x1F92F;",
+    "HeartEyes":   "&#x1F60D;",
+    "RollingEyes": "&#x1F644;",
+    "Screaming":   "&#x1F631;",
 }
 
 SHAPES = [
@@ -152,7 +156,7 @@ class RateCounter:
         with self.lock:
             if not self.first_bucket:
                 self.first_bucket = now
-            
+
             bucket = now - self.first_bucket
 
             if bucket >= self.number_of_buckets:
@@ -176,6 +180,7 @@ class BaseServer(BaseHTTPRequestHandler):
     delay_buckets = []
     error_fraction = 0
     max_rate = 0.0
+    error_text = "Error fraction triggered"
 
     @classmethod
     def setup_from_environment(cls, *args, **kwargs):
@@ -231,7 +236,7 @@ class BaseServer(BaseHTTPRequestHandler):
 
         if self.__class__.error_fraction > 0:
             if random.randint(0, 99) <= self.__class__.error_fraction:
-                self.send_error(500, "Error fraction triggered")
+                self.send_error(500, self.__class__.error_text)
                 return
 
         response = {
@@ -249,6 +254,8 @@ class BaseServer(BaseHTTPRequestHandler):
     def standard_headers(self):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
+        self.send_header("X-Faces-User", self.headers.get("x-faces-user", "unknown"))
+        self.send_header("User-Agent", self.headers.get("user-agent", "unknown"))
         self.end_headers()
 
 
@@ -259,7 +266,12 @@ class ShapeServer(BaseServer):
 
 class ColorServer(BaseServer):
     def do_GET(self):
-        self.standard_response({"color": random.choice(COLORS)})
+        color = os.environ.get("COLOR", None)
+
+        if color is None:
+            color = random.choice(COLORS)
+
+        self.standard_response({"color": color})
 
 
 class QuoteServer(BaseServer):
@@ -269,14 +281,22 @@ class QuoteServer(BaseServer):
 
 class SmileyServer(BaseServer):
     def do_GET(self):
-        self.standard_response({"smiley": Smileys["Smiling"]})
+        smiley_name = os.environ.get("SMILEY", None)
+
+        if smiley_name and (smiley_name not in Smileys):
+            smiley_name = "RollingEyes"
+
+        if not smiley_name:
+            smiley_name = "Smiling"
+
+        self.standard_response({"smiley": Smileys[smiley_name]})
 
 
 class FaceServer(BaseServer):
     # The face server is a bit more complicated. It makes requests to the
     # color service and the smiley service, and coalesces the results into a
     # single response.
-    # 
+    #
     # We have defaults for all the services.
 
     defaults = {
@@ -352,8 +372,13 @@ class FaceServer(BaseServer):
         start = time.time()
 
         url = f"http://{service}/"
+        user = self.headers.get("x-faces-user", "unknown")
+        user_agent = self.headers.get("user-agent", "unknown")
 
-        response = requests.get(url)
+        response = requests.get(url, headers={
+            "X-Faces-User": user,
+            "User-Agent": user_agent
+        })
 
         end = time.time()
 
@@ -377,6 +402,75 @@ class FaceServer(BaseServer):
         return 200, value
 
 
+class GUITemplate(Template):
+    delimiter = "%%"
+
+class GUIServer(BaseServer):
+    # The GUI server is here so that we can induce failures, and so that we
+    # can grab the X-Faces-User header from the request and pass it into the
+    # UI.
+
+    error_text = f"""
+        <html><head><title>ERROR!</title></head>
+        <body><h1>ERROR!</h1>
+            <p style="font-size: 128pt; margin: 0;">{Smileys['Screaming']}</p>
+        </body></html>
+    """
+
+    # While this is all one file, all these classes get instantiated no matter
+    # what server is going to run, so we need to allow for the index file not
+    # being present.
+    template = error_text
+
+    try:
+        template = GUITemplate(open("/application/data/index.html").read())
+    except FileNotFoundError:
+        pass
+
+    def do_GET(self):
+        start = time.time()
+
+        user = self.headers.get("x-faces-user", "unknown")
+        user_agent = self.headers.get("user-agent", "unknown")
+
+        # Is there a color set for this user?
+        color_name = f"COLOR_{user}"
+        color = os.environ.get(color_name, "white")
+
+        rcode = 404
+        rtext = self.__class__.error_text
+
+        # It turns out that self.send_error() can't really return a body
+        # with a 500, so we handle that inline here.
+
+        failed = False
+
+        if self.__class__.error_fraction > 0:
+            if random.randint(0, 99) <= self.__class__.error_fraction:
+                rcode = 500
+                failed = True
+
+        if (not failed) and (self.path == "/"):
+            rcode = 200
+            rtext = self.template.safe_substitute(
+                color=color,
+                user=user,
+                user_agent=user_agent,
+            )
+
+        end = time.time()
+        latency_ms = delta_ms(start, end)
+
+        self.send_response(rcode)
+        self.send_header("Content-type", "text/html")
+        self.send_header("X-Faces-User", user)
+        self.send_header("X-Faces-User-Agent", user_agent)
+        self.send_header("X-Faces-Latency", latency_ms)
+        self.end_headers()
+
+        self.wfile.write(rtext.encode("utf-8"))
+
+
 if __name__ == '__main__':
     import sys
 
@@ -395,6 +489,7 @@ if __name__ == '__main__':
         "quote": QuoteServer,
         "smiley": SmileyServer,
         "face": FaceServer,
+        "gui": GUIServer,
     }
 
     server_class = servers.get(server_type, None)
