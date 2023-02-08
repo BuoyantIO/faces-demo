@@ -31,10 +31,12 @@ HOST_NAME = ""
 PORT_NUMBER = 8000
 
 Smileys = {
-    "Smiling":  "&#x1F603;",
-    "Sleeping": "&#x1F634;",
-    "Cursing":  "&#x1F92C;",
-    "Kaboom":   "&#x1F92F;",
+    "Smiling":     "&#x1F603;",
+    "Sleeping":    "&#x1F634;",
+    "Cursing":     "&#x1F92C;",
+    "Kaboom":      "&#x1F92F;",
+    "HeartEyes":   "&#x1F60D;",
+    "RollingEyes": "&#x1F644;",
 }
 
 SHAPES = [
@@ -261,7 +263,12 @@ class ShapeServer(BaseServer):
 
 class ColorServer(BaseServer):
     def do_GET(self):
-        self.standard_response({"color": random.choice(COLORS)})
+        color = os.environ.get("COLOR", None)
+
+        if color is None:
+            color = random.choice(COLORS)
+
+        self.standard_response({"color": color})
 
 
 class QuoteServer(BaseServer):
@@ -271,7 +278,15 @@ class QuoteServer(BaseServer):
 
 class SmileyServer(BaseServer):
     def do_GET(self):
-        self.standard_response({"smiley": Smileys["Smiling"]})
+        smiley_name = os.environ.get("SMILEY", None)
+
+        if smiley_name and (smiley_name not in Smileys):
+            smiley_name = "RollingEyes"
+
+        if not smiley_name:
+            smiley_name = "Smiling"
+
+        self.standard_response({"smiley": Smileys[smiley_name]})
 
 
 class FaceServer(BaseServer):
