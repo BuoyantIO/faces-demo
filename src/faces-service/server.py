@@ -26,6 +26,7 @@ import threading
 import time
 
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+from string import Template
 
 HOST_NAME = ""
 PORT_NUMBER = 8000
@@ -37,6 +38,7 @@ Smileys = {
     "Kaboom":      "&#x1F92F;",
     "HeartEyes":   "&#x1F60D;",
     "RollingEyes": "&#x1F644;",
+    "Screaming":   "&#x1F631;",
 }
 
 SHAPES = [
@@ -178,6 +180,7 @@ class BaseServer(BaseHTTPRequestHandler):
     delay_buckets = []
     error_fraction = 0
     max_rate = 0.0
+    error_text = "Error fraction triggered"
 
     @classmethod
     def setup_from_environment(cls, *args, **kwargs):
@@ -233,7 +236,7 @@ class BaseServer(BaseHTTPRequestHandler):
 
         if self.__class__.error_fraction > 0:
             if random.randint(0, 99) <= self.__class__.error_fraction:
-                self.send_error(500, "Error fraction triggered")
+                self.send_error(500, self.__class__.error_text)
                 return
 
         response = {
@@ -399,6 +402,75 @@ class FaceServer(BaseServer):
         return 200, value
 
 
+class GUITemplate(Template):
+    delimiter = "%%"
+
+class GUIServer(BaseServer):
+    # The GUI server is here so that we can induce failures, and so that we
+    # can grab the X-Faces-User header from the request and pass it into the
+    # UI.
+
+    error_text = f"""
+        <html><head><title>ERROR!</title></head>
+        <body><h1>ERROR!</h1>
+            <p style="font-size: 128pt; margin: 0;">{Smileys['Screaming']}</p>
+        </body></html>
+    """
+
+    # While this is all one file, all these classes get instantiated no matter
+    # what server is going to run, so we need to allow for the index file not
+    # being present.
+    template = error_text
+
+    try:
+        template = GUITemplate(open("/application/data/index.html").read())
+    except FileNotFoundError:
+        pass
+
+    def do_GET(self):
+        start = time.time()
+
+        user = self.headers.get("x-faces-user", "unknown")
+        user_agent = self.headers.get("user-agent", "unknown")
+
+        # Is there a color set for this user?
+        color_name = f"COLOR_{user}"
+        color = os.environ.get(color_name, "white")
+
+        rcode = 404
+        rtext = self.__class__.error_text
+
+        # It turns out that self.send_error() can't really return a body
+        # with a 500, so we handle that inline here.
+
+        failed = False
+
+        if self.__class__.error_fraction > 0:
+            if random.randint(0, 99) <= self.__class__.error_fraction:
+                rcode = 500
+                failed = True
+
+        if (not failed) and (self.path == "/"):
+            rcode = 200
+            rtext = self.template.safe_substitute(
+                color=color,
+                user=user,
+                user_agent=user_agent,
+            )
+
+        end = time.time()
+        latency_ms = delta_ms(start, end)
+
+        self.send_response(rcode)
+        self.send_header("Content-type", "text/html")
+        self.send_header("X-Faces-User", user)
+        self.send_header("X-Faces-User-Agent", user_agent)
+        self.send_header("X-Faces-Latency", latency_ms)
+        self.end_headers()
+
+        self.wfile.write(rtext.encode("utf-8"))
+
+
 if __name__ == '__main__':
     import sys
 
@@ -417,6 +489,7 @@ if __name__ == '__main__':
         "quote": QuoteServer,
         "smiley": SmileyServer,
         "face": FaceServer,
+        "gui": GUIServer,
     }
 
     server_class = servers.get(server_type, None)

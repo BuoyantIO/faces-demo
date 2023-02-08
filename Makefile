@@ -17,8 +17,8 @@
 
 SHELL=bash
 
-FACES_GUI_VERSION=0.5.0
-FACES_SERVICE_VERSION=0.5.0
+FACES_GUI_VERSION=0.6.0
+FACES_SERVICE_VERSION=0.6.0
 
 BASEDIR=k8s/01-base
 
@@ -68,15 +68,15 @@ oci/python.img: | oci
 oci/faces-gui.layer: oci src/faces-gui/data/index.html src/faces-gui/start
 	ocibuild layer dir --prefix application src/faces-gui > oci/faces-gui.layer
 
-oci/faces-gui.img: oci/python.img oci/faces-gui.layer
-	ocibuild image build \
-		--base oci/python.img \
-		--config.Entrypoint /application/start \
-		--tag $(DEV_REGISTRY)/faces-gui:$(FACES_GUI_VERSION) \
-		oci/faces-gui.layer \
-		> oci/faces-gui.img
-	docker load -i oci/faces-gui.img
-	docker push $(DEV_REGISTRY)/faces-gui:$(FACES_GUI_VERSION)
+# oci/faces-gui.img: oci/python.img oci/faces-gui.layer
+# 	ocibuild image build \
+# 		--base oci/python.img \
+# 		--config.Entrypoint /application/start \
+# 		--tag $(DEV_REGISTRY)/faces-gui:$(FACES_GUI_VERSION) \
+# 		oci/faces-gui.layer \
+# 		> oci/faces-gui.img
+# 	docker load -i oci/faces-gui.img
+# 	docker push $(DEV_REGISTRY)/faces-gui:$(FACES_GUI_VERSION)
 
 PYTHON_LAYERS = \
 	oci/urllib3-1.26.12-py2.py3-none-any.layer \
@@ -102,6 +102,17 @@ oci/squashed-python.layer: $(PYTHON_LAYERS)
 
 oci/faces-service.layer: oci src/faces-service/server.py
 	ocibuild layer dir --prefix faces-service src/faces-service > oci/faces-service.layer
+
+oci/faces-gui.img: oci/python.img oci/faces-service.layer oci/squashed-python.layer oci/faces-gui.layer
+	ocibuild image build \
+		--base oci/python.img \
+		--config.Entrypoint /faces-service/server.py \
+		--config.Env.append FACES_SERVICE=gui \
+		--tag $(DEV_REGISTRY)/faces-gui:$(FACES_GUI_VERSION) \
+		oci/squashed-python.layer oci/faces-service.layer oci/faces-gui.layer \
+		> oci/faces-gui.img
+	docker load -i oci/faces-gui.img
+	docker push $(DEV_REGISTRY)/faces-gui:$(FACES_SERVICE_VERSION)
 
 oci/faces-service.img: oci/python.img oci/faces-service.layer oci/squashed-python.layer
 	ocibuild image build \
