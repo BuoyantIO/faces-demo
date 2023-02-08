@@ -249,6 +249,8 @@ class BaseServer(BaseHTTPRequestHandler):
     def standard_headers(self):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
+        self.send_header("X-Faces-User", self.headers.get("x-faces-user", "unknown"))
+        self.send_header("User-Agent", self.headers.get("user-agent", "unknown"))
         self.end_headers()
 
 
@@ -352,8 +354,13 @@ class FaceServer(BaseServer):
         start = time.time()
 
         url = f"http://{service}/"
+        user = self.headers.get("x-faces-user", "unknown")
+        user_agent = self.headers.get("user-agent", "unknown")
 
-        response = requests.get(url)
+        response = requests.get(url, headers={
+            "X-Faces-User": user,
+            "User-Agent": user_agent
+        })
 
         end = time.time()
 
