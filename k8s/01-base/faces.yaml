@@ -41,6 +41,13 @@ spec:
           value: "20"
         # - name: DELAY_BUCKETS
         #   value: "0,5,10,15,20,50,200,500,1500"
+        resources:
+          requests:
+            cpu: 300m     # The face service doesn't need much memory, but it does need more
+            memory: 64Mi  # CPU than the other backend services since it has to call the
+          limits:         # face and smiley services, then composite the results.
+            cpu: 500m
+            memory: 128Mi
 ---
 apiVersion: v1
 kind: Service
@@ -84,6 +91,13 @@ spec:
           value: "20"
         - name: DELAY_BUCKETS
           value: "0,5,10,15,20,50,200,500,1500"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 250m
+            memory: 128Mi
 ---
 apiVersion: v1
 kind: Service
@@ -127,3 +141,10 @@ spec:
           value: "20"
         - name: DELAY_BUCKETS
           value: "0,5,10,15,20,50,200,500,1500"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 250m
+            memory: 128Mi
