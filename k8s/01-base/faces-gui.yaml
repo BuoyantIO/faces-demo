@@ -29,8 +29,15 @@ spec:
     spec:
       containers:
       - name: faces-gui
-        image: dwflynn/faces-gui:0.6.0
+        image: dwflynn/faces-gui:0.6.1
         imagePullPolicy: Always
         ports:
         - name: http
           containerPort: 8000
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi

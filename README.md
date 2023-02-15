@@ -1,9 +1,10 @@
 # Faces Demo
 
-This is the Faces demo application. It has a single-page web GUI that presents a grid of cells, each of which _should_ show a smiling
-face on a green background. Spoiler alert: installed exactly as committed to this
-repo, that isn't what you'll get -- many, many things can go wrong, and will.
-The point of the demo is let you try to fix things.
+This is the Faces demo application. It has a single-page web GUI that presents
+a grid of cells, each of which _should_ show a smiling face on a green
+background. Spoiler alert: installed exactly as committed to this repo, that
+isn't what you'll get -- many, many things can go wrong, and will. The point
+of the demo is let you try to fix things.
 
 In here you will find:
 
@@ -20,7 +21,15 @@ In here you will find:
       - We only configure HTTP, not HTTPS. Again, **DON'T** do this in
         production.
 
-To try this yourself:
+- `DEMO.md`, a Markdown file for the resilience demo presented live for a
+  couple of events. The easiest way to use `DEMO.md` is to run it with
+  [demosh].
+
+   - (You can also run `create-cluster.sh` and `setup-cluster.sh` with
+     [demosh], but they're fine with `bash` as well. Realize that all the
+     `#@` comments are special to [demosh] and ignored by `bash`.)
+
+## To try this yourself:
 
 - Make sure `$KUBECONFIG` is set correctly.
 
@@ -37,18 +46,14 @@ To try this yourself:
   http://localhost/
 
    - If you're not using k3d, instead of `localhost` use the IP or DNS name of
-     the `emissary-ingress` service in the `emissary` namespace. 
+     the `emissary-ingress` service in the `emissary` namespace.
 
    - Remember, HTTPS is **not** configured.
 
-- More to come here!
+- To run the demo as we've given it before, check out [DEMO.md]. The easiest
+  way to use that is to run it with [demosh].
 
 [Linkerd]: https://linkerd.io
 [Emissary-ingress]: https://www.getambassador.io/docs/emissary/
-
----
-
-#### DEMO HOOKS
-
-There are many `#@` comments in the shell scripts; those are hooks to be
-interpreted by external software. You can safely ignore them for now.
+[DEMO.md]: DEMO.md
+[demosh]: https://github.com/BuoyantIO/demosh

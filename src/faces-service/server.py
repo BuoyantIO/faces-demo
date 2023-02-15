@@ -435,7 +435,11 @@ class GUIServer(BaseServer):
 
         # Is there a color set for this user?
         color_name = f"COLOR_{user}"
-        color = os.environ.get(color_name, "white")
+        color = os.environ.get(color_name, None)
+
+        # If not, is there a global color override set?
+        if not color:
+            color = os.environ.get("COLOR", "white")
 
         rcode = 404
         rtext = self.__class__.error_text
