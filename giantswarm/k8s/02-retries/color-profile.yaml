@@ -1,0 +1,13 @@
+---
+apiVersion: linkerd.io/v1alpha2
+kind: ServiceProfile
+metadata:
+  name: color.faces.svc.cluster.local
+  namespace: faces
+spec:
+  routes:
+  - condition:
+      method: GET
+      pathRegex: /.*
+    name: GET /
+    isRetryable: true
