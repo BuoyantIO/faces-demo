@@ -1,8 +1,8 @@
-# Emissary and Linkerd Resilience Patterns
+# Linkerd Resilience Patterns on Giant Swarm
 
 This is the documentation - and executable code! - for a demo of resilience
-patterns using Emissary-ingress and Linkerd. The easiest way to use this file
-is to execute it with [demosh].
+patterns using Linkerd running on a Giant Swarm cluster. The easiest way to
+use this file is to execute it with [demosh].
 
 Things in Markdown comments are safe to ignore when reading this later. When
 executing this with [demosh], things after the horizontal rule below (which
