@@ -10,6 +10,12 @@
 #@hook show_browser BROWSER
 #@hook show_video VIDEO
 #@hook show_slides SLIDES
+#@hook show_composite COMPOSITE
+#@hook show_1 SCENE_1
+#@hook show_2 SCENE_2
+#@hook show_3 SCENE_3
+#@hook show_4 SCENE_4
+#@hook show_5 SCENE_5
 
 # browser_then_terminal, if we're livecasting, will wait, then switch the
 # view for the livestream to the browser, then wait again, then clear the
@@ -28,6 +34,18 @@
   #@clear
   #@show_terminal
 #@end
+
+# browser_then_composite is the same, but it flips back to the composite view
+# rather than the terminal.
+
+#@macro browser_then_composite
+  #@wait
+  #@show_browser
+  #@wait
+  #@clear
+  #@show_composite
+#@end
+
 
 # wait_clear is a macro that just waits before clearing the terminal. We
 # do this a lot.
