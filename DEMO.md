@@ -172,7 +172,7 @@ kubectl apply -f k8s/03-timeouts/color-profile.yaml
 
 ## TIMEOUTS continued
 
-Let's continue by adding a timout to the smiley service. The faces service
+Let's continue by adding a timout to the smiley service. The face service
 will show a smiley-service timeout as a sleeping face.
 
 ```bash
@@ -184,11 +184,11 @@ kubectl apply -f k8s/03-timeouts/smiley-profile.yaml
 
 ## TIMEOUTS continued
 
-Finally, we'll add a timeout that lets the GUI decide what to do if the faces
+Finally, we'll add a timeout that lets the GUI decide what to do if the face
 service itself takes too long. We'll use Emissary for this (although we
 could've used Linkerd, since Emissary is itself in the mesh).
 
-When the GUI sees a timeout talking to the faces service, it will just keep
+When the GUI sees a timeout talking to the face service, it will just keep
 showing the user the old data for awhile. There are a lot of applications
 where this makes an enormous amount of sense: if you can't get updated data,
 the most recent data may still be valuable for some time! Eventually, though,
@@ -209,11 +209,11 @@ kubectl apply -f k8s/03-timeouts/face-mapping.yaml
 ## RATELIMITS
 
 Given retries and timeouts, things look better -- still far from perfect, but
-better. Suppose, though, that someone now adds some code to the faces service
+better. Suppose, though, that someone now adds some code to the face service
 that makes it just completely collapse under heavy load? Sadly, this is often
 all-too-easy to mistakenly do.
 
-Let's simulate this. The faces service has internal functionality to limit its
+Let's simulate this. The face service has internal functionality to limit its
 abilities under load when we set the `MAX_RATE` environment variable, so we'll
 do that now:
 
@@ -227,8 +227,8 @@ Once that's done, we can take a look in the browser to see what happens.
 
 ## RATELIMITS continued
 
-Since the faces service is right on the edge, we can have Emissary enforce a
-rate limit on requests to the faces service. This is both protecting the
+Since the face service is right on the edge, we can have Emissary enforce a
+rate limit on requests to the face service. This is both protecting the
 service (by reducing the traffic) **and** providing agency to the client (by
 providing a specific status code when the limit is hit). Here, our web app is
 going to handle rate limits just like it handles timeouts.
