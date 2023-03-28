@@ -18,14 +18,6 @@ When you use `demosh` to run this file, your cluster will be checked for you.
 
 <!-- @start_livecast -->
 
-The "diff -u99 --color" function does a simple colorized diff.
-
-```bash
-diff -u99 --color() {
-	diff -U 9999 "$1" "$2" | ./diffc
-}
-```
-
 ---
 <!-- @SHOW -->
 
