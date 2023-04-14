@@ -37,6 +37,7 @@ Smileys = {
     "Cursing":     "&#x1F92C;",
     "Kaboom":      "&#x1F92F;",
     "HeartEyes":   "&#x1F60D;",
+    "Neutral":     "&#x1F610;",
     "RollingEyes": "&#x1F644;",
     "Screaming":   "&#x1F631;",
 }
@@ -181,12 +182,21 @@ class BaseServer(BaseHTTPRequestHandler):
     error_fraction = 0
     max_rate = 0.0
     error_text = "Error fraction triggered"
+    latched = False
+    latch_count = 0
+    debug_enabled = False
+    lock = None
+    last_request_time = None
 
     @classmethod
     def setup_from_environment(cls, *args, **kwargs):
         delay_buckets = os.environ.get("DELAY_BUCKETS", None)
         error_fraction = int(os.environ.get("ERROR_FRACTION", 0))
+        latch_fraction = float(os.environ.get("LATCH_FRACTION", 0.0))
         max_rate = float(os.environ.get("MAX_RATE", 0.0))
+        debug_enabled = os.environ.get("DEBUG", "False")
+        cls.host_ip = os.environ.get("HOST_IP", os.environ.get("HOSTNAME", "unknown"))
+        cls.lock = threading.Lock()
 
         if delay_buckets:
             for bucket_str in delay_buckets.split(","):
@@ -201,11 +211,17 @@ class BaseServer(BaseHTTPRequestHandler):
                     bucket = max(bucket, 0)
                     cls.delay_buckets.append(bucket)
 
+        print(f"{cls.__name__}: booted on {cls.host_ip}")
+
         print(f"{cls.__name__}: delay_buckets env {delay_buckets} => {cls.delay_buckets}")
 
         cls.error_fraction = min(max(error_fraction, 0), 100)
 
         print(f"{cls.__name__}: error_fraction env {error_fraction} => {cls.error_fraction}")
+
+        cls.latch_fraction = min(max(latch_fraction, 0), 100)
+
+        print(f"{cls.__name__}: latch_fraction env {latch_fraction} => {cls.latch_fraction}")
 
         cls.max_rate = max(max_rate, 0.0)
 
@@ -217,11 +233,18 @@ class BaseServer(BaseHTTPRequestHandler):
         else:
             cls.rate_counter = None
 
+        if (debug_enabled.lower() == "true") or (debug_enabled.lower() == "yes"):
+            cls.debug_enabled = True
+        else:
+            cls.debug_enabled = False
+
+        print(f"{cls.__name__}: debug_enabled env {debug_enabled} => {cls.debug_enabled}")
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def do_HEAD(self):
-        self.standard_headers()
+        self.standard_headers(200, None)
 
     def do_POST(self):
         self.send_error(405, "Method not allowed")
@@ -234,28 +257,85 @@ class BaseServer(BaseHTTPRequestHandler):
             delay_ms = random.choice(self.__class__.delay_buckets)
             time.sleep(delay_ms / 1000)
 
-        if self.__class__.error_fraction > 0:
+        # We need to figure out if we're going to send an error.
+        errored = False
+        response_body = None
+        response_type = "text/plain"
+        status_code = 200
+
+        # Step 1: if we've gotten latched into an error state, we're
+        # definitely sending an error.
+        #
+        # I'm cheating a bit by not grabbing the lock before looking
+        # at self.__class__.latched, but whatever: the failure mode is
+        # that an extra request slips through, and who cares?
+
+        latched = self.__class__.latched
+
+        if latched:
+            errored = True
+            response_body = "Error state latched"
+
+            # Here the lock is important, since we're writing.
+            with self.__class__.lock:
+                self.__class__.latched = True
+                self.__class__.latch_count += 1
+
+                # # After the fifth failure, switch from 503 to 500, because
+                # # the GUI treats those differently.
+                # if self.__class__.latch_count > 5:
+                #     status_code = 500
+                # else:
+                #     status_code = 503
+                status_code = 599
+
+        elif self.__class__.error_fraction > 0:
+            # Not latched, but there's a chance of an error here too.
             if random.randint(0, 99) <= self.__class__.error_fraction:
-                self.send_error(500, self.__class__.error_text)
-                return
+                # OK, we're going to send back an error...
+                errored = True
+                response_body = self.__class__.error_text
+                status_code = 500
 
-        response = {
-            "path": self.path,
-            "client_address": self.client_address,
-            "method": self.command,
-            "headers": dict(self.headers),
-            "status": 200,
-        }
-        response.update(data)
+                # ...but also, we might be able to get stuck here.
+                if self.__class__.latch_fraction > 0:
+                    if random.randint(0, 99) <= self.__class__.latch_fraction:
+                        # Yup, we're newly stuck!
+                        with self.__class__.lock:
+                            self.__class__.latched = True
+                            self.__class__.latch_count = 0
 
-        self.standard_headers()
-        self.wfile.write(json.dumps(response).encode("utf-8"))
+                        response_body = "Error fraction triggered and latched!"
+                        status_code = 599
 
-    def standard_headers(self):
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
+        # OK. After all that... figure out what our response is.
+        if not errored:
+            # Not an error! Off we go.
+            response = {
+                "path": self.path,
+                "client_address": self.client_address,
+                "method": self.command,
+                "headers": dict(self.headers),
+                "status": 200,
+            }
+            response.update(data)
+
+            response_body = json.dumps(response)
+            response_type = "application/json"
+
+        # Finally, send it!
+        self.standard_headers(status_code, response_type)
+        self.wfile.write(response_body.encode("utf-8"))
+
+    def standard_headers(self, status_code, content_type):
+        self.send_response(status_code)
+
+        if content_type is not None:
+            self.send_header("Content-Type", content_type)
+
         self.send_header("X-Faces-User", self.headers.get("x-faces-user", "unknown"))
         self.send_header("User-Agent", self.headers.get("user-agent", "unknown"))
+        self.send_header("X-Faces-Pod", self.__class__.host_ip)
         self.end_headers()
 
 
@@ -318,6 +398,19 @@ class FaceServer(BaseServer):
     def do_GET(self):
         start = time.time()
 
+        with self.__class__.lock:
+            last_request_time = self.__class__.last_request_time
+            self.__class__.last_request_time = start
+
+            # How long has it been since our last request?
+            delta_s = int(start - last_request_time)
+
+            if delta_s > 30:
+                # It's been thirty full seconds since our last request. If we were latched
+                # into the error state, it's time to come out.
+                self.__class__.latched = False
+                self.__class__.latch_count = 0
+
         rdict = {}
         errors = []
 
@@ -375,19 +468,34 @@ class FaceServer(BaseServer):
         user = self.headers.get("x-faces-user", "unknown")
         user_agent = self.headers.get("user-agent", "unknown")
 
-        response = requests.get(url, headers={
-            "X-Faces-User": user,
-            "User-Agent": user_agent
-        })
+        if self.__class__.debug_enabled:
+            print(f"...{url}: starting")
+
+        rtext = None
+
+        try:
+            response = requests.get(url, headers={
+                "X-Faces-User": user,
+                "User-Agent": user_agent
+            })
+            rcode = response.status_code
+        except requests.RequestException as e:
+            rcode = 500
+            rtext = str(e)
 
         end = time.time()
 
         latency_ms = delta_ms(start, end)
 
-        if response.status_code != 200:
+        if rcode != 200:
             # So. We got an error. Propagate it.
-            print(f"...{url} ({latency_ms}ms): {response.status_code}")
-            return response.status_code, ""
+            if rtext is None:
+                rtext = response.text
+
+            if self.__class__.debug_enabled:
+                print(f"...{url} ({latency_ms}ms): {rcode} {rtext}")
+
+            return rcode, f"error from {service}"
 
         # We got a response. Try to grab the key from the JSON.
         value = response.json().get(keyword, "")
@@ -395,10 +503,12 @@ class FaceServer(BaseServer):
         if not value:
             # This is not how this is meant to go.
             print(f"...{url} ({latency_ms}ms): no {keyword} in response")
-            return 400, ""
+            return 400, f"malformed response from {service}"
 
         # We got a value. Return it.
-        print(f"...{url} ({latency_ms}ms): {value}")
+        if self.__class__.debug_enabled:
+            print(f"...{url} ({latency_ms}ms): {value}")
+
         return 200, value
 
 
@@ -443,6 +553,7 @@ class GUIServer(BaseServer):
 
         rcode = 404
         rtext = self.__class__.error_text
+        rtype = "text/html"
 
         # It turns out that self.send_error() can't really return a body
         # with a 500, so we handle that inline here.
@@ -454,22 +565,59 @@ class GUIServer(BaseServer):
                 rcode = 500
                 failed = True
 
-        if (not failed) and (self.path == "/"):
-            rcode = 200
-            rtext = self.template.safe_substitute(
-                color=color,
-                user=user,
-                user_agent=user_agent,
-            )
+        if not failed:
+            if self.path == "/":
+                # Serve the GUI itself.
+                rcode = 200
+                rtext = self.template.safe_substitute(
+                    color=color,
+                    user=user,
+                    user_agent=user_agent,
+                )
+
+            elif self.path.startswith("/face/"):
+                # Forward to the face service. This is here solely so the demo
+                # can work with no ingress controller.
+                req_start = time.time()
+
+                # This [6:] is stripping off the leading "/face/" from the PATH.
+                url = f"http://face/{self.path[6:]}"
+                user = self.headers.get("x-faces-user", "unknown")
+                user_agent = self.headers.get("user-agent", "unknown")
+
+                if self.__class__.debug_enabled:
+                    print(f"...{url}: starting")
+
+                try:
+                    response = requests.get(url, headers={
+                        "X-Faces-User": user,
+                        "User-Agent": user_agent
+                    })
+
+                    rcode = response.status_code
+                    rtext = response.text
+                    rtype = response.headers.get("content-type")
+                except requests.RequestException as e:
+                    rcode = 500
+                    rtext = str(e)
+                    rtype = "text/plain"
+
+                req_end = time.time()
+
+                req_latency_ms = delta_ms(req_start, req_end)
+
+                if self.__class__.debug_enabled:
+                    print(f"...{url} ({req_latency_ms}ms): {rcode}")
 
         end = time.time()
         latency_ms = delta_ms(start, end)
 
         self.send_response(rcode)
-        self.send_header("Content-type", "text/html")
+        self.send_header("Content-type", rtype)
         self.send_header("X-Faces-User", user)
         self.send_header("X-Faces-User-Agent", user_agent)
         self.send_header("X-Faces-Latency", latency_ms)
+        self.send_header("X-Faces-Pod", self.__class__.host_ip)
         self.end_headers()
 
         self.wfile.write(rtext.encode("utf-8"))

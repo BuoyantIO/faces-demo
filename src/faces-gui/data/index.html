@@ -74,7 +74,7 @@
 
 		.cell {
 			display: inline-block;
-			border: 2px solid grey;
+			border: 1px solid grey;
 			border-radius: 16px;
 			height: 120px;
 			width: 120px;
@@ -87,13 +87,35 @@
         .cell-count {
             position: absolute;
 			background: white;
-			border-radius: 16px 0px 16px 0px;
+			border-radius: 14px 0px 14px 0px;
 			width: 2em;
-			bottom: 0px;
-			right: 0px;
+			bottom: 1px;
+			right: 1px;
 			color: black;
 			z-index: 999;
         }
+
+		.cell-pod-info {
+		    height: 120px;
+		    width: 120px;
+		    border-radius: 16px;
+		}
+
+		.cell-pod-id {
+            position: absolute;
+            top: 1px;
+            left: 1px;
+            width: 118px;
+			border-radius: 14px 14px 0px 0px;
+            font-family: sans-serif;
+			background: white;
+            z-index: 999;
+        }
+
+		.faded-pod-id {
+			color: rgba(.5,.5,.5,.5);
+		    font-style: italic;
+		}
 
 		.cell-smiley {
 			background: transparent;
@@ -150,6 +172,17 @@
 			margin: 2px;
 		}
 
+		.pod-stats {
+			margin-left: .5em;
+		    margin-right: .5em;
+		    border-left: 2px solid grey;
+		    border-right: 2px solid grey;
+		    padding-left: .5em;
+		    padding-right: .5em;
+			max-width: 252px !important;
+			width: 252px !important;
+		}
+
 		.bg-green {
 			background-color: green;
 		}
@@ -182,7 +215,7 @@
 
 		.roundedButton {
 			border-radius: 7px;
-			width: 5em;
+			min-width: 5em;
 		}
 
 		.log {
@@ -196,6 +229,7 @@
 
 <input id="btnToggle" type="button" value="Init..." class="roundedButton margins" />
 <input id="btnCounters" type="button" value="Init..." class="roundedButton margins" />
+<input id="btnShowPods" type="button" value="Init..." class="roundedButton margins" />
 <div id="userDiv" class="inline margins"></div>
 
 <div id="timer" class="inline margins"></div>
@@ -204,7 +238,10 @@
 	<div id="column1" class="inline-block float-left">
 		<div id="cells" class="vert-margins"></div>
 	</div>
-	<div id="column2" class="inline-block margins">
+	<div id="column2" class="inline-block float-left pod-stats">
+	    <div id="pods" class="vert-margins"></div>
+	</div>
+	<div id="column3" class="inline-block margins">
 		<div id="key" class="vert-margins margin-left">
 		</div>
 	</div>
@@ -380,6 +417,143 @@ class CounterSwitch {
 	}
 }
 
+//////// PodSet
+
+class PodInfo {
+	constructor(logger, name, infoDiv, idDiv, smileySpan, countDiv) {
+		this.logger = logger
+		this.name = name
+		this.infoDiv = infoDiv
+		this.idDiv = idDiv
+		this.smileySpan = smileySpan
+		this.countDiv = countDiv
+		this.lastUpdated = 0
+	}
+
+	update(xhr) {
+		let status = xhr.status
+		let smiley = Cell.smilies.upset
+		let bgColor = "red";
+		let borderColor = "grey";
+
+		let bumpCounter = false
+
+		let currCountText = this.countDiv.innerHTML
+		let currCount = 0
+
+		if (currCountText != "") {
+			currCount = parseInt(currCountText)
+		}
+
+		if (status == 599) {
+			// Latched error state.
+			smiley = Cell.smilies.neutral
+			bgColor = "hotpink"
+			this.countDiv.innerHTML = currCount + 1
+			this.countDiv.style.opacity = 1.0
+		}
+		else if (status == 429) {
+			smiley = Cell.smilies.sleeping
+			bgColor = "pink"
+			this.countDiv.innerHTML = currCount + 1
+			this.countDiv.style.opacity = 1.0
+		}
+		else if (status == 200) {
+			try {
+				let obj = JSON.parse(xhr.responseText)
+				smiley = obj.smiley
+				bgColor = obj.color
+
+				if (obj.errors != undefined) {
+					borderColor = "red"
+				}
+
+				this.countDiv.innerHTML = 0
+				this.countDiv.style.opacity = 0.0
+			}
+			catch (e) {
+				// Whoops, something went wrong. If it's a SyntaxError, that
+				// probably means we got bad JSON. Otherwise, it's... who knows?
+				borderColor = "red"
+				smiley = Cell.smilies.confused
+				bgColor = "red"
+				this.countDiv.innerHTML = currCount + 1
+				this.countDiv.style.opacity = 1.0
+			}
+		}
+
+		this.infoDiv.style.opacity = 1.0
+		this.infoDiv.style.background = bgColor
+		this.infoDiv.style.borderColor = borderColor
+		this.idDiv.classList.remove("faded-pod-id")
+		this.smileySpan.innerHTML = smiley
+
+		this.lastUpdated = new Date().getTime()
+	}
+}
+
+class PodSet {
+	constructor(logger, enclosingDiv) {
+		this.logger = logger
+		this.enclosingDiv = enclosingDiv
+		this.pods = {}
+	}
+
+	dropPod(name) {
+		let podDiv = document.getElementById(`cell-pod-${name}`)
+		podDiv.remove()
+		delete this.pods[name]
+	}
+
+	getPod(name) {
+		let nameFields = name.split("-")
+		let firstField = nameFields[0]
+		let lastField = nameFields[nameFields.length - 1]
+		let shortName = `${firstField}-${lastField}`
+
+		if (!(shortName in this.pods)) {
+			// New pod!
+			let podDiv = document.createElement("div")
+			podDiv.id = `cell-pod-${shortName}`
+			podDiv.className = "cell"
+
+			let podIDDiv = document.createElement("div")
+			podIDDiv.id = `cell-pod-id-${shortName}`
+			podIDDiv.className = "cell-pod-id"
+			podIDDiv.innerHTML = shortName
+			podDiv.appendChild(podIDDiv)
+
+			let podInfoDiv = document.createElement("div")
+			podInfoDiv.id = `cell-pod-info-${shortName}`
+			podInfoDiv.className = "cell-pod-info"
+			podDiv.appendChild(podInfoDiv)
+
+			let podSmileySpan = document.createElement("span")
+			podSmileySpan.id = `cell-pod-smiley-${shortName}`
+			podSmileySpan.className = "cell-smiley"
+			podInfoDiv.appendChild(podSmileySpan)
+
+			let podCountDiv = document.createElement("div")
+			podCountDiv.id = `cell-pod-count-${shortName}`
+			podCountDiv.className = "cell-count"
+			podCountDiv.style.opacity = 0.0
+			podInfoDiv.appendChild(podCountDiv)
+
+			// Create a PodInfo for this pod...
+			let podInfo = new PodInfo(this.logger, shortName,
+									  podInfoDiv, podIDDiv, podSmileySpan, podCountDiv)
+
+			// ...and add the PodInfo to our pod dict.
+			this.pods[shortName] = podInfo
+
+			// After all that, append the entire podDiv to our enclosingDiv.
+			this.enclosingDiv.appendChild(podDiv)
+		}
+
+		return this.pods[shortName]
+	}
+}
+
 //////// Cell
 //
 // Cell is a class that represents a single cell in the grid. A cell
@@ -388,20 +562,23 @@ class CounterSwitch {
 
 class Cell {
 	static smilies = {
-		"confused": "&#x1F615;",
-		"cursing":  "&#x1F92C;",
-		"kaboom":   "&#x1F92F;",
-		"sleeping": "&#x1F634;",
-		"smiling":  "&#x1F603;",
-		"thinking": "&#x1F914;",
-		"tongue":   "&#x1F61B;",
-		"upset":    "&#x1F62C;",
-		"yay":      "&#x1F389;",
+		"confused":  "&#x1F615;",
+		"cursing":   "&#x1F92C;",
+		"kaboom":    "&#x1F92F;",
+		"neutral":   "&#x1F610;",
+		"screaming": "&#x1F631;",
+		"sleeping":  "&#x1F634;",
+		"smiling":   "&#x1F603;",
+		"thinking":  "&#x1F914;",
+		"tongue":    "&#x1F61B;",
+		"upset":     "&#x1F62C;",
+		"yay":       "&#x1F389;",
 	};
 
-	constructor(logger, sw, fetchURL, enclosingDiv, row, col) {
+	constructor(logger, sw, podSet, fetchURL, enclosingDiv, row, col) {
 		this.logger = logger
 		this.sw = sw
+		this.podSet = podSet
 		this.fetchURL = fetchURL
 		this.count = 0
 		this.pending = false
@@ -428,6 +605,7 @@ class Cell {
 		enclosingDiv.appendChild(cellDiv)
 
 		this.lastUpdated = new Date().getTime()
+		this.lastStatus = 0		// will be an HTTP status code
 		this.sentAt = {}
 
 		this.interval = 2000	// ms
@@ -484,40 +662,62 @@ class Cell {
 			let now = new Date()
 			let latency = now - sentAt
 
-			this.lastUpdated = now.getTime()
-
 			// ...then figure out what we got.
 			let smiley = undefined
 			let bgColor = "grey"
 			let errors = "unknown"
 			let borderColor = "grey"
 			let text = xhr.responseText
+			let currCountText = $(`cell-count-${this.row}-${this.col}`).innerHTML
+			let currCount = 0
+
+			if (currCountText != "") {
+				currCount = parseInt(currCountText)
+			}
+
+			let pod = xhr.getResponseHeader("x-faces-pod")
+
+			if (pod != null) {
+				// Update the pod info for this pod.
+				this.podSet.getPod(pod).update(xhr)
+			}
+
+			// Save our lastStatus for later examination...
+			let prevStatus = this.lastStatus
+
+			// ...then update lastStatus and lastUpdated.
+			this.lastUpdated = now.getTime()
+			this.lastStatus = xhr.status
+
+			// this.info(`lastStatus ${this.lastStatus} for ${this.row} ${this.col}`)
 
 			// ...then check the status code.
+			// if ((xhr.status == 599) || (xhr.status == 504) || (xhr.status == 429)) {
 			if ((xhr.status == 504) || (xhr.status == 429)) {
-				// 504 is a timeout; 429 is a ratelimit. Bump the counter in the cell.
-				let currCountText = $(`cell-count-${this.row}-${this.col}`).innerHTML
-				let count = 0
+				// 599 is for a service that's latched into an error state (yes, it's
+				// a bogus code).
+				// 504 is a timeout.
+				// 429 is a ratelimit.
+				//
+				// In all these cases we start by bumping the counter in the cell.
+				currCount++
 
-				if (currCountText != "") {
-					count = parseInt(currCountText)
-				}
+				$(`cell-count-${this.row}-${this.col}`).innerHTML = currCount
 
-				count++
+				// this.info(`lastStatus ${this.lastStatus} for ${this.row} ${this.col}; currCount ${currCount}`)
 
-				$(`cell-count-${this.row}-${this.col}`).innerHTML = count
-
-				// smiley = Cell.smilies.sleeping
-				// bgColor = "pink"
-				errors = "overall timeout"
-
+				// At this point we can just reschedule and be done with it. We've
+				// bumped the counter and set lastStatus, and the CellWatcher will
+				// do the rest.
 				this.reschedule(latency)
 				return
 			}
+			else {
+				// For literally any other status code, we can reset the counter.
+				$(`cell-count-${this.row}-${this.col}`).innerHTML = ""
 
-			// For literally any other status code, we can reset the timeout
-			// counter.
-			$(`cell-count-${this.row}-${this.col}`).innerHTML = ""
+				// this.info(`lastStatus ${this.lastStatus} for ${this.row} ${this.col}; counter reset`)
+			}
 
 			if (xhr.status == 200) {
 				// Parse JSON!
@@ -551,8 +751,16 @@ class Cell {
 			}
 			else if (Math.floor(xhr.status / 100) == 5) {
 				// 5yz. Server error.
-				smiley = Cell.smilies.confused
-				bgColor = "red"
+
+				if (xhr.status == 599) {
+					smiley = Cell.smilies.neutral
+					bgColor = "hotpink"
+				}
+				else {
+					smiley = Cell.smilies.confused
+					bgColor = "red"
+				}
+
 				errors = "server error"
 			}
 
@@ -684,10 +892,11 @@ class Key {
 }
 
 class CellWatcher {
-	constructor(logger, sw, cells) {
+	constructor(logger, sw, cells, podSet) {
 		this.logger = logger
 		this.sw = sw
 		this.cells = cells
+		this.podSet = podSet
 		this.count = 0
 		this.maxSolid = 2000
 		this.maxVisible = 2500
@@ -737,12 +946,35 @@ class CellWatcher {
 			// }
 
 			if (cellCount > 4) {
-				$(`smiley-${cell.row}-${cell.col}`).innerHTML = Cell.smilies.sleeping
-				$(`cell-${cell.row}-${cell.col}`).style.background = "pink"
+				let smiley = Cell.smilies.sleeping
+				let bgColor = "pink"
+
+				if (cell.lastStatus == 599) {
+					smiley = Cell.smilies.screaming
+					bgColor = "hotpink"
+				}
+
+				$(`smiley-${cell.row}-${cell.col}`).innerHTML = smiley
+				$(`cell-${cell.row}-${cell.col}`).style.background = bgColor
 				opacity = 0.2
 			}
 
 			$(`cell-${cell.row}-${cell.col}`).style.opacity = opacity
+		}
+
+		for (let podInfo of Object.values(this.podSet.pods)) {
+			let opacity = podInfo.infoDiv.style.opacity
+
+			if (opacity > 0.0) {
+				podInfo.infoDiv.style.opacity = opacity - 0.1
+
+				if (podInfo.infoDiv.style.opacity <= 0.0) {
+					podInfo.idDiv.classList.add("faded-pod-id")
+				}
+			}
+			else if ((now - podInfo.lastUpdated) > 30000) {
+				this.podSet.dropPod(podInfo.name)
+			}
 		}
 	}
 }
@@ -969,11 +1201,23 @@ window.onload = () => {
 		}
 	)
 
+	let showPods = new CounterSwitch(
+		$("btnShowPods"), "Show Pods", "Hide Pods",
+		() => {
+			$("column2").style.display = "none"
+		},
+		() => {
+			$("column2").style.display = "block"
+		},
+	)
+
+	let podSet = new PodSet(logger, $("pods"))
+
 	let cells = []
 
 	for (row = 0; row < 4; row++) {
 		for (col = 0; col < 4; col++) {
-			let cell = new Cell(logger, sw, `../face/cell/`, $("cells"), row, col)
+			let cell = new Cell(logger, sw, podSet, `../face/cell/`, $("cells"), row, col)
 			cells.push(cell)
 		}
 		$("cells").innerHTML += "<br/>"
@@ -981,7 +1225,7 @@ window.onload = () => {
 
 	key = new Key($("key"))
 
-	let watcher = new CellWatcher(logger, sw, cells)
+	let watcher = new CellWatcher(logger, sw, cells, podSet)
 
 	sw.cells = cells
 
