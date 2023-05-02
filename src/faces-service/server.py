@@ -385,8 +385,9 @@ class FaceServer(BaseServer):
         "color": "grey",
         "smiley": Smileys["Cursing"],
 
-        "color-504": "pink",
-        "smiley-504": Smileys["Sleeping"],
+        # The GUI handles the display of timeouts, so just pass these on.
+        "color-504": "504",
+        "smiley-504": "504",
 
         "color-ratelimit": "pink",
         "smiley-ratelimit": Smileys["Kaboom"],

@@ -252,7 +252,6 @@
 <!-- <div id="log" class="log"><div> -->
 
 <script>
-
 //////// Utilities
 //
 // Sucking in all of jQuery is massive overkill, but the $() shorthand
@@ -430,58 +429,54 @@ class PodInfo {
 		this.lastUpdated = 0
 	}
 
-	update(xhr) {
-		let status = xhr.status
-		let smiley = Cell.smilies.upset
-		let bgColor = "red";
-		let borderColor = "grey";
-
+	update(status, anyTimeouts, smiley, bgColor, borderColor) {
 		let bumpCounter = false
-
-		let currCountText = this.countDiv.innerHTML
-		let currCount = 0
-
-		if (currCountText != "") {
-			currCount = parseInt(currCountText)
-		}
 
 		if (status == 599) {
 			// Latched error state.
 			smiley = Cell.smilies.neutral
 			bgColor = "hotpink"
-			this.countDiv.innerHTML = currCount + 1
-			this.countDiv.style.opacity = 1.0
+            bumpCounter = true
 		}
 		else if (status == 429) {
 			smiley = Cell.smilies.sleeping
 			bgColor = "pink"
-			this.countDiv.innerHTML = currCount + 1
-			this.countDiv.style.opacity = 1.0
+            bumpCounter = true
 		}
-		else if (status == 200) {
-			try {
-				let obj = JSON.parse(xhr.responseText)
-				smiley = obj.smiley
-				bgColor = obj.color
+        else if (status == 200) {
+            if (smiley == "504") {
+                smiley = Cell.smilies.sleeping
+            }
 
-				if (obj.errors != undefined) {
-					borderColor = "red"
-				}
+            if (bgColor == "504") {
+                bgColor = "pink"
+            }
 
-				this.countDiv.innerHTML = 0
-				this.countDiv.style.opacity = 0.0
-			}
-			catch (e) {
-				// Whoops, something went wrong. If it's a SyntaxError, that
-				// probably means we got bad JSON. Otherwise, it's... who knows?
-				borderColor = "red"
-				smiley = Cell.smilies.confused
-				bgColor = "red"
-				this.countDiv.innerHTML = currCount + 1
-				this.countDiv.style.opacity = 1.0
-			}
+            this.countDiv.innerHTML = 0
+            this.countDiv.style.opacity = 0.0
+        }
+        else {
+            // This should probably never happen.
+            borderColor = "red"
+            smiley = Cell.smilies.upset
+            bgColor = "red"
+            bumpCounter = true
 		}
 
+        // OK, bump the counter if we need to...
+        if (bumpCounter) {
+            let currCountText = this.countDiv.innerHTML
+            let currCount = 0
+
+            if (currCountText != "") {
+                currCount = parseInt(currCountText)
+            }
+
+            this.countDiv.innerHTML = currCount + 1
+            this.countDiv.style.opacity = 1.0
+        }
+
+        // ...then update the cell.
 		this.infoDiv.style.opacity = 1.0
 		this.infoDiv.style.background = bgColor
 		this.infoDiv.style.borderColor = borderColor
@@ -663,127 +658,80 @@ class Cell {
 			let latency = now - sentAt
 
 			// ...then figure out what we got.
-			let smiley = undefined
-			let bgColor = "grey"
-			let errors = "unknown"
-			let borderColor = "grey"
-			let text = xhr.responseText
-			let currCountText = $(`cell-count-${this.row}-${this.col}`).innerHTML
-			let currCount = 0
 
-			if (currCountText != "") {
-				currCount = parseInt(currCountText)
-			}
+            let { curStatus, anyTimeouts,
+                  smiley, bgColor, borderColor } = this.parseResults(xhr);
 
-			let pod = xhr.getResponseHeader("x-faces-pod")
+            // Update the pod, if we can...
+            let pod = xhr.getResponseHeader("x-faces-pod");
 
-			if (pod != null) {
-				// Update the pod info for this pod.
-				this.podSet.getPod(pod).update(xhr)
-			}
+            // If we got a pod and it's _not_ a faces-* pod, update it. (It can
+            // only be a faces-* pod if we're running with no ingress controller and
+            // something weird has happened, in which case... just ignore it.)
 
-			// Save our lastStatus for later examination...
-			let prevStatus = this.lastStatus
+            if ((pod != null) && !pod.startsWith("faces-")) {
+                this.podSet.getPod(pod).update(curStatus, anyTimeouts,
+                                               smiley, bgColor, borderColor);
+            }
 
-			// ...then update lastStatus and lastUpdated.
+            // ...then go on to update the main cell.
+            //
+            // For our purposes here, a 504 for the smiley or bgColor means
+            // that we won't update that element.
+            if (smiley == "504") {
+                smiley = undefined
+            }
+
+            if (bgColor == "504") {
+                bgColor = undefined
+            }
+
+            // OK. We can update lastStatus and lastUpdated.
 			this.lastUpdated = now.getTime()
-			this.lastStatus = xhr.status
+			this.lastStatus = curStatus
 
 			// this.info(`lastStatus ${this.lastStatus} for ${this.row} ${this.col}`)
 
-			// ...then check the status code.
-			// if ((xhr.status == 599) || (xhr.status == 504) || (xhr.status == 429)) {
-			if ((xhr.status == 504) || (xhr.status == 429)) {
-				// 599 is for a service that's latched into an error state (yes, it's
-				// a bogus code).
-				// 504 is a timeout.
-				// 429 is a ratelimit.
-				//
-				// In all these cases we start by bumping the counter in the cell.
-				currCount++
+            // Next up: if there are any timeouts, we need to update the cell
+            // counter. If not, we need to clear it.
+            if (anyTimeouts) {
+                let currCountText = $(`cell-count-${this.row}-${this.col}`).innerHTML;
+                let currCount = 0;
 
+                if (currCountText != "") {
+                    currCount = parseInt(currCountText);
+                }
+
+                currCount++
 				$(`cell-count-${this.row}-${this.col}`).innerHTML = currCount
-
-				// this.info(`lastStatus ${this.lastStatus} for ${this.row} ${this.col}; currCount ${currCount}`)
-
-				// At this point we can just reschedule and be done with it. We've
-				// bumped the counter and set lastStatus, and the CellWatcher will
-				// do the rest.
-				this.reschedule(latency)
-				return
 			}
 			else {
-				// For literally any other status code, we can reset the counter.
 				$(`cell-count-${this.row}-${this.col}`).innerHTML = ""
-
-				// this.info(`lastStatus ${this.lastStatus} for ${this.row} ${this.col}; counter reset`)
-			}
-
-			if (xhr.status == 200) {
-				// Parse JSON!
-				try {
-					let obj = JSON.parse(xhr.responseText)
-					smiley = obj.smiley
-					bgColor = obj.color
-
-					if (obj.errors != undefined) {
-						errors = obj.errors.join(",")
-						borderColor = "red"
-					}
-					else {
-						errors = "success!"
-					}
-				}
-				catch (e) {
-					// Whoops, something went wrong. If it's a SyntaxError, that
-					// probably means we got bad JSON. Otherwise, it's... who knows?
-					borderColor = "red"
-					smiley = Cell.smilies.confused
-					bgColor = "red"
-
-					if (e instanceof SyntaxError) {
-						errors = "parse error"
-					}
-					else {
-						errors = "unknown error"
-					}
-				}
-			}
-			else if (Math.floor(xhr.status / 100) == 5) {
-				// 5yz. Server error.
-
-				if (xhr.status == 599) {
-					smiley = Cell.smilies.neutral
-					bgColor = "hotpink"
-				}
-				else {
-					smiley = Cell.smilies.confused
-					bgColor = "red"
-				}
-
-				errors = "server error"
-			}
-
-			if (smiley == undefined) {
-				smiley = Cell.smilies.upset
-			}
-
-			if (bgColor == undefined) {
-				bgColor = "purple"
 			}
 
 			// FINALLY: show 'em what we got.
 			// let msg = `[${xhrName}] XHR result (${latency}ms): ${errors} -- ${text}`
 			// this.success(msg);
 
-			$(`cell-${this.row}-${this.col}`).style.opacity = 0.0
+			if ((smiley != undefined) || (bgColor != undefined)) {
+				$(`cell-${this.row}-${this.col}`).style.opacity = 0.0
 
-			setTimeout(() => {
-				$(`smiley-${this.row}-${this.col}`).innerHTML = smiley
-				$(`cell-${this.row}-${this.col}`).style.opacity = 1.0
-				$(`cell-${this.row}-${this.col}`).style.background = bgColor
-				$(`cell-${this.row}-${this.col}`).style.borderColor = borderColor
-			}, 50)
+				setTimeout(() => {
+					if (smiley != undefined) {
+						$(`smiley-${this.row}-${this.col}`).innerHTML = smiley
+					}
+
+					if (bgColor != undefined) {
+						$(`cell-${this.row}-${this.col}`).style.background = bgColor
+					}
+
+					if (borderColor != undefined) {
+						$(`cell-${this.row}-${this.col}`).style.borderColor = borderColor
+					}
+
+					$(`cell-${this.row}-${this.col}`).style.opacity = 1.0
+				}, 50)
+			}
 
 			this.reschedule(latency)
 		})
@@ -837,6 +785,92 @@ class Cell {
 		// this.info(`[${xhrName}] sending XHR`)
 		xhr.send();
 	}
+
+    parseResults(xhr) {
+        let errors = "unknown";
+        let smiley = undefined;
+        let bgColor = undefined;
+        let borderColor = "grey";
+
+        // Start by assuming that we didn't get any timeouts.
+        let anyTimeouts = false;
+
+        // Stash the status of this XHR to reduce typing...
+        let curStatus = xhr.status;
+
+        // ...then figure out what happened.
+        if (curStatus == 200) {
+            // The face service itself succeeded. Parse JSON.
+            try {
+                let obj = JSON.parse(xhr.responseText);
+                smiley = obj.smiley;
+                bgColor = obj.color;
+
+                if (obj.errors != undefined) {
+                    errors = obj.errors.join(",");
+                    borderColor = "red";
+                }
+                else {
+                    errors = "success!";
+                }
+
+                // If we get "504" for either the smiley or the color, flag
+                // that as a timeout (the "504" means that the smiley or color
+                // service timed out when the face service tried to call it).
+                if ((smiley == "504") || (bgColor == "504")) {
+                    anyTimeouts = true;
+                }
+            }
+            catch (e) {
+                // Whoops, something went wrong. If it's a SyntaxError, that
+                // probably means we got bad JSON. Otherwise, it's... who knows?
+                borderColor = "red";
+                smiley = Cell.smilies.confused;
+                bgColor = "red";
+
+                if (e instanceof SyntaxError) {
+                    errors = "parse error";
+                }
+                else {
+                    errors = "unknown error";
+                }
+            }
+        }
+        else if ((curStatus == 504) || (curStatus == 429)) {
+            // Timeout (504) or ratelimit (429) talking to the face
+            // service. We treat these the same: remember that a timeout
+            // happened...
+            anyTimeouts = true;
+
+            // ...and force the smiley & color to "timed out" too.
+            smiley = "504";
+            bgColor = "504";
+        }
+        else if (curStatus == 599) {
+            // This is our latched-error status. Show it as a neutral face
+            // on a hot pink background.
+            smiley = Cell.smilies.neutral;
+            bgColor = "hotpink";
+        }
+        else if (Math.floor(curStatus / 100) == 5) {
+            // Some other 5yz, so an unknown kind of server error. (In
+            // practice, this is probably a 503 because there's some kind
+            // of connectivity error, but whatever, we don't care.
+            smiley = Cell.smilies.confused;
+            bgColor = "red";
+            errors = "server error";
+        }
+
+        if (smiley == undefined) {
+            smiley = Cell.smilies.upset
+        }
+
+        if (bgColor == undefined) {
+            bgColor = "purple"
+        }
+
+        return { curStatus, anyTimeouts, smiley, bgColor, borderColor };
+    }
 }
 
 class Key {
@@ -1242,6 +1276,6 @@ window.onload = () => {
 	// 	q.run()
 	// })
 }
-
 </script>
+
 </BODY>
