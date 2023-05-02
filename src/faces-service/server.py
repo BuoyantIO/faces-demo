@@ -638,6 +638,10 @@ class GUIServer(BaseServer):
                     rcode = response.status_code
                     rtext = response.text
                     rtype = response.headers.get("content-type")
+
+                    # If we're forwarding a request to the face service, we want
+                    # to forward its pod ID back to the client.
+                    pod_id = response.headers.get("x-faces-pod", pod_id)
                 except requests.RequestException as e:
                     rcode = 500
                     rtext = str(e)
