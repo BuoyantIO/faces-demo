@@ -534,11 +534,6 @@ class GUIServer(BaseServer):
     # being present.
     template = error_text
 
-    try:
-        template = GUITemplate(open("/application/data/index.html").read())
-    except FileNotFoundError:
-        pass
-
     def do_GET(self):
         start = time.time()
 
@@ -589,11 +584,22 @@ class GUIServer(BaseServer):
             if self.path == "/":
                 # Serve the GUI itself.
                 rcode = 200
-                rtext = self.template.safe_substitute(
-                    color=color,
-                    user=user,
-                    user_agent=user_agent,
-                )
+
+                try:
+                    template = GUITemplate(open("/application/data/index.html").read())
+                    rtext = template.safe_substitute(
+                        color=color,
+                        user=user,
+                        user_agent=user_agent,
+                    )
+                except FileNotFoundError:
+                    rcode = 404
+                    rtype = "text/plain"
+                    rtext = "/application/data/index.html not found??"
+                except Exception as e:
+                    rcode = 500
+                    rtype = "text/plain"
+                    rtext = f"Exception: {e}"
 
             elif self.path.startswith("/face/"):
                 # Forward to the face service. This is here solely so the demo
