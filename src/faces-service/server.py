@@ -566,6 +566,18 @@ class GUIServer(BaseServer):
         if not color:
             color = os.environ.get("COLOR", "white")
 
+        # Should we hide the key?
+        hide_key = "false"
+
+        if os.environ.get("HIDE_KEY", "false").lower() in [ "true", "yes", "1" ]:
+            hide_key = "true"
+
+        # Should we show pod IDs?
+        show_pods = "false"
+
+        if os.environ.get("SHOW_PODS", "false").lower() in [ "true", "yes", "1" ]:
+            show_pods = "true"
+
         rcode = 404
         rtext = self.__class__.error_text
         rtype = "text/html"
@@ -589,6 +601,8 @@ class GUIServer(BaseServer):
                     template = GUITemplate(open("/application/data/index.html").read())
                     rtext = template.safe_substitute(
                         color=color,
+                        hide_key=hide_key,
+                        show_pods=show_pods,
                         user=user,
                         user_agent=user_agent,
                     )
