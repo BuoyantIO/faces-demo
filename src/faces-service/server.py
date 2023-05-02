@@ -190,6 +190,8 @@ class BaseServer(BaseHTTPRequestHandler):
 
     @classmethod
     def setup_from_environment(cls, *args, **kwargs):
+        print(time.asctime(), f"{cls.__name__}: setup_from_environment starting")
+
         delay_buckets = os.environ.get("DELAY_BUCKETS", None)
         error_fraction = int(os.environ.get("ERROR_FRACTION", 0))
         latch_fraction = float(os.environ.get("LATCH_FRACTION", 0.0))
@@ -211,24 +213,24 @@ class BaseServer(BaseHTTPRequestHandler):
                     bucket = max(bucket, 0)
                     cls.delay_buckets.append(bucket)
 
-        print(f"{cls.__name__}: booted on {cls.host_ip}")
+        print(time.asctime(), f"{cls.__name__}: booted on {cls.host_ip}")
 
-        print(f"{cls.__name__}: delay_buckets env {delay_buckets} => {cls.delay_buckets}")
+        print(time.asctime(), f"{cls.__name__}: delay_buckets env {delay_buckets} => {cls.delay_buckets}")
 
         cls.error_fraction = min(max(error_fraction, 0), 100)
 
-        print(f"{cls.__name__}: error_fraction env {error_fraction} => {cls.error_fraction}")
+        print(time.asctime(), f"{cls.__name__}: error_fraction env {error_fraction} => {cls.error_fraction}")
 
         cls.latch_fraction = min(max(latch_fraction, 0), 100)
 
-        print(f"{cls.__name__}: latch_fraction env {latch_fraction} => {cls.latch_fraction}")
+        print(time.asctime(), f"{cls.__name__}: latch_fraction env {latch_fraction} => {cls.latch_fraction}")
 
         cls.max_rate = max(max_rate, 0.0)
 
-        print(f"{cls.__name__}: max_rate env {max_rate} => {cls.max_rate}")
+        print(time.asctime(), f"{cls.__name__}: max_rate env {max_rate} => {cls.max_rate}")
 
         if cls.max_rate >= 0.1:
-            print(f"{cls.__name__}: max_rate is {cls.max_rate} requests per second, setting up rate counter")
+            print(time.asctime(), f"{cls.__name__}: max_rate is {cls.max_rate} requests per second, setting up rate counter")
             cls.rate_counter = RateCounter(10)
         else:
             cls.rate_counter = None
@@ -238,7 +240,7 @@ class BaseServer(BaseHTTPRequestHandler):
         else:
             cls.debug_enabled = False
 
-        print(f"{cls.__name__}: debug_enabled env {debug_enabled} => {cls.debug_enabled}")
+        print(time.asctime(), f"{cls.__name__}: debug_enabled env {debug_enabled} => {cls.debug_enabled}")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
