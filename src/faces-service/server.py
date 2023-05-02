@@ -545,6 +545,24 @@ class GUIServer(BaseServer):
         user = self.headers.get("x-faces-user", "unknown")
         user_agent = self.headers.get("user-agent", "unknown")
 
+        # Assume we'll be handing back our own pod ID...
+        pod_id = self.__class__.host_ip
+
+        if self.path == "/ready":
+            end = time.time()
+            latency_ms = delta_ms(start, end)
+
+            self.send_response(200)
+            self.send_header("Content-type", "text/plain")
+            self.send_header("X-Faces-User", user)
+            self.send_header("X-Faces-User-Agent", user_agent)
+            self.send_header("X-Faces-Latency", latency_ms)
+            self.send_header("X-Faces-Pod", pod_id)
+            self.end_headers()
+
+            self.wfile.write("Ready and waiting!".encode("utf-8"))
+            return
+
         # Is there a color set for this user?
         color_name = f"COLOR_{user}"
         color = os.environ.get(color_name, None)
@@ -619,7 +637,7 @@ class GUIServer(BaseServer):
         self.send_header("X-Faces-User", user)
         self.send_header("X-Faces-User-Agent", user_agent)
         self.send_header("X-Faces-Latency", latency_ms)
-        self.send_header("X-Faces-Pod", self.__class__.host_ip)
+        self.send_header("X-Faces-Pod", pod_id)
         self.end_headers()
 
         self.wfile.write(rtext.encode("utf-8"))
