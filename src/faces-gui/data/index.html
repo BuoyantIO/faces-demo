@@ -1223,7 +1223,13 @@ window.onload = () => {
 		$("cells").innerHTML += "<br/>"
 	}
 
-	key = new Key($("key"))
+	if (!%%{hide_key}) {
+		key = new Key($("key"))
+	}
+
+	if (%%{show_pods}) {
+		showPods.toggle()
+	}
 
 	let watcher = new CellWatcher(logger, sw, cells, podSet)
 
