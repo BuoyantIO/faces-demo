@@ -29,7 +29,7 @@ spec:
     spec:
       containers:
       - name: faces-gui
-        image: dwflynn/faces-gui:0.7.0
+        image: dwflynn/faces-gui:0.8.0
         imagePullPolicy: Always
         ports:
         - name: http
