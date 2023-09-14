@@ -1,4 +1,4 @@
-#!/bin/env bash
+#!/usr/bin/env bash
 #
 # SPDX-FileCopyrightText: 2022 Buoyant Inc.
 # SPDX-License-Identifier: Apache-2.0
