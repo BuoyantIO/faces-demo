@@ -89,6 +89,25 @@ dockers:
     build_flag_templates:
       - "--platform=linux/amd64"
 
+  - use: buildx
+    goos: linux
+    goarch: arm64
+    dockerfile: Dockerfiles/Dockerfile.external-workload
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:{{ .Version }}-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest-arm64"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+  - use: buildx
+    goos: linux
+    goarch: amd64
+    dockerfile: Dockerfiles/Dockerfile.external-workload
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:{{ .Version }}-amd64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest-amd64"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+
 docker_manifests:
   - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}"
     image_templates:
@@ -121,6 +140,24 @@ docker_manifests:
     image_templates:
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:latest-arm64"
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:latest-amd64"
+    create_flags:
+      - --insecure
+    push_flags:
+      - --insecure
+
+  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest"
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest-amd64"
+    create_flags:
+      - --insecure
+    push_flags:
+      - --insecure
+
+  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:{{ .Version }}"
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:{{ .Version }}-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:{{ .Version }}-amd64"
     create_flags:
       - --insecure
     push_flags:
