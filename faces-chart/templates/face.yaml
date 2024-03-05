@@ -1,0 +1,48 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: face
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: ClusterIP
+  selector:
+    service: face
+  ports:
+  - port: 80
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: face
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      service: face
+  template:
+    metadata:
+      labels:
+        service: face
+    spec:
+      containers:
+      - name: face
+        image: {{ include "partials.face-image" . }}
+        imagePullPolicy: {{ include "partials.face-imagePullPolicy" . }}
+        ports:
+        - name: http
+          containerPort: 8000
+        env:
+        - name: FACES_SERVICE
+          value: "face"
+        {{- include "partials.face-errorFraction" . }}
+        {{- include "partials.face-delayBuckets" . }}
+        resources:
+          requests:
+            cpu: 300m     # The face service doesn't need much memory, but it does need more
+            memory: 64Mi  # CPU than the other backend services since it has to call the
+          limits:         # face and smiley services, then composite the results.
+            cpu: 500m
+            memory: 128Mi

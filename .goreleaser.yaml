@@ -1,0 +1,226 @@
+# SPDX-FileCopyrightText: 2024 Buoyant Inc.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright 2022-2024 Buoyant Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.  You may obtain
+# a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Docs for goreleaser are at https://goreleaser.com.
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
+version: 1
+
+# Allow overriding the registry and image name with environment variables.
+env:
+  - REGISTRY={{ if index .Env "REGISTRY"  }}{{ .Env.REGISTRY }}{{ else }}ghcr.io/buoyantio{{ end }}
+  - IMAGE_NAME={{ if index .Env "IMAGE_NAME"  }}{{ .Env.IMAGE_NAME }}{{ else }}faces{{ end }}
+
+before:
+  hooks:
+    - go mod tidy
+    # Make the chart as part of the build process.
+    - make VERSION={{ .Version }} chart
+
+builds:
+  # "generic" is our build for any random hardware out there.
+  - id: generic
+    main: ./cmd/generic
+    binary: workload
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - arm64
+      - amd64
+
+  # "pi" is our build specifically for the Raspberry Pi (it uses Pi GPIO for
+  # some LEDs and a knob).
+  - id: pi
+    main: ./cmd/raspberry-pi
+    binary: workload
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - arm64
+
+# We build GUI and workload images for both arm64 and amd64, then build a
+# multiarch manifest from them.
+dockers:
+  - use: buildx
+    goos: linux
+    goarch: arm64
+    dockerfile: Dockerfiles/Dockerfile.gui
+    ids:
+      - generic
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest-arm64"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+    extra_files:
+      - assets/html
+  - use: buildx
+    goos: linux
+    goarch: amd64
+    dockerfile: Dockerfiles/Dockerfile.gui
+    ids:
+      - generic
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}-amd64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest-amd64"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+    extra_files:
+      - assets/html
+
+  - use: buildx
+    goos: linux
+    goarch: arm64
+    dockerfile: Dockerfiles/Dockerfile.workload
+    ids:
+      - generic
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:{{ .Version }}-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:latest-arm64"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+  - use: buildx
+    goos: linux
+    goarch: amd64
+    dockerfile: Dockerfiles/Dockerfile.workload
+    ids:
+      - generic
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:{{ .Version }}-amd64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:latest-amd64"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+
+  - use: buildx
+    goos: linux
+    goarch: arm64
+    dockerfile: Dockerfiles/Dockerfile.external-workload
+    ids:
+      - generic
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:{{ .Version }}-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest-arm64"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+  - use: buildx
+    goos: linux
+    goarch: amd64
+    dockerfile: Dockerfiles/Dockerfile.external-workload
+    ids:
+      - generic
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:{{ .Version }}-amd64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest-amd64"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+
+  # For the Pi, we only build an external-workload image for arm64. The Pi itself
+  # is arm64, so there's no point in building for amd64, and we're not going to try
+  # to access Pi GPIO from inside Kubernetes.
+  - use: buildx
+    goos: linux
+    goarch: arm64
+    # Not a typo! We really do use the same Dockerfile as the generic external
+    # workload, we're just copying in our workload binary from the Pi build
+    # rather than the generic build.
+    dockerfile: Dockerfiles/Dockerfile.external-workload
+    ids:
+      - pi
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-workload:{{ .Version }}-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-workload:latest-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-workload:{{ .Version }}"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-workload:latest"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+
+docker_manifests:
+  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}"
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}-amd64"
+    create_flags:
+      - --insecure
+    push_flags:
+      - --insecure
+
+  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest"
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest-amd64"
+    create_flags:
+      - --insecure
+    push_flags:
+      - --insecure
+
+  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:{{ .Version }}"
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:{{ .Version }}-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:{{ .Version }}-amd64"
+    create_flags:
+      - --insecure
+    push_flags:
+      - --insecure
+
+  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:latest"
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:latest-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:latest-amd64"
+    create_flags:
+      - --insecure
+    push_flags:
+      - --insecure
+
+  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest"
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest-amd64"
+    create_flags:
+      - --insecure
+    push_flags:
+      - --insecure
+
+  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:{{ .Version }}"
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:{{ .Version }}-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:{{ .Version }}-amd64"
+    create_flags:
+      - --insecure
+    push_flags:
+      - --insecure
+
+archives:
+  - id: generic
+    name_template: '{{ .ProjectName }}_generic_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
+    builds:
+      - generic
+  - id: pi
+    name_template: '{{ .ProjectName }}_pi_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
+    builds:
+      - pi
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"

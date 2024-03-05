@@ -1,0 +1,23 @@
+apiVersion: "v2"
+# this version will be updated by the CI before publishing the Helm tarball
+appVersion: %VERSION%
+description: |
+  This is the Faces demo application. It has a single-page web GUI that
+  presents a grid of cells, each of which _should_ show a smiling face on
+  a green background. Spoiler alert: installed exactly as committed to this
+  repo, that isn't what you'll get -- many, many things can go wrong, and
+  will. The point of the demo is let you try to fix things.
+type: application
+home: https://github.com/BuoyantIO/faces-demo
+keywords:
+- service-mesh
+kubeVersion: ">=1.25.0-0"
+name: "faces-chart"
+sources:
+- https://github.com/BuoyantIO/faces-demo
+version: %VERSION%
+icon: https://raw.githubusercontent.com/BuoyantIO/faces-demo/main/assets/logo-128.png
+maintainers:
+  - name: Flynn
+    email: flynn@buoyant.io
+    url: https://github.com/BuoyantIO/faces-demo

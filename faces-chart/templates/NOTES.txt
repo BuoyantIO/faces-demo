@@ -1,0 +1,7 @@
+The Faces demo has been successfully installed! 🎉
+
+To use it, you need to arrange for the "/face" HTTP Path to reach the "face"
+Service, and some other Path to reach the "face-gui" Service.
+
+For more information, visit https://github.com/BuoyantIO/faces-demo/ !
+

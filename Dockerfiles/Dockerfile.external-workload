@@ -17,30 +17,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-clear
+ARG BASE=ghcr.io/buoyantio/demo-external-base:0.2.0
 
-# Create a K3d cluster to run the Faces application.
-CLUSTER=${CLUSTER:-faces}
-# echo "CLUSTER is $CLUSTER"
+# Build over the external-workload base image.
+FROM $BASE AS final
 
-SETUP=${SETUP:-setup-cluster.sh}
-# echo "SETUP is $SETUP"
+# This is associated with the faces-demo repo.
+LABEL org.opencontainers.image.source=https://github.com/BuoyantIO/faces-demo
 
-# Ditch any old cluster...
-k3d cluster delete $CLUSTER &>/dev/null
-
-#@SHOW
-
-# Expose ports 80 and 443 to the local host, so that our ingress can work.
-# Also, don't install traefik, since we'll be putting Linkerd on instead.
-k3d cluster create $CLUSTER \
-    -p "80:80@loadbalancer" -p "443:443@loadbalancer" \
-    --k3s-arg '--disable=traefik@server:*;agents:*'
-
-#@wait
-#@HIDE
-
-# if [ -f images.tar ]; then k3d image import -c ${CLUSTER} images.tar; fi
-# #@wait
-
-# $SHELL $SETUP
+# Copy the compiled binary from the builder stage into the final image
+COPY workload /workload/start
