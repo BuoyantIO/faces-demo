@@ -38,16 +38,6 @@ linkerd install | kubectl apply -f -
 linkerd check
 #### LINKERD_INSTALL_END
 
-# # Next up, install Grafana, since we don't get that by default in 2.12.
-# #### GRAFANA_INSTALL_START
-# helm repo add grafana https://grafana.github.io/helm-charts
-# helm install grafana -n grafana --create-namespace grafana/grafana \
-#   -f https://raw.githubusercontent.com/linkerd/linkerd2/main/grafana/values.yaml \
-#   --wait
-# linkerd viz install --set grafana.url=grafana.grafana:3000 | kubectl apply -f -
-# linkerd check
-# #### GRAFANA_INSTALL_END
-
 linkerd viz install | kubectl apply -f -
 linkerd check
 
