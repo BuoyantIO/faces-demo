@@ -61,6 +61,7 @@ registry-check:
 clean:
 	rm -rf oci
 	rm -rf faces-chart-*
+	rm -rf dist
 .PHONY: clean
 
 clobber: clean
