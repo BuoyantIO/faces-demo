@@ -23,11 +23,11 @@ FACES_SERVICE_VERSION=0.8.0
 BASEDIR=k8s/01-base
 
 help:
-	@echo "'make images' will build the Docker images for the Faces GUI"
-	@echo "(version $(FACES_GUI_VERSION)) and the Faces service (version $(FACES_SERVICE_VERSION))."
-	@echo "Make sure you update the versions in the Makefile when you change"
-	@echo "the images, or Kubernetes might get confused. You will need to"
-	@echo "have the DEV_REGISTRY variable set when doing this."
+	@echo "'make images' will do local builds of all the Docker images,"
+	@echo "without pushing them to a registry and therefore without creating"
+	@echo "multiarch manifests. This will leave you with images in the local"
+	@echo "Docker cache, tagged with version 'latest-{architecture}' (e.g."
+	@echo "'latest-arm64' and 'latest-amd64')."
 	@echo ""
 	@echo "'VERSION=... make chart' will package up the Helm chart into"
 	@echo "'faces-chart-$$VERSION.tgz'. You must set VERSION in order to use
@@ -51,6 +51,9 @@ help:
 	@echo "or 'make clobber' to smite everything and completely start over."
 .PHONY: help
 
+images:
+	goreleaser release --snapshot --clean
+
 registry-check:
 	@if [ -z "$(DEV_REGISTRY)" ]; then \
 		echo "DEV_REGISTRY must be set (e.g. DEV_REGISTRY=docker.io/myregistry)" >&2 ;\
@@ -59,7 +62,6 @@ registry-check:
 .PHONY: registry-check
 
 clean:
-	rm -rf oci
 	rm -rf faces-chart-*
 	rm -rf dist
 .PHONY: clean
@@ -67,75 +69,6 @@ clean:
 clobber: clean
 	rm -f $(BASEDIR)/faces.yaml $(BASEDIR)/faces-gui.yaml
 .PHONY: clobber
-
-oci: registry-check
-	mkdir -p oci
-
-oci/python.img: | oci
-	crane pull python:3.10.7 oci/python.img
-.PRECIOUS: oci/python.img
-
-oci/faces-gui.layer: oci src/faces-gui/data/index.html src/faces-gui/start
-	ocibuild layer dir --prefix application src/faces-gui > oci/faces-gui.layer
-
-# oci/faces-gui.img: oci/python.img oci/faces-gui.layer
-# 	ocibuild image build \
-# 		--base oci/python.img \
-# 		--config.Entrypoint /application/start \
-# 		--tag $(DEV_REGISTRY)/faces-gui:$(FACES_GUI_VERSION) \
-# 		oci/faces-gui.layer \
-# 		> oci/faces-gui.img
-# 	docker load -i oci/faces-gui.img
-# 	docker push $(DEV_REGISTRY)/faces-gui:$(FACES_GUI_VERSION)
-
-PYTHON_LAYERS = \
-	oci/urllib3-1.26.12-py2.py3-none-any.layer \
-	oci/idna-3.4-py3-none-any.layer \
-	oci/charset_normalizer-2.1.1-py3-none-any.layer \
-	oci/certifi-2022.9.24-py3-none-any.layer \
-	oci/requests-2.28.1-py3-none-any.layer
-
-python-layers: $(PYTHON_LAYERS)
-
-oci/%.whl: | oci
-	ocibuild python getwheel $(patsubst oci/%,%,$(patsubst %.layer,%.whl,$@)) > $(patsubst %.layer,%.whl,$@)
-
-oci/python-platform.yaml: oci/python.img
-	ocibuild python inspect --imagefile=oci/python.img > oci/python-platform.yaml
-.PRECIOUS: oci/python.img
-
-oci/%.layer: oci/%.whl oci/python-platform.yaml
-	ocibuild layer wheel --platform-file oci/python-platform.yaml oci/$*.whl > oci/$*.layer
-
-oci/squashed-python.layer: $(PYTHON_LAYERS)
-	ocibuild layer squash $(PYTHON_LAYERS) > oci/squashed-python.layer
-
-oci/faces-service.layer: oci src/faces-service/server.py
-	ocibuild layer dir --prefix faces-service src/faces-service > oci/faces-service.layer
-
-oci/faces-gui.img: oci/python.img oci/faces-service.layer oci/squashed-python.layer oci/faces-gui.layer
-	ocibuild image build \
-		--base oci/python.img \
-		--config.Entrypoint /faces-service/server.py \
-		--config.Env.append FACES_SERVICE=gui \
-		--tag $(DEV_REGISTRY)/faces-gui:$(FACES_GUI_VERSION) \
-		oci/squashed-python.layer oci/faces-service.layer oci/faces-gui.layer \
-		> oci/faces-gui.img
-	docker load -i oci/faces-gui.img
-	docker push $(DEV_REGISTRY)/faces-gui:$(FACES_SERVICE_VERSION)
-
-oci/faces-service.img: oci/python.img oci/faces-service.layer oci/squashed-python.layer
-	ocibuild image build \
-		--base oci/python.img \
-		--config.Entrypoint /faces-service/server.py \
-		--tag $(DEV_REGISTRY)/faces-service:$(FACES_SERVICE_VERSION) \
-		oci/squashed-python.layer oci/faces-service.layer \
-		> oci/faces-service.img
-	docker load -i oci/faces-service.img
-	docker push $(DEV_REGISTRY)/faces-service:$(FACES_SERVICE_VERSION)
-
-# This is just an alias
-images: oci/faces-gui.img oci/faces-service.img
 
 $(BASEDIR)/faces-gui.yaml: src/templates/faces-gui.yaml.in FORCE
 	sed -e "s%DEV_REGISTRY%$(DEV_REGISTRY)%" \
