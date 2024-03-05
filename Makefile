@@ -17,11 +17,6 @@
 
 SHELL=bash
 
-FACES_GUI_VERSION=0.8.0
-FACES_SERVICE_VERSION=0.8.0
-
-BASEDIR=k8s/01-base
-
 help:
 	@echo "'make images' will do local builds of all the Docker images,"
 	@echo "without pushing them to a registry and therefore without creating"
@@ -37,13 +32,6 @@ help:
 	@echo "to the given HELM_REGISTRY. You must set both HELM_REGISTRY and VERSION"
 	@echo "in order to use this target."
 	@echo ""
-	@echo "'make yaml' will build $(BASEDIR)/faces-gui.yaml and"
-	@echo "$(BASEDIR)/faces.yaml, suitable for feeding to kubectl apply."
-	@echo "These will create Kubernetes Services and Deployments for the"
-	@echo "Faces GUI and its microservices. No namespace is stamped into"
-	@echo "the YAML, so you can use whatever namespace you like when you"
-	@echo "apply it."
-	@echo ""
 	@echo "'make deploy' will build and apply the k8s YAML into the faces"
 	@echo "namespace. This should be safe to do repeatedly."
 	@echo ""
@@ -54,34 +42,13 @@ help:
 images:
 	goreleaser release --snapshot --clean
 
-registry-check:
-	@if [ -z "$(DEV_REGISTRY)" ]; then \
-		echo "DEV_REGISTRY must be set (e.g. DEV_REGISTRY=docker.io/myregistry)" >&2 ;\
-		exit 1; \
-	fi
-.PHONY: registry-check
-
 clean:
 	rm -rf faces-chart-*
 	rm -rf dist
 .PHONY: clean
 
 clobber: clean
-	rm -f $(BASEDIR)/faces.yaml $(BASEDIR)/faces-gui.yaml
 .PHONY: clobber
-
-$(BASEDIR)/faces-gui.yaml: src/templates/faces-gui.yaml.in FORCE
-	sed -e "s%DEV_REGISTRY%$(DEV_REGISTRY)%" \
-	    -e "s%FACES_GUI_VERSION%$(FACES_GUI_VERSION)%" \
-		< src/templates/faces-gui.yaml.in > $(BASEDIR)/faces-gui.yaml
-
-$(BASEDIR)/faces.yaml: src/templates/faces.yaml.in FORCE
-	sed -e "s%DEV_REGISTRY%$(DEV_REGISTRY)%" \
-	    -e "s%FACES_SERVICE_VERSION%$(FACES_SERVICE_VERSION)%" \
-		< src/templates/faces.yaml.in > $(BASEDIR)/faces.yaml
-
-# This is just an alias
-yaml: $(BASEDIR)/faces-gui.yaml $(BASEDIR)/faces.yaml
 
 version-check:
 	@if [ -z "$(VERSION)" ]; then \
@@ -114,18 +81,6 @@ push-chart: version-check helm-registry-check faces-chart-$(VERSION).tgz
 
 # This is just an alias
 chart: faces-chart-$(VERSION).tgz
-
-deploy: images $(BASEDIR)/faces-gui.yaml $(BASEDIR)/faces.yaml
-	$(MAKE) reset
-	$(MAKE) apply
-
-apply:
-	kubectl create namespace faces || true
-	linkerd inject $(BASEDIR) | kubectl apply -n faces -f -
-	@echo "You should now be able to open http://localhost/faces/ in your browser."
-
-reset: FORCE
-	kubectl delete ns faces || true
 
 # Sometimes we have a file-target that we want Make to always try to
 # re-generate (such as compiling a Go program; we would like to let
