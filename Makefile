@@ -29,6 +29,14 @@ help:
 	@echo "the images, or Kubernetes might get confused. You will need to"
 	@echo "have the DEV_REGISTRY variable set when doing this."
 	@echo ""
+	@echo "'VERSION=... make chart' will package up the Helm chart into"
+	@echo "'faces-chart-$$VERSION.tgz'. You must set VERSION in order to use
+	@echo "this target."
+	@echo ""
+	@echo "'HELM_REGISTRY=... VERSION=... make push-chart' will push the chart"
+	@echo "to the given HELM_REGISTRY. You must set both HELM_REGISTRY and VERSION"
+	@echo "in order to use this target."
+	@echo ""
 	@echo "'make yaml' will build $(BASEDIR)/faces-gui.yaml and"
 	@echo "$(BASEDIR)/faces.yaml, suitable for feeding to kubectl apply."
 	@echo "These will create Kubernetes Services and Deployments for the"
@@ -52,6 +60,7 @@ registry-check:
 
 clean:
 	rm -rf oci
+	rm -rf faces-chart-*
 .PHONY: clean
 
 clobber: clean
@@ -139,6 +148,38 @@ $(BASEDIR)/faces.yaml: src/templates/faces.yaml.in FORCE
 
 # This is just an alias
 yaml: $(BASEDIR)/faces-gui.yaml $(BASEDIR)/faces.yaml
+
+version-check:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "VERSION must be set (e.g. VERSION=1.0.0-alpha.3)" >&2 ;\
+		exit 1; \
+	fi
+.PHONY: version-check
+
+helm-registry-check:
+	@if [ -z "$(HELM_REGISTRY)" ]; then \
+		echo "HELM_REGISTRY must be set (e.g. HELM_REGISTRY=oci://ghcr.io/myorganization)" >&2 ;\
+		exit 1; \
+	fi
+.PHONY: helm-registry-check
+
+faces-chart-$(VERSION).tgz: version-check faces-chart
+	rm -rf faces-chart-$(VERSION)
+	cp -prv faces-chart faces-chart-$(VERSION)
+	sed -e "s/%VERSION%/$(VERSION)/" \
+		< faces-chart-$(VERSION)/Chart.yaml > faces-chart-$(VERSION)/Chart-fixed.yaml
+	mv faces-chart-$(VERSION)/Chart-fixed.yaml faces-chart-$(VERSION)/Chart.yaml
+	helm package ./faces-chart-$(VERSION)
+
+push-chart: version-check helm-registry-check faces-chart-$(VERSION).tgz
+	if [ -n "$(HELM_REGISTRY)" ]; then \
+		helm push faces-chart-$(VERSION).tgz $(HELM_REGISTRY); \
+	else \
+		echo "HELM_REGISTRY not set, not pushing"; \
+	fi
+
+# This is just an alias
+chart: faces-chart-$(VERSION).tgz
 
 deploy: images $(BASEDIR)/faces-gui.yaml $(BASEDIR)/faces.yaml
 	$(MAKE) reset
