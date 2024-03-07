@@ -14,10 +14,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Get the version
-      id: get_version
-      run: echo ::set-output name=VERSION::${GITHUB_REF#refs/tags/}
-
     - name: Checkout code
       uses: actions/checkout@v4
       with:
@@ -47,5 +43,4 @@ jobs:
     - name: Run make push-chart
       env:
         HELM_REGISTRY: oci://ghcr.io/buoyantio
-        VERSION: ${{ steps.get_version.outputs.VERSION }}
-      run: make push-chart
+      run: make VERSION=${GITHUB_REF#refs/tags/v} push-chart
