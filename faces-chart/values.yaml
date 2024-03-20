@@ -39,6 +39,7 @@ smiley:
   imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
   errorFraction: ""             # If not set, uses backend.errorFraction
   delayBuckets: ""              # If not set, uses backend.delayBuckets
+  smiley: "Smiling"             # Override if desired
 
 color:
   image: ""                     # If set, overrides the imageName/imageTag pair
@@ -47,3 +48,4 @@ color:
   imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
   errorFraction: ""             # If not set, uses backend.errorFraction
   delayBuckets: ""              # If not set, uses backend.delayBuckets
+  color: "blue"                 # Override if desired

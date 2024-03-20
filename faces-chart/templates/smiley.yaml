@@ -37,6 +37,8 @@ spec:
         env:
         - name: FACES_SERVICE
           value: "smiley"
+        - name: SMILEY
+          value: {{ .Values.smiley.smiley }}
         {{- include "partials.smiley-errorFraction" . }}
         {{- include "partials.smiley-delayBuckets" . }}
         resources:

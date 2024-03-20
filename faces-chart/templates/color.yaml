@@ -37,6 +37,8 @@ spec:
         env:
         - name: FACES_SERVICE
           value: "color"
+        - name: COLOR
+          value: {{ .Values.color.color }}
         {{- include "partials.color-errorFraction" . }}
         {{- include "partials.color-delayBuckets" . }}
         resources:
