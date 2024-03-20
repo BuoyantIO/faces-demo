@@ -1,13 +1,14 @@
+{{- if .Values.color2.enabled -}}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: color
+  name: color2
   namespace: {{ .Release.Namespace }}
 spec:
   type: ClusterIP
   selector:
-    service: color
+    service: color2
   ports:
   - port: 80
     targetPort: http
@@ -15,22 +16,22 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: color
+  name: color2
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      service: color
+      service: color2
   template:
     metadata:
       labels:
-        service: color
+        service: color2
     spec:
       containers:
-      - name: color
-        image: {{ include "partials.color-image" . }}
-        imagePullPolicy: {{ include "partials.color-imagePullPolicy" . }}
+      - name: color2
+        image: {{ include "partials.color2-image" . }}
+        imagePullPolicy: {{ include "partials.color2-imagePullPolicy" . }}
         ports:
         - name: http
           containerPort: 8000
@@ -38,9 +39,9 @@ spec:
         - name: FACES_SERVICE
           value: "color"
         - name: COLOR
-          value: {{ .Values.color.color }}
-        {{- include "partials.color-errorFraction" . }}
-        {{- include "partials.color-delayBuckets" . }}
+          value: {{ .Values.color2.color }}
+        {{- include "partials.color2-errorFraction" . }}
+        {{- include "partials.color2-delayBuckets" . }}
         resources:
           requests:
             cpu: 100m
@@ -48,3 +49,4 @@ spec:
           limits:
             cpu: 250m
             memory: 128Mi
+{{- end -}}

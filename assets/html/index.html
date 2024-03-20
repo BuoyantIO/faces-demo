@@ -876,20 +876,25 @@ class Cell {
 class Key {
 	constructor(keyDiv) {
 		let keyEntries = [
-			[ "smiling",  "green", "grey", "24px", "Success!" ],
-			[ "confused", "red",   "grey", "",     "Face service error" ],
-			[ "sleeping", "pink",  "grey", "",     "Timeout" ],
-			[ "kaboom",   "red",   "grey", "24px", "Service overwhelmed" ],
-			[ "smiling",  "grey",  "red",  "",     "Color service error" ],
-			[ "cursing",  "green", "red",  "24px", "Smiley service error" ],
-			[ "-",        "-",     "-",    "",     "Slow service" ]
+			[ "smiling",  "blue",  "grey",         "24px", "Success!" ],
+			[ "confused", "red",   "grey",         "",     "Face service error" ],
+			[ "sleeping", "pink",  "grey",         "",     "Timeout" ],
+			[ "kaboom",   "red",   "grey",         "24px", "Service overwhelmed" ],
+			[ "smiling",  "grey",  "transparent",  "",     "Color service error" ],
+			[ "",         "blue",  "red",          "24px", "Smiley service error" ],
+			[ "-",         "-",     "-",           "",     "Slow service" ]
 		]
 
 		for (let i = 0; i < keyEntries.length; i++) {
 			let [ smileyName, bgColor, borderColor, margin, text ] = keyEntries[i]
 
 			if (smileyName != "-") {
-				let smiley = Cell.smilies[smileyName]
+				let smiley = ""
+
+				if (smileyName != "") {
+					smiley = Cell.smilies[smileyName]
+				}
+
 				let style = `background: ${bgColor}; border: 2px solid ${borderColor};`
 
 				if (margin) {
