@@ -7,7 +7,7 @@
 defaultImageTag: ""             # If not set, uses the appVersion
 
 # Default imagePullPolicy. This is used only if not set in the sections below.
-defaultImagePullPolicy: Always
+defaultImagePullPolicy: IfNotPresent
 
 gui:
   image: ""                     # If set, overrides the imageName/imageTag pair
