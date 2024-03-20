@@ -41,6 +41,16 @@ smiley:
   delayBuckets: ""              # If not set, uses backend.delayBuckets
   smiley: "Smiling"             # Override if desired
 
+smiley2:
+  enabled: False                # If set to True, enables the second smiley workload
+  image: ""                     # If set, overrides the imageName/imageTag pair
+  imageName: ""                 # If not set, uses backend.imageName
+  imageTag: ""                  # If not set, uses backend.imageTag
+  imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
+  errorFraction: ""             # If not set, uses backend.errorFraction
+  delayBuckets: ""              # If not set, uses backend.delayBuckets
+  smiley: "HeartEyes"           # Override if desired
+
 color:
   image: ""                     # If set, overrides the imageName/imageTag pair
   imageName: ""                 # If not set, uses backend.imageName
@@ -49,3 +59,13 @@ color:
   errorFraction: ""             # If not set, uses backend.errorFraction
   delayBuckets: ""              # If not set, uses backend.delayBuckets
   color: "blue"                 # Override if desired
+
+color2:
+  enabled: False                # If set to True, enables the second color workload
+  image: ""                     # If set, overrides the imageName/imageTag pair
+  imageName: ""                 # If not set, uses backend.imageName
+  imageTag: ""                  # If not set, uses backend.imageTag
+  imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
+  errorFraction: ""             # If not set, uses backend.errorFraction
+  delayBuckets: ""              # If not set, uses backend.delayBuckets
+  color: "orange"               # Override if desired

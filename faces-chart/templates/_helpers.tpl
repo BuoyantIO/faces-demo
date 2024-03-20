@@ -107,6 +107,22 @@
   {{- include "partials.select-errorFraction" (dict "source" .Values.color "default" .Values.backend) -}}
 {{- end -}}
 
+{{- define "partials.color2-image" -}}
+  {{- include "partials.select-image" (dict "source" .Values.color2 "default" .Values.backend "root" .) -}}
+{{- end -}}
+
+{{- define "partials.color2-imagePullPolicy" -}}
+  {{- include "partials.select-imagePullPolicy" (dict "source" .Values.color2 "default" .Values.backend "root" .) -}}
+{{- end -}}
+
+{{- define "partials.color2-delayBuckets" -}}
+  {{- include "partials.select-delayBuckets" (dict "source" .Values.color2 "default" .Values.backend) -}}
+{{- end -}}
+
+{{- define "partials.color2-errorFraction" -}}
+  {{- include "partials.select-errorFraction" (dict "source" .Values.color2 "default" .Values.backend) -}}
+{{- end -}}
+
 {{- define "partials.smiley-image" -}}
   {{- include "partials.select-image" (dict "source" .Values.smiley "default" .Values.backend "root" .) -}}
 {{- end -}}
@@ -123,3 +139,18 @@
   {{- include "partials.select-errorFraction" (dict "source" .Values.smiley "default" .Values.backend) -}}
 {{- end -}}
 
+{{- define "partials.smiley2-image" -}}
+  {{- include "partials.select-image" (dict "source" .Values.smiley2 "default" .Values.backend "root" .) -}}
+{{- end -}}
+
+{{- define "partials.smiley2-imagePullPolicy" -}}
+  {{- include "partials.select-imagePullPolicy" (dict "source" .Values.smiley2 "default" .Values.backend "root" .) -}}
+{{- end -}}
+
+{{- define "partials.smiley2-delayBuckets" -}}
+  {{- include "partials.select-delayBuckets" (dict "source" .Values.smiley2 "default" .Values.backend) -}}
+{{- end -}}
+
+{{- define "partials.smiley2-errorFraction" -}}
+  {{- include "partials.select-errorFraction" (dict "source" .Values.smiley2 "default" .Values.backend) -}}
+{{- end -}}
