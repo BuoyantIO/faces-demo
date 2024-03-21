@@ -33,10 +33,11 @@ var Defaults = map[string]string{
 	"color":  "grey",
 	"smiley": Smileys["Cursing"],
 
-	// 504 errors (GatewayTimeout) get handled in the GUI, so
-	// just pass those on.
-	"color-504":  "504",
-	"smiley-504": "504",
+	// 504 errors (GatewayTimeout) from the face workload will get handled in
+	// the GUI, but from the color & smiley workloads, they should get
+	// translated to a pink color or a sleeping face.
+	"color-504":  "pink",
+	"smiley-504": Smileys["Sleeping"],
 
 	// Ratelimits are pink with an exploding head.
 	"color-ratelimit":  "pink",
