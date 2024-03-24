@@ -28,18 +28,31 @@ var Smileys = map[string]string{
 	"Screaming":   "&#x1F631;",
 }
 
+// colorblind-friendly colors from the Tol palette
+var Colors = map[string]string{
+	"grey":    "grey",
+	"purple":  "rgb(48 34 130)",
+	"green":   "rgb(55 117 59)",
+	"teal":    "rgb(55 117 59)",   // too similar to grey, avoid
+	"blue":    "rgb(151 202 234)", // light blue
+	"yellow":  "rgb(218 204 130)",
+	"pink":    "rgb(191 108 120)",
+	"hotpink": "rgb(158 75 149)",
+	"red":     "rgb(125 42 83)", // dark magenta
+}
+
 var Defaults = map[string]string{
 	// Default to grey background, cursing face.
-	"color":  "grey",
+	"color":  Colors["grey"],
 	"smiley": Smileys["Cursing"],
 
 	// 504 errors (GatewayTimeout) from the face workload will get handled in
 	// the GUI, but from the color & smiley workloads, they should get
-	// translated to a pink color or a sleeping face.
-	"color-504":  "pink",
+	// translated to a pink color and a sleeping face.
+	"color-504":  Colors["pink"],
 	"smiley-504": Smileys["Sleeping"],
 
 	// Ratelimits are pink with an exploding head.
-	"color-ratelimit":  "pink",
+	"color-ratelimit":  Colors["pink"],
 	"smiley-ratelimit": Smileys["Kaboom"],
 }
