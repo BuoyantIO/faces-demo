@@ -39,7 +39,7 @@ smiley:
   imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
   errorFraction: ""             # If not set, uses backend.errorFraction
   delayBuckets: ""              # If not set, uses backend.delayBuckets
-  smiley: "Smiling"             # Override if desired
+  smiley: ""                    # Override if desired
 
 smiley2:
   enabled: False                # If set to True, enables the second smiley workload
@@ -58,7 +58,7 @@ color:
   imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
   errorFraction: ""             # If not set, uses backend.errorFraction
   delayBuckets: ""              # If not set, uses backend.delayBuckets
-  color: "blue"                 # Override if desired, defaults to colorblind-friendly light blue from the Tol palette
+  color: ""                     # Override if desired, defaults to colorblind-friendly light blue from the Tol palette
 
 color2:
   enabled: False                # If set to True, enables the second color workload
