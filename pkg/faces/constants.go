@@ -17,15 +17,32 @@
 
 package faces
 
-var Smileys = map[string]string{
-	"Smiling":     "&#x1F603;",
-	"Sleeping":    "&#x1F634;",
-	"Cursing":     "&#x1F92C;",
-	"Kaboom":      "&#x1F92F;",
-	"HeartEyes":   "&#x1F60D;",
-	"Neutral":     "&#x1F610;",
-	"RollingEyes": "&#x1F644;",
-	"Screaming":   "&#x1F631;",
+type SmileyMap struct {
+	smileys map[string]string
+}
+
+var Smileys = SmileyMap{
+	smileys: map[string]string{
+		"Smiling":     "&#x1F603;",
+		"Sleeping":    "&#x1F634;",
+		"Cursing":     "&#x1F92C;",
+		"Kaboom":      "&#x1F92F;",
+		"HeartEyes":   "&#x1F60D;",
+		"Neutral":     "&#x1F610;",
+		"RollingEyes": "&#x1F644;",
+		"Screaming":   "&#x1F631;",
+		"Vomiting":    "&#x1F92E;",
+	},
+}
+
+// Lookup a smiley by name. If found, return the HTML entity for the smiley
+// and true; if not found, return an empty string and false.
+func (sm *SmileyMap) Lookup(name string) (string, bool) {
+	if smiley, ok := sm.smileys[name]; ok {
+		return smiley, true
+	}
+
+	return "", false
 }
 
 type Palette struct {
@@ -101,15 +118,15 @@ func (p *Palette) Lookup(name string) string {
 var Defaults = map[string]string{
 	// Default to grey background, cursing face.
 	"color":  "grey",
-	"smiley": Smileys["Cursing"],
+	"smiley": "Cursing",
 
 	// 504 errors (GatewayTimeout) from the face workload will get handled in
 	// the GUI, but from the color & smiley workloads, they should get
 	// translated to a red color and a sleeping face.
 	"color-504":  "red",
-	"smiley-504": Smileys["Sleeping"],
+	"smiley-504": "Sleeping",
 
 	// Ratelimits are yellow with an exploding head.
 	"color-ratelimit":  "yellow",
-	"smiley-ratelimit": Smileys["Kaboom"],
+	"smiley-ratelimit": "Kaboom",
 }

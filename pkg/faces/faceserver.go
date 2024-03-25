@@ -181,12 +181,13 @@ func (srv *FaceServer) faceGetHandler(r *http.Request, rstat *BaseRequestStatus)
 	errors := []string{}
 	var smiley string
 	var color string
+	var smileyOK bool
 
 	rateStr := fmt.Sprintf("%.1f RPS", srv.CurrentRate())
 
 	if rstat.IsRateLimited() {
 		errors = append(errors, rstat.Message())
-		smiley = Defaults["smiley-ratelimit"]
+		smiley, smileyOK = Smileys.Lookup(Defaults["smiley-ratelimit"])
 		color = Colors.Lookup(Defaults["color-ratelimit"])
 	} else {
 		user := r.Header.Get("X-Faces-User")
@@ -218,9 +219,16 @@ func (srv *FaceServer) faceGetHandler(r *http.Request, rstat *BaseRequestStatus)
 
 		if smileyResp.statusCode != http.StatusOK {
 			errors = append(errors, fmt.Sprintf("smiley: %s", smileyResp.data))
-			smiley = mapStatus("smiley", smileyResp.statusCode)
+			mapped := mapStatus("smiley", smileyResp.statusCode)
+			smiley, smileyOK = Smileys.Lookup(mapped)
+
+			if srv.debugEnabled {
+				fmt.Printf("%s %s: mapped smiley %d to %s (%s, %v)\n",
+				            time.Now().Format(time.RFC3339), srv.Name, smileyResp.statusCode, mapped, smiley, smileyOK)
+			}
 		} else {
 			smiley = smileyResp.data
+			smileyOK = true
 		}
 
 		colorResp := <-colorCh
@@ -231,6 +239,11 @@ func (srv *FaceServer) faceGetHandler(r *http.Request, rstat *BaseRequestStatus)
 		} else {
 			color = colorResp.data
 		}
+	}
+
+	if !smileyOK {
+		// Something bizarre happened with the smiley lookup?
+		smiley, _ = Smileys.Lookup("Vomiting")
 	}
 
 	end := time.Now()
