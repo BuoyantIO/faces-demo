@@ -58,7 +58,7 @@ color:
   imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
   errorFraction: ""             # If not set, uses backend.errorFraction
   delayBuckets: ""              # If not set, uses backend.delayBuckets
-  color: "blue"                 # Override if desired
+  color: "rgb(151 202 234)"     # Override if desired, defaults to colorblind-friendly light blue from the Tol palette
 
 color2:
   enabled: False                # If set to True, enables the second color workload
@@ -68,4 +68,4 @@ color2:
   imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
   errorFraction: ""             # If not set, uses backend.errorFraction
   delayBuckets: ""              # If not set, uses backend.delayBuckets
-  color: "orange"               # Override if desired
+  color: "rgb(55 117 59)"       # Override if desired, defaults to colorblind-friendly green from the Tol palette

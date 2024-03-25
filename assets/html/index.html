@@ -26,19 +26,19 @@
 		}
 
 		.green {
-			color: green;
+			color: rgb(55 117 59);
 		}
 
 		.red {
-			color: red;
+			color: rgb(125 42 83); /* dark magenta */
 		}
 
 		.blue {
-			color: blue;
+			color: rgb(151 202 234); /* light blue */
 		}
 
 		.grey {
-			color: gray;
+			color: grey;
 		}
 
 		.key {
@@ -184,19 +184,19 @@
 		}
 
 		.bg-green {
-			background-color: green;
+			background-color: rgb(55 117 59);
 		}
 
 		.bg-red {
-			background-color: red;
+			background-color: rgb(125 42 83); /* dark magenta */
 		}
 
 		.bg-blue {
-			background-color: blue;
+			background-color: rgb(151 202 234); /* light blue */
 		}
 
 		.bg-grey {
-			background-color: gray;
+			background-color: grey;
 		}
 
 		.inline {
@@ -304,15 +304,15 @@ class Logger {
 	// having to always pass the color by hand.
 
 	success(msg) {
-		this.logmsg("green", msg)
+		this.logmsg(Cell.colors.green, msg)
 	}
 
 	fail(msg) {
-		this.logmsg("red", msg)
+		this.logmsg(Cell.colors.red, msg)
 	}
 
 	info(msg) {
-		this.logmsg("grey", msg)
+		this.logmsg(Cell.colors.grey, msg)
 	}
 }
 
@@ -435,12 +435,12 @@ class PodInfo {
 		if (status == 599) {
 			// Latched error state.
 			smiley = Cell.smilies.neutral
-			bgColor = "hotpink"
+			bgColor = Cell.colors.hotpink
             bumpCounter = true
 		}
 		else if (status == 429) {
 			smiley = Cell.smilies.sleeping
-			bgColor = "pink"
+			bgColor = Cell.colors.pink
             bumpCounter = true
 		}
         else if (status == 200) {
@@ -449,7 +449,7 @@ class PodInfo {
             }
 
             if (bgColor == "504") {
-                bgColor = "pink"
+                bgColor = Cell.colors.pink
             }
 
             this.countDiv.innerHTML = 0
@@ -457,9 +457,9 @@ class PodInfo {
         }
         else {
             // This should probably never happen.
-            borderColor = "red"
+            borderColor = Cell.colors.red
             smiley = Cell.smilies.upset
-            bgColor = "red"
+            bgColor = Cell.colors.red
             bumpCounter = true
 		}
 
@@ -569,6 +569,18 @@ class Cell {
 		"upset":     "&#x1F62C;",
 		"yay":       "&#x1F389;",
 	};
+
+	static colors = {
+		"grey": "grey",
+		"purple": "rgb(48 34 130)",
+		"green": "rgb(55 117 59)",
+		"cyan": "rgb(55 117 59)", // too similar to pink and grey, avoid
+		"blue": "rgb(151 202 234)", // light blue
+		"yellow": "rgb(218 204 130)",
+		"pink": "rgb(191 108 120)",
+		"hotpink": "rgb(158 75 149)",
+		"red": "rgb(125 42 83)", // dark magenta
+	}
 
 	constructor(logger, sw, podSet, fetchURL, enclosingDiv, row, col) {
 		this.logger = logger
@@ -755,7 +767,7 @@ class Cell {
 			setTimeout(() => {
 				$(`smiley-${this.row}-${this.col}`).innerHTML = Cell.smilies.confused
 				$(`cell-${this.row}-${this.col}`).style.opacity = 1.0
-				$(`cell-${this.row}-${this.col}`).style.background = "red"
+				$(`cell-${this.row}-${this.col}`).style.background = Cell.colors.red
 				$(`cell-${this.row}-${this.col}`).style.borderColor = "grey"
 			}, 50)
 
@@ -790,7 +802,7 @@ class Cell {
         let errors = "unknown";
         let smiley = undefined;
         let bgColor = undefined;
-        let borderColor = "grey";
+        let borderColor = Cell.colors.grey;
 
         // Start by assuming that we didn't get any timeouts.
         let anyTimeouts = false;
@@ -808,7 +820,7 @@ class Cell {
 
                 if (obj.errors != undefined) {
                     errors = obj.errors.join(",");
-                    borderColor = "red";
+                    borderColor = Cell.colors.red
                 }
                 else {
                     errors = "success!";
@@ -824,9 +836,9 @@ class Cell {
             catch (e) {
                 // Whoops, something went wrong. If it's a SyntaxError, that
                 // probably means we got bad JSON. Otherwise, it's... who knows?
-                borderColor = "red";
+                borderColor = Cell.colors.red
                 smiley = Cell.smilies.confused;
-                bgColor = "red";
+                bgColor = Cell.colors.red;
 
                 if (e instanceof SyntaxError) {
                     errors = "parse error";
@@ -850,14 +862,14 @@ class Cell {
             // This is our latched-error status. Show it as a neutral face
             // on a hot pink background.
             smiley = Cell.smilies.neutral;
-            bgColor = "hotpink";
+            bgColor = Cell.colors.hotpink;
         }
         else if (Math.floor(curStatus / 100) == 5) {
             // Some other 5yz, so an unknown kind of server error. (In
             // practice, this is probably a 503 because there's some kind
             // of connectivity error, but whatever, we don't care.
             smiley = Cell.smilies.confused;
-            bgColor = "red";
+            bgColor = Cell.colors.red;
             errors = "server error";
         }
 
@@ -866,7 +878,7 @@ class Cell {
         }
 
         if (bgColor == undefined) {
-            bgColor = "purple"
+            bgColor = Cell.colors.purple
         }
 
         return { curStatus, anyTimeouts, smiley, bgColor, borderColor };
@@ -876,12 +888,12 @@ class Cell {
 class Key {
 	constructor(keyDiv) {
 		let keyEntries = [
-			[ "smiling",  "blue",  "grey",         "24px", "Success!" ],
-			[ "confused", "red",   "grey",         "",     "Face service error" ],
-			[ "sleeping", "pink",  "grey",         "",     "Timeout" ],
-			[ "kaboom",   "red",   "grey",         "24px", "Service overwhelmed" ],
-			[ "smiling",  "grey",  "transparent",  "",     "Color service error" ],
-			[ "",         "blue",  "red",          "24px", "Smiley service error" ],
+			[ "smiling",  Cell.colors.blue,  Cell.colors.grey,         "24px", "Success!" ],
+			[ "confused", Cell.colors.red,   Cell.colors.grey,         "",     "Face service error" ],
+			[ "sleeping", Cell.colors.pink,  Cell.colors.grey,         "",     "Timeout" ],
+			[ "kaboom",   Cell.colors.red,   Cell.colors.grey,         "24px", "Service overwhelmed" ],
+			[ "smiling",  Cell.colors.grey,  "transparent",  "",     "Color service error" ],
+			[ "",         Cell.colors.blue,  Cell.colors.red,          "24px", "Smiley service error" ],
 			[ "-",         "-",     "-",           "",     "Slow service" ]
 		]
 
@@ -986,11 +998,11 @@ class CellWatcher {
 
 			if (cellCount > 4) {
 				let smiley = Cell.smilies.sleeping
-				let bgColor = "pink"
+				let bgColor = Cell.colors.pink
 
 				if (cell.lastStatus == 599) {
 					smiley = Cell.smilies.screaming
-					bgColor = "hotpink"
+					bgColor = Cell.colors.hotpink
 				}
 
 				$(`smiley-${cell.row}-${cell.col}`).innerHTML = smiley
@@ -1097,12 +1109,12 @@ class Fetcher {
 			if (xhr.status == 504) {
 				text = `Timeout after ${latency}ms`
 				shape = "19.000,49.000 31.000,49.000 31.000,1.000 19.000,1.000"
-				fgColor = "cyan"
+				fgColor = Cell.colors.cyan
 			}
 			else if (xhr.status != 200) {
 				text = `Unknown status ${xhr.status} after ${latency}ms`
 				shape = "19.000,49.000 31.000,49.000 31.000,1.000 19.000,1.000"
-				fgColor = "red"
+				fgColor = Cell.colors.red
 			}
 			else {
 				// Parse JSON!
@@ -1118,12 +1130,12 @@ class Fetcher {
 					if (e instanceof SyntaxError) {
 						text = `Could not parse QotM: ${e.message}\n${xhr.responseText}`
 						shape = "19.000,49.000 31.000,49.000 31.000,1.000 19.000,1.000"
-						fgColor = "red"
+						fgColor = Cell.colors.red
 					}
 					else {
 						text = `Missing QotM? ${e.message}`
 						shape = "19.000,49.000 31.000,49.000 31.000,1.000 19.000,1.000"
-						fgColor = "red"
+						fgColor = Cell.colors.red
 					}
 				}
 			}
@@ -1134,11 +1146,11 @@ class Fetcher {
 			// XSRF-protection cookie, and it changes whenever the auth token does.
 			let decoration = `${latency}ms`
 
-			let bgColor = "green"
+			let bgColor = Cell.colors.green
 			let curXSRF = getCookie("ambassador_xsrf.keycloak-multi.default")
 
 			if (curXSRF != this.lastXSRF) {
-				bgColor = "blue"
+				bgColor = Cell.colors.blue
 				decoration += ", new session token"
 				this.lastXSRF = curXSRF
 			}
@@ -1167,6 +1179,8 @@ class Fetcher {
 
 			let nowISO = now.toISOString()
 			this.xhrdiv.innerHTML = `<span class="red"><p>${nowISO}: Failed!</p></span>`
+
+			// FIXME: this looks like the wrong arguments for calling this.markers.mark
 			this.markers.mark("red")
 		})
 
