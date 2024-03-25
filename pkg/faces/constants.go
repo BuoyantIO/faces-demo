@@ -33,7 +33,7 @@ var Colors = map[string]string{
 	"grey":    "grey",
 	"purple":  "rgb(48 34 130)",
 	"green":   "rgb(55 117 59)",
-	"teal":    "rgb(55 117 59)",   // too similar to grey, avoid
+	"cyan":    "rgb(55 117 59)",   // too similar to pink and grey, avoid
 	"blue":    "rgb(151 202 234)", // light blue
 	"yellow":  "rgb(218 204 130)",
 	"pink":    "rgb(191 108 120)",
