@@ -187,7 +187,7 @@ func (srv *FaceServer) faceGetHandler(r *http.Request, rstat *BaseRequestStatus)
 	if rstat.IsRateLimited() {
 		errors = append(errors, rstat.Message())
 		smiley = Defaults["smiley-ratelimit"]
-		color = Defaults["color-ratelimit"]
+		color = Colors.Lookup(Defaults["color-ratelimit"])
 	} else {
 		user := r.Header.Get("X-Faces-User")
 
@@ -227,7 +227,7 @@ func (srv *FaceServer) faceGetHandler(r *http.Request, rstat *BaseRequestStatus)
 
 		if colorResp.statusCode != http.StatusOK {
 			errors = append(errors, fmt.Sprintf("color: %s", colorResp.data))
-			color = mapStatus("color", colorResp.statusCode)
+			color = Colors.Lookup(mapStatus("color", colorResp.statusCode))
 		} else {
 			color = colorResp.data
 		}
