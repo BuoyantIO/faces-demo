@@ -23,7 +23,7 @@ type SmileyMap struct {
 
 var Smileys = SmileyMap{
 	smileys: map[string]string{
-		"Smiling":     "&#x1F603;",
+		"Grinning":    "&#x1F603;",
 		"Sleeping":    "&#x1F634;",
 		"Cursing":     "&#x1F92C;",
 		"Kaboom":      "&#x1F92F;",

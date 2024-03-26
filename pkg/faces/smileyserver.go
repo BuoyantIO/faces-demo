@@ -48,7 +48,7 @@ func NewSmileyServer(serverName string) *SmileyServer {
 func (srv *SmileyServer) SetupFromEnvironment() {
 	srv.BaseServer.SetupFromEnvironment()
 
-	smileyKey := utils.StringFromEnv("SMILEY", "Smiling")
+	smileyKey := utils.StringFromEnv("SMILEY", "Grinning")
 
 	smiley, ok := Smileys.Lookup(smileyKey)
 
