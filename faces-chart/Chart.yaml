@@ -3,8 +3,8 @@ apiVersion: "v2"
 appVersion: %VERSION%
 description: |
   This is the Faces demo application. It has a single-page web GUI that
-  presents a grid of cells, each of which _should_ show a smiling face on
-  a green background. Spoiler alert: installed exactly as committed to this
+  presents a grid of cells, each of which _should_ show a grinning face on a
+  light blue background. Spoiler alert: installed exactly as committed to this
   repo, that isn't what you'll get -- many, many things can go wrong, and
   will. The point of the demo is let you try to fix things.
 type: application
