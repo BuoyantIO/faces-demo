@@ -1,7 +1,7 @@
 # Faces Demo
 
 This is the Faces demo application. It has a single-page web GUI that presents
-a grid of cells, each of which _should_ show a smiling face on a green
+a grid of cells, each of which _should_ show a grinning face on a light blue
 background. Spoiler alert: installed exactly as committed to this repo, that
 isn't what you'll get -- many, many things can go wrong, and will. The point
 of the demo is let you try to fix things.
@@ -16,10 +16,14 @@ In here you will find:
    - These things are installed in a demo configuration: read and think
      **carefully** before using this demo as background for a production
      installation! In particular:
-      - We use `sed` to force everything to just one replica when installing
-        Emissary -- **DON'T** do that in production.
-      - We only configure HTTP, not HTTPS. Again, **DON'T** do this in
-        production.
+
+      - We deploy Emissary with only one replica of everything, using a
+        currently-unofficial chart to also skip support for `v1` and `v2`
+        Emissary CRDs.
+
+      - We only configure HTTP, not HTTPS.
+
+     These are likely both bad ideas for a production installation.
 
 - `DEMO.md`, a Markdown file for the resilience demo presented live for a
   couple of events. The easiest way to use `DEMO.md` is to run it with
@@ -52,6 +56,35 @@ In here you will find:
 
 - To run the demo as we've given it before, check out [DEMO.md]. The easiest
   way to use that is to run it with [demosh].
+
+## Architecture
+
+The Faces architecture is fairly simple:
+
+- The `faces-gui` workload, reached on the `/faces/` path, just returns the
+  HTML and Javascript for the GUI. The GUI is a single-page webapp that
+  displays a grid of cells: for each cell, the GUI calls the `face` workload.
+
+- The `face` workload, reached on the `/face/` path, calls the `smiley`
+  workload to get a smiley face and the `color` workload to get a color. It
+  then composes the responses together and returns the smiley/color
+  combination to the GUI for display.
+
+- The `smiley` workload returns a smiley face. By default, this is a grinning
+  smiley, U+1F603, but you can set the `SMILEY` environment variable to any
+  key in the `Smileys` map from `constants.go` to get a different smiley.
+
+- The `color` workload returns a color. By default, this is a light blue, but
+  you can set the `COLOR` environment variable to any key in the `Colors` map
+  from `constants.go` to get a different color, or to any arbitrary hex color
+  code (e.g. `#ff0000` for bright red).
+
+  The named colors in the `Colors` map are meant to work for normal color
+  vision and for various kinds of colorblindness, and are taken from the
+  "Bright" color scheme shown in the "Qualitative // Color Schemes" section of
+  https://personal.sron.nl/~pault/. For (much) more information, read the
+  comments in `pkg/faces/constants.go`. Feedback here is welcome, since the
+  Faces authors have normal color vision...
 
 [Linkerd]: https://linkerd.io
 [Emissary-ingress]: https://www.getambassador.io/docs/emissary/

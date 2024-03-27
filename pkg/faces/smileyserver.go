@@ -48,28 +48,35 @@ func NewSmileyServer(serverName string) *SmileyServer {
 func (srv *SmileyServer) SetupFromEnvironment() {
 	srv.BaseServer.SetupFromEnvironment()
 
-	smileyKey := utils.StringFromEnv("SMILEY", "Smiling")
+	smileyKey := utils.StringFromEnv("SMILEY", "Grinning")
 
-	smiley, ok := Smileys[smileyKey]
+	smiley, ok := Smileys.Lookup(smileyKey)
 
 	if !ok {
 		smileyKey = "Neutral"
-		smiley = Smileys[smileyKey]
+		smiley, _ = Smileys.Lookup(smileyKey)
 	}
 
 	srv.smiley = smiley
 
-	fmt.Printf("%s %s: smiley %s\n", time.Now().Format(time.RFC3339), srv.Name, smileyKey)
+	fmt.Printf("%s %s: smiley %s (%s)\n", time.Now().Format(time.RFC3339), srv.Name, smileyKey, srv.smiley)
 }
 
 func (srv *SmileyServer) smileyGetHandler(r *http.Request, rstat *BaseRequestStatus) *BaseServerResponse {
 	// The only error we need to handle here is the internal rate limiter.
 	if rstat.ratelimited {
+		smiley, ok := Smileys.Lookup(Defaults["smiley-ratelimit"])
+
+		if !ok {
+			// This isn't good.
+			smiley, _ = Smileys.Lookup("Vomiting")
+		}
+
 		errstr := fmt.Sprintf("Rate limited (%.1f RPS > max %.1f RPS)", srv.CurrentRate(), srv.maxRate)
 		return &BaseServerResponse{
 			StatusCode: http.StatusTooManyRequests,
 			Data: map[string]interface{}{
-				"smiley": Defaults["smiley-ratelimit"],
+				"smiley": smiley,
 				"rate":   fmt.Sprintf("%.1f RPS", srv.CurrentRate()),
 				"errors": []string{errstr},
 			},

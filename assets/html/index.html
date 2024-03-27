@@ -25,22 +25,6 @@
 			font-family: sans-serif;
 		}
 
-		.green {
-			color: rgb(55 117 59);
-		}
-
-		.red {
-			color: rgb(125 42 83); /* dark magenta */
-		}
-
-		.blue {
-			color: rgb(151 202 234); /* light blue */
-		}
-
-		.grey {
-			color: grey;
-		}
-
 		.key {
 			font-family: sans-serif;
 			font-size: 32px;
@@ -74,7 +58,7 @@
 
 		.cell {
 			display: inline-block;
-			border: 1px solid grey;
+			border: 2px solid grey;
 			border-radius: 16px;
 			height: 120px;
 			width: 120px;
@@ -96,16 +80,16 @@
         }
 
 		.cell-pod-info {
-		    height: 120px;
-		    width: 120px;
-		    border-radius: 16px;
+			display: inline-block;
+			position: relative;
+			text-align: center;
 		}
 
 		.cell-pod-id {
             position: absolute;
-            top: 1px;
-            left: 1px;
-            width: 118px;
+            top: 4px;
+            left: 4px;
+            width: 120px;
 			border-radius: 14px 14px 0px 0px;
             font-family: sans-serif;
 			background: white;
@@ -179,24 +163,8 @@
 		    border-right: 2px solid grey;
 		    padding-left: .5em;
 		    padding-right: .5em;
-			max-width: 252px !important;
-			width: 252px !important;
-		}
-
-		.bg-green {
-			background-color: rgb(55 117 59);
-		}
-
-		.bg-red {
-			background-color: rgb(125 42 83); /* dark magenta */
-		}
-
-		.bg-blue {
-			background-color: rgb(151 202 234); /* light blue */
-		}
-
-		.bg-grey {
-			background-color: grey;
+			max-width: 258px !important;
+			width: 258px !important;
 		}
 
 		.inline {
@@ -297,7 +265,7 @@ class Logger {
 	logmsg(color, msg) {
 		let now = new Date().toISOString()
 		console.log(`${now} ${msg}`)
-		// this.logdiv.innerHTML = `<span class="${color}">${now}: ${msg}</span><br/>` + this.logdiv.innerHTML
+		// this.logdiv.innerHTML = `<span style="color:${color}">${now}: ${msg}</span><br/>` + this.logdiv.innerHTML
 	}
 
 	// success, fail, and info are wrappers around logmsg to avoid
@@ -308,7 +276,7 @@ class Logger {
 	}
 
 	fail(msg) {
-		this.logmsg(Cell.colors.red, msg)
+		this.logmsg(Cell.colors.purple, msg)
 	}
 
 	info(msg) {
@@ -369,7 +337,7 @@ class UserController {
 	}
 
 	start() {
-		this.userDiv.innerHTML = `<span class="grey">User: ${this.user}</span>`
+		this.userDiv.innerHTML = `<span style="color:${Cell.colors.grey}">User: ${this.user}</span>`
 	}
 
 	// stop() {
@@ -435,12 +403,12 @@ class PodInfo {
 		if (status == 599) {
 			// Latched error state.
 			smiley = Cell.smilies.neutral
-			bgColor = Cell.colors.hotpink
+			bgColor = Cell.colors.yellow
             bumpCounter = true
 		}
 		else if (status == 429) {
 			smiley = Cell.smilies.sleeping
-			bgColor = Cell.colors.pink
+			bgColor = Cell.colors.red
             bumpCounter = true
 		}
         else if (status == 200) {
@@ -449,7 +417,7 @@ class PodInfo {
             }
 
             if (bgColor == "504") {
-                bgColor = Cell.colors.pink
+                bgColor = Cell.colors.red
             }
 
             this.countDiv.innerHTML = 0
@@ -457,9 +425,9 @@ class PodInfo {
         }
         else {
             // This should probably never happen.
-            borderColor = Cell.colors.red
+            borderColor = Cell.colors.purple
             smiley = Cell.smilies.upset
-            bgColor = Cell.colors.red
+            bgColor = Cell.colors.purple
             bumpCounter = true
 		}
 
@@ -510,7 +478,7 @@ class PodSet {
 			// New pod!
 			let podDiv = document.createElement("div")
 			podDiv.id = `cell-pod-${shortName}`
-			podDiv.className = "cell"
+			podDiv.className = "cell-pod-info"
 
 			let podIDDiv = document.createElement("div")
 			podIDDiv.id = `cell-pod-id-${shortName}`
@@ -520,7 +488,7 @@ class PodSet {
 
 			let podInfoDiv = document.createElement("div")
 			podInfoDiv.id = `cell-pod-info-${shortName}`
-			podInfoDiv.className = "cell-pod-info"
+			podInfoDiv.className = "cell"
 			podDiv.appendChild(podInfoDiv)
 
 			let podSmileySpan = document.createElement("span")
@@ -563,23 +531,26 @@ class Cell {
 		"neutral":   "&#x1F610;",
 		"screaming": "&#x1F631;",
 		"sleeping":  "&#x1F634;",
-		"smiling":   "&#x1F603;",
+		"grinning":  "&#x1F603;",
 		"thinking":  "&#x1F914;",
 		"tongue":    "&#x1F61B;",
 		"upset":     "&#x1F62C;",
 		"yay":       "&#x1F389;",
 	};
 
+	// There are many many notes about these colors in pkg/faces/constants.go.
+	// Go read that: the short version is that colorblindness is a thing, so
+	// don't muck with these too much.
 	static colors = {
-		"grey": "grey",
-		"purple": "rgb(48 34 130)",
-		"green": "rgb(55 117 59)",
-		"cyan": "rgb(55 117 59)", // too similar to pink and grey, avoid
-		"blue": "rgb(151 202 234)", // light blue
-		"yellow": "rgb(218 204 130)",
-		"pink": "rgb(191 108 120)",
-		"hotpink": "rgb(158 75 149)",
-		"red": "rgb(125 42 83)", // dark magenta
+		"grey":      "#BBBBBB",
+		"black":     "#000000",
+		"white":     "#FFFFFF",
+		"darkblue":  "#4477AA",
+		"blue":      "#66CCEE",
+		"green":     "#228833",
+		"yellow":    "#CCBB44",
+		"red":       "#EE6677",
+		"purple":    "#AA3377",
 	}
 
 	constructor(logger, sw, podSet, fetchURL, enclosingDiv, row, col) {
@@ -596,7 +567,7 @@ class Cell {
 		let cellDiv = document.createElement("div")
 		cellDiv.id = `cell-${row}-${col}`
 		cellDiv.className = "cell"
-		cellDiv.style.background = "grey"
+		cellDiv.style.background = Cell.colors.grey
 		cellDiv.style.opacity = 0.5
 
 		let smileySpan = document.createElement("span")
@@ -672,7 +643,10 @@ class Cell {
 			// ...then figure out what we got.
 
             let { curStatus, anyTimeouts,
-                  smiley, bgColor, borderColor } = this.parseResults(xhr);
+                  smiley, bgColor, borderColor, errors } = this.parseResults(xhr);
+
+            // let msg = `[${xhrName}] (${latency}ms): ${smiley} ${bgColor} ${borderColor} -- ${errors}`
+            // this.success(msg);
 
             // Update the pod, if we can...
             let pod = xhr.getResponseHeader("x-faces-pod");
@@ -721,10 +695,6 @@ class Cell {
 				$(`cell-count-${this.row}-${this.col}`).innerHTML = ""
 			}
 
-			// FINALLY: show 'em what we got.
-			// let msg = `[${xhrName}] XHR result (${latency}ms): ${errors} -- ${text}`
-			// this.success(msg);
-
 			if ((smiley != undefined) || (bgColor != undefined)) {
 				$(`cell-${this.row}-${this.col}`).style.opacity = 0.0
 
@@ -767,7 +737,7 @@ class Cell {
 			setTimeout(() => {
 				$(`smiley-${this.row}-${this.col}`).innerHTML = Cell.smilies.confused
 				$(`cell-${this.row}-${this.col}`).style.opacity = 1.0
-				$(`cell-${this.row}-${this.col}`).style.background = Cell.colors.red
+				$(`cell-${this.row}-${this.col}`).style.background = Cell.colors.purple
 				$(`cell-${this.row}-${this.col}`).style.borderColor = "grey"
 			}, 50)
 
@@ -818,9 +788,9 @@ class Cell {
                 smiley = obj.smiley;
                 bgColor = obj.color;
 
-                if (obj.errors != undefined) {
+                if ((obj.errors != undefined) && (obj.errors.length > 0)) {
                     errors = obj.errors.join(",");
-                    borderColor = Cell.colors.red
+                    borderColor = Cell.colors.purple
                 }
                 else {
                     errors = "success!";
@@ -836,9 +806,9 @@ class Cell {
             catch (e) {
                 // Whoops, something went wrong. If it's a SyntaxError, that
                 // probably means we got bad JSON. Otherwise, it's... who knows?
-                borderColor = Cell.colors.red
+                borderColor = Cell.colors.purple
                 smiley = Cell.smilies.confused;
-                bgColor = Cell.colors.red;
+                bgColor = Cell.colors.purple;
 
                 if (e instanceof SyntaxError) {
                     errors = "parse error";
@@ -860,16 +830,16 @@ class Cell {
         }
         else if (curStatus == 599) {
             // This is our latched-error status. Show it as a neutral face
-            // on a hot pink background.
+            // on a yellow background.
             smiley = Cell.smilies.neutral;
-            bgColor = Cell.colors.hotpink;
+            bgColor = Cell.colors.yellow;
         }
         else if (Math.floor(curStatus / 100) == 5) {
             // Some other 5yz, so an unknown kind of server error. (In
             // practice, this is probably a 503 because there's some kind
             // of connectivity error, but whatever, we don't care.
             smiley = Cell.smilies.confused;
-            bgColor = Cell.colors.red;
+            bgColor = Cell.colors.purple;
             errors = "server error";
         }
 
@@ -881,24 +851,37 @@ class Cell {
             bgColor = Cell.colors.purple
         }
 
-        return { curStatus, anyTimeouts, smiley, bgColor, borderColor };
+        return { curStatus, anyTimeouts, smiley, bgColor, borderColor, errors };
     }
 }
 
 class Key {
 	constructor(keyDiv) {
 		let keyEntries = [
-			[ "smiling",  Cell.colors.blue,  Cell.colors.grey,         "24px", "Success!" ],
-			[ "confused", Cell.colors.red,   Cell.colors.grey,         "",     "Face service error" ],
-			[ "sleeping", Cell.colors.pink,  Cell.colors.grey,         "",     "Timeout" ],
-			[ "kaboom",   Cell.colors.red,   Cell.colors.grey,         "24px", "Service overwhelmed" ],
-			[ "smiling",  Cell.colors.grey,  "transparent",  "",     "Color service error" ],
-			[ "",         Cell.colors.blue,  Cell.colors.red,          "24px", "Smiley service error" ],
-			[ "-",         "-",     "-",           "",     "Slow service" ]
+			[ "Success!",
+			  "grinning", Cell.colors.blue,   Cell.colors.grey,    "24px" ],
+
+			[ "Face service error",
+			  "confused", Cell.colors.purple, Cell.colors.grey,    ""     ],
+
+			[ "Timeout",
+			  "sleeping", Cell.colors.red,    Cell.colors.grey,    ""     ],
+
+			[ "Service overwhelmed",
+			  "kaboom",   Cell.colors.yellow, Cell.colors.purple, "24px" ],
+
+			[ "Color service error",
+			  "grinning", Cell.colors.grey,   Cell.colors.purple,  ""     ],
+
+			[ "Smiley service error",
+			  "",         Cell.colors.blue,   Cell.colors.purple,  "24px" ],
+
+			[ "Slow service",
+			  "-",        "-",                "-",                 ""     ]
 		]
 
 		for (let i = 0; i < keyEntries.length; i++) {
-			let [ smileyName, bgColor, borderColor, margin, text ] = keyEntries[i]
+			let [ text, smileyName, bgColor, borderColor, margin ] = keyEntries[i]
 
 			if (smileyName != "-") {
 				let smiley = ""
@@ -998,11 +981,11 @@ class CellWatcher {
 
 			if (cellCount > 4) {
 				let smiley = Cell.smilies.sleeping
-				let bgColor = Cell.colors.pink
+				let bgColor = Cell.colors.red
 
 				if (cell.lastStatus == 599) {
-					smiley = Cell.smilies.screaming
-					bgColor = Cell.colors.hotpink
+					smiley = Cell.smilies.neutral
+					bgColor = Cell.colors.yellow
 				}
 
 				$(`smiley-${cell.row}-${cell.col}`).innerHTML = smiley
@@ -1044,7 +1027,7 @@ class Markers {
 
 	mark(shape, fgColor, bgColor) {
 		this.markerdiv.innerHTML += `
-			<div class="bg-${bgColor} marker">
+			<div class="marker" style="background-color:${bgColor}">
 				<svg width="50" height="50" xmlns="http://www.w3.org/2000/svg">
 				    <g transform="rotate(0 25 25)">
 					    <polygon points="${shape}" fill="${fgColor}" stroke="black"></polygon>
@@ -1114,7 +1097,7 @@ class Fetcher {
 			else if (xhr.status != 200) {
 				text = `Unknown status ${xhr.status} after ${latency}ms`
 				shape = "19.000,49.000 31.000,49.000 31.000,1.000 19.000,1.000"
-				fgColor = Cell.colors.red
+				fgColor = Cell.colors.purple
 			}
 			else {
 				// Parse JSON!
@@ -1130,12 +1113,12 @@ class Fetcher {
 					if (e instanceof SyntaxError) {
 						text = `Could not parse QotM: ${e.message}\n${xhr.responseText}`
 						shape = "19.000,49.000 31.000,49.000 31.000,1.000 19.000,1.000"
-						fgColor = Cell.colors.red
+						fgColor = Cell.colors.purple
 					}
 					else {
 						text = `Missing QotM? ${e.message}`
 						shape = "19.000,49.000 31.000,49.000 31.000,1.000 19.000,1.000"
-						fgColor = Cell.colors.red
+						fgColor = Cell.colors.purple
 					}
 				}
 			}
@@ -1160,7 +1143,7 @@ class Fetcher {
 			// this.success(msg);
 
 			let nowISO = now.toISOString()
-			this.xhrdiv.innerHTML = `<span class="${bgColor}"><p>${nowISO}: ${msg}</p></span>`
+			this.xhrdiv.innerHTML = `<span style="background-color:${bgColor}"><p>${nowISO}: ${msg}</p></span>`
 			this.markers.mark(shape, fgColor, bgColor)
 		})
 
@@ -1178,7 +1161,7 @@ class Fetcher {
 			// this.fail(msg);
 
 			let nowISO = now.toISOString()
-			this.xhrdiv.innerHTML = `<span class="red"><p>${nowISO}: Failed!</p></span>`
+			this.xhrdiv.innerHTML = `<span style="background-color:${Cell.colors.red}"><p>${nowISO}: Failed!</p></span>`
 
 			// FIXME: this looks like the wrong arguments for calling this.markers.mark
 			this.markers.mark("red")

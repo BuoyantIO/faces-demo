@@ -48,9 +48,10 @@ func NewColorServer(serverName string) *ColorServer {
 func (srv *ColorServer) SetupFromEnvironment() {
 	srv.BaseServer.SetupFromEnvironment()
 
-	srv.color = utils.StringFromEnv("COLOR", "green")
+	colorName := utils.StringFromEnv("COLOR", "blue")
+	srv.color = Colors.Lookup(colorName)
 
-	fmt.Printf("%s %s: color %s\n", time.Now().Format(time.RFC3339), srv.Name, srv.color)
+	fmt.Printf("%s %s: color %s => %s\n", time.Now().Format(time.RFC3339), srv.Name, colorName, srv.color)
 }
 
 func (srv *ColorServer) colorGetHandler(r *http.Request, rstat *BaseRequestStatus) *BaseServerResponse {
@@ -61,7 +62,7 @@ func (srv *ColorServer) colorGetHandler(r *http.Request, rstat *BaseRequestStatu
 		return &BaseServerResponse{
 			StatusCode: http.StatusTooManyRequests,
 			Data: map[string]interface{}{
-				"color":  Defaults["color-ratelimit"],
+				"color":  Colors.Lookup(Defaults["color-ratelimit"]),
 				"rate":   fmt.Sprintf("%.1f RPS", srv.CurrentRate()),
 				"errors": []string{errstr},
 			},
