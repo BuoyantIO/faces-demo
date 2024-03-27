@@ -118,7 +118,7 @@ func (srv *GUIServer) guiGetHandler(w http.ResponseWriter, r *http.Request) {
 			rtext = strings.ReplaceAll(rtext, "%%{hide_key}", fmt.Sprintf("%v", srv.hideKey))
 			rtext = strings.ReplaceAll(rtext, "%%{show_pods}", fmt.Sprintf("%v", srv.showPods))
 			rtext = strings.ReplaceAll(rtext, "%%{user}", user)
-			rtext = strings.ReplaceAll(rtext, "%%{user_Agent}", userAgent)
+			rtext = strings.ReplaceAll(rtext, "%%{user_agent}", userAgent)
 		}
 	} else if strings.HasPrefix(r.URL.Path, "/face/") {
 		// /face/ is a special case: we forward it to the face workload. This is

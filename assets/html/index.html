@@ -58,7 +58,7 @@
 
 		.cell {
 			display: inline-block;
-			border: 1px solid grey;
+			border: 2px solid grey;
 			border-radius: 16px;
 			height: 120px;
 			width: 120px;
@@ -80,16 +80,16 @@
         }
 
 		.cell-pod-info {
-		    height: 120px;
-		    width: 120px;
-		    border-radius: 16px;
+			display: inline-block;
+			position: relative;
+			text-align: center;
 		}
 
 		.cell-pod-id {
             position: absolute;
-            top: 1px;
-            left: 1px;
-            width: 118px;
+            top: 4px;
+            left: 4px;
+            width: 120px;
 			border-radius: 14px 14px 0px 0px;
             font-family: sans-serif;
 			background: white;
@@ -163,8 +163,8 @@
 		    border-right: 2px solid grey;
 		    padding-left: .5em;
 		    padding-right: .5em;
-			max-width: 252px !important;
-			width: 252px !important;
+			max-width: 258px !important;
+			width: 258px !important;
 		}
 
 		.inline {
@@ -478,7 +478,7 @@ class PodSet {
 			// New pod!
 			let podDiv = document.createElement("div")
 			podDiv.id = `cell-pod-${shortName}`
-			podDiv.className = "cell"
+			podDiv.className = "cell-pod-info"
 
 			let podIDDiv = document.createElement("div")
 			podIDDiv.id = `cell-pod-id-${shortName}`
@@ -488,7 +488,7 @@ class PodSet {
 
 			let podInfoDiv = document.createElement("div")
 			podInfoDiv.id = `cell-pod-info-${shortName}`
-			podInfoDiv.className = "cell-pod-info"
+			podInfoDiv.className = "cell"
 			podDiv.appendChild(podInfoDiv)
 
 			let podSmileySpan = document.createElement("span")
