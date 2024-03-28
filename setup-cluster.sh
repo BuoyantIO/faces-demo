@@ -82,8 +82,7 @@ kubectl create ns faces
 kubectl annotate ns faces linkerd.io/inject=enabled
 
 helm install faces -n faces \
-     oci://ghcr.io/buoyantio/faces-chart --version 1.0.0-alpha.1 \
-     --set gui.serviceType=LoadBalancer
+     oci://ghcr.io/buoyantio/faces-chart --version 1.2.0
 
 kubectl rollout status -n faces deploy
 kubectl apply -f k8s/01-base
