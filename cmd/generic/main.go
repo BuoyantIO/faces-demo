@@ -18,8 +18,12 @@
 package main
 
 import (
+	"io"
 	"log"
+	"net/http"
 	"os"
+	"strconv"
+	"time"
 
 	"flag"
 	"fmt"
@@ -51,17 +55,63 @@ func main() {
 	case "color":
 		server = &faces.NewColorServer("ColorServer").BaseServer
 
+	case "load":
+		fmt.Printf("Running load generator")
+
 	default:
 		log.Fatalf("Unknown service: %s", service)
 	}
 
-	fmt.Printf("%s %s (generic), commit %s, built at %s\n", server.Name, version, commit, date)
+	if server != nil {
+		fmt.Printf("%s %s (generic), commit %s, built at %s\n", server.Name, version, commit, date)
 
-	// Define a command-line flag for the port number
-	port := flag.Int("port", 8000, "the port number to listen on")
-	flag.Parse()
+		// Define a command-line flag for the port number
+		port := flag.Int("port", 8000, "the port number to listen on")
+		flag.Parse()
 
-	// Use the port number from the command line flag
-	addr := fmt.Sprintf(":%d", *port)
-	server.ListenAndServe(addr)
+		// Use the port number from the command line flag
+		addr := fmt.Sprintf(":%d", *port)
+		server.ListenAndServe(addr)
+	} else {
+		target := os.Getenv("LOAD_TARGET")
+		rps := os.Getenv("LOAD_RPS")
+		debug, _ := strconv.ParseBool(os.Getenv("LOAD_DEBUG"))
+
+		// Convert rps to an integer
+		rpsInt, err := strconv.Atoi(rps)
+		if err != nil {
+			log.Fatalf("Failed to convert rps to an integer: %v", err)
+		}
+
+		// Create a ticker to control the rate of requests
+		ticker := time.NewTicker(time.Second / time.Duration(rpsInt))
+		defer ticker.Stop()
+		count := 0
+
+		// Start a goroutine to send requests
+		for range ticker.C {
+			go func() {
+				// Make a GET request to http://target/
+				resp, err := http.Get(fmt.Sprintf("http://%s/", target))
+				if err != nil {
+					log.Fatalf("Failed to make request: %v", err)
+				}
+				defer resp.Body.Close()
+
+				// Read the response body
+				body, _ := io.ReadAll(resp.Body)
+
+				if debug {
+					fmt.Printf("http://%s/ %d %s\n", target, resp.StatusCode, string(body))
+				}
+
+				count++
+
+				if count >= (rpsInt * 10) {
+					fmt.Printf("Sent %d requests\n", count)
+					count = 0
+				}
+			}()
+		}
+	}
 }
