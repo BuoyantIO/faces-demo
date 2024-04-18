@@ -5,6 +5,6 @@ github.com/stretchr/testify v1.8.2 h1:+h33VjcLVPDHtOdpUCuF+7gSuG3yGIftsP1YvFihtJ
 github.com/warthog618/go-gpiosim v0.1.0 h1:2rTMTcKUVZxpUuvRKsagnKAbKpd3Bwffp87xywEDVGI=
 github.com/warthog618/gpiod v0.8.2 h1:2HgQ9pNowPp7W77sXhX5ut5Tqq1WoS3t7bXYDxtYvxc=
 github.com/warthog618/gpiod v0.8.2/go.mod h1:O7BNpHjCn/4YS5yFVmoFZAlY1LuYuQ8vhPf0iy/qdi4=
-golang.org/x/sys v0.10.0 h1:SqMFp9UcQJZa+pmYuAKjd9xq1f0j5rLcDIk0mj4qAsA=
-golang.org/x/sys v0.10.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+golang.org/x/sys v0.17.0 h1:25cE3gD+tdBA7lp7QfhuV+rJiE9YXTcS3VG1SqssI/Y=
+golang.org/x/sys v0.17.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
