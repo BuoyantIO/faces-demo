@@ -31,6 +31,9 @@ spec:
       - name: faces-gui
         image: {{ include "partials.gui-image" . }}
         imagePullPolicy: {{ include "partials.gui-imagePullPolicy" . }}
+        env:
+        - name: USER_HEADER_NAME
+          value: {{ .Values.authHeader | quote }}
         ports:
         - name: http
           containerPort: 8000

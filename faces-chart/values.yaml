@@ -9,6 +9,9 @@ defaultImageTag: ""             # If not set, uses the appVersion
 # Default imagePullPolicy. This is used only if not set in the sections below.
 defaultImagePullPolicy: IfNotPresent
 
+# User auth header.
+authHeader: "X-Faces-User"
+
 gui:
   image: ""                     # If set, overrides the imageName/imageTag pair
   imageName: ghcr.io/buoyantio/faces-gui
