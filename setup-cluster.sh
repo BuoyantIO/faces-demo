@@ -57,13 +57,12 @@ helm install emissary-crds \
   --wait
 
 helm install emissary-ingress \
-  datawire/emissary-ingress \
+  oci://ghcr.io/emissary-ingress/emissary-chart \
   -n emissary \
-  --version 8.9.1 \
-  --set replicaCount=1 \
-  --set waitForApiext.enabled=false \
-  --set waitForApiext.createRoles=false \
-  --wait
+  --version 0.0.0-test \
+  --set nameOverride=emissary \
+  --set fullnameOverride=emissary \
+  --set replicaCount=1
 
 kubectl -n emissary wait --for condition=available --timeout=90s deploy -lproduct=aes
 
