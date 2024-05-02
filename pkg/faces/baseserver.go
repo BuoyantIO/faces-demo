@@ -90,6 +90,7 @@ type BaseServer struct {
 	server          *http.ServeMux
 	preHook         Hook
 	postHook        Hook
+	userHeaderName  string
 }
 
 func NewBaseServer(serverName string) *BaseServer {
@@ -153,6 +154,7 @@ func (srv *BaseServer) SetupFromEnvironment() {
 
 	srv.RegisterCustom("/rl", srv.rlGetHandler)
 
+	srv.userHeaderName = utils.StringFromEnv("USER_HEADER_NAME", "X-Faces-User")
 	srv.hostIP = utils.StringFromEnv("HOST_IP", utils.StringFromEnv("HOSTNAME", "unknown"))
 
 	delayBucketsStr := utils.StringFromEnv("DELAY_BUCKETS", "")
@@ -188,6 +190,7 @@ func (srv *BaseServer) SetupFromEnvironment() {
 	fmt.Printf("%s %s: latch_fraction %d\n", time.Now().Format(time.RFC3339), srv.Name, srv.latchFraction)
 	fmt.Printf("%s %s: debug_enabled %v\n", time.Now().Format(time.RFC3339), srv.Name, srv.debugEnabled)
 	fmt.Printf("%s %s: max_rate %f\n", time.Now().Format(time.RFC3339), srv.Name, srv.maxRate)
+	fmt.Printf("%s %s: userHeaderName %v\n", time.Now().Format(time.RFC3339), srv.Name, srv.userHeaderName)
 }
 
 func (srv *BaseServer) ListenAndServe(port string) {
@@ -430,7 +433,7 @@ func (srv *BaseServer) standardHeaders(w http.ResponseWriter, r *http.Request, s
 	}
 
 	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("X-Faces-User", r.Header.Get("x-faces-user"))
+	w.Header().Set(srv.userHeaderName, r.Header.Get(srv.userHeaderName))
 	w.Header().Set("User-Agent", r.Header.Get("User-Agent"))
 	w.Header().Set("X-Faces-Pod", srv.hostIP)
 	w.WriteHeader(statusCode)

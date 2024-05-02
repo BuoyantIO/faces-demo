@@ -86,7 +86,7 @@ func (srv *FaceServer) makeRequest(user string, userAgent string, service string
 	}
 
 	if !failed {
-		req.Header.Set("X-Faces-User", user)
+		req.Header.Set(srv.userHeaderName, user)
 		req.Header.Set("User-Agent", userAgent)
 
 		response, err = http.DefaultClient.Do(req)
@@ -190,7 +190,7 @@ func (srv *FaceServer) faceGetHandler(r *http.Request, rstat *BaseRequestStatus)
 		smiley, smileyOK = Smileys.Lookup(Defaults["smiley-ratelimit"])
 		color = Colors.Lookup(Defaults["color-ratelimit"])
 	} else {
-		user := r.Header.Get("X-Faces-User")
+		user := r.Header.Get(srv.userHeaderName)
 
 		if user == "" {
 			user = "unknown"
@@ -224,7 +224,7 @@ func (srv *FaceServer) faceGetHandler(r *http.Request, rstat *BaseRequestStatus)
 
 			if srv.debugEnabled {
 				fmt.Printf("%s %s: mapped smiley %d to %s (%s, %v)\n",
-				            time.Now().Format(time.RFC3339), srv.Name, smileyResp.statusCode, mapped, smiley, smileyOK)
+					time.Now().Format(time.RFC3339), srv.Name, smileyResp.statusCode, mapped, smiley, smileyOK)
 			}
 		} else {
 			smiley = smileyResp.data
