@@ -55,8 +55,9 @@
 
 {{- define "partials.select-errorFraction" -}}
   {{ $fraction := "" }}
-  {{- if .source.errorFraction -}}
-    {{- $fraction = .source.errorFraction -}}
+  {{ $srcFraction := .source.errorFraction }}
+  {{- if or ($srcFraction) (eq $srcFraction 0) -}}
+    {{- $fraction = $srcFraction -}}
   {{- else if (and .default .default.errorFraction) -}}
     {{- $fraction = .default.errorFraction -}}
   {{- end -}}

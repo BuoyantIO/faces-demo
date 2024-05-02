@@ -71,8 +71,10 @@ func (srv *GUIServer) guiGetHandler(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
 	fmt.Printf("%s %s: GET %s\n", time.Now().Format(time.RFC3339), srv.Name, r.URL.Path)
+	fmt.Printf("  userHeaderName: %s\n", srv.userHeaderName)
+	fmt.Printf("  headers: %s\n", r.Header)
 
-	user := r.Header.Get("x-faces-user")
+	user := r.Header.Get(srv.userHeaderName)
 	if user == "" {
 		user = "unknown"
 	}
@@ -80,6 +82,9 @@ func (srv *GUIServer) guiGetHandler(w http.ResponseWriter, r *http.Request) {
 	if userAgent == "" {
 		userAgent = "unknown"
 	}
+
+	fmt.Printf("  user: %s\n", user)
+	fmt.Printf("  userAgent: %s\n", userAgent)
 
 	podID := srv.hostIP
 	rcode := http.StatusNotFound
@@ -92,7 +97,7 @@ func (srv *GUIServer) guiGetHandler(w http.ResponseWriter, r *http.Request) {
 		latencyMs := end.Sub(start).Milliseconds()
 
 		w.Header().Set("Content-Type", "text/plain")
-		w.Header().Set("X-Faces-User", user)
+		w.Header().Set(srv.userHeaderName, user)
 		w.Header().Set("X-Faces-User-Agent", userAgent)
 		w.Header().Set("X-Faces-Latency", strconv.FormatInt(latencyMs, 10))
 		w.Header().Set("X-Faces-Pod", podID)
@@ -118,6 +123,7 @@ func (srv *GUIServer) guiGetHandler(w http.ResponseWriter, r *http.Request) {
 			rtext = strings.ReplaceAll(rtext, "%%{hide_key}", fmt.Sprintf("%v", srv.hideKey))
 			rtext = strings.ReplaceAll(rtext, "%%{show_pods}", fmt.Sprintf("%v", srv.showPods))
 			rtext = strings.ReplaceAll(rtext, "%%{user}", user)
+			rtext = strings.ReplaceAll(rtext, "%%{user_header}", fmt.Sprintf("%v", srv.userHeaderName))
 			rtext = strings.ReplaceAll(rtext, "%%{user_agent}", userAgent)
 		}
 	} else if strings.HasPrefix(r.URL.Path, "/face/") {
@@ -127,7 +133,7 @@ func (srv *GUIServer) guiGetHandler(w http.ResponseWriter, r *http.Request) {
 		reqStart := time.Now()
 
 		url := fmt.Sprintf("http://face/%s", r.URL.Path[6:])
-		user := r.Header.Get("x-faces-user")
+		user := r.Header.Get(srv.userHeaderName)
 		if user == "" {
 			user = "unknown"
 		}
@@ -202,7 +208,7 @@ func (srv *GUIServer) guiGetHandler(w http.ResponseWriter, r *http.Request) {
 	latencyMs := end.Sub(start).Milliseconds()
 
 	w.Header().Set("Content-Type", rtype)
-	w.Header().Set("X-Faces-User", user)
+	w.Header().Set(srv.userHeaderName, user)
 	w.Header().Set("X-Faces-User-Agent", userAgent)
 	w.Header().Set("X-Faces-Latency", strconv.FormatInt(latencyMs, 10))
 	w.Header().Set("X-Faces-Pod", podID)
