@@ -37,6 +37,8 @@ spec:
         env:
         - name: FACES_SERVICE
           value: "smiley"
+        - name: USER_HEADER_NAME
+          value: {{ .Values.authHeader | quote }}
         {{- if .Values.smiley.smiley }}
         - name: SMILEY
           value: {{ .Values.smiley.smiley }}

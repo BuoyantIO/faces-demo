@@ -38,6 +38,8 @@ spec:
         env:
         - name: FACES_SERVICE
           value: "color"
+        - name: USER_HEADER_NAME
+          value: {{ .Values.authHeader | quote }}
         {{- if .Values.color2.color }}
         - name: COLOR
           value: {{ .Values.color2.color }}

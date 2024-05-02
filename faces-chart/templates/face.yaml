@@ -37,6 +37,8 @@ spec:
         env:
         - name: FACES_SERVICE
           value: "face"
+        - name: USER_HEADER_NAME
+          value: {{ .Values.authHeader | quote }}
         {{- include "partials.face-errorFraction" . }}
         {{- include "partials.face-delayBuckets" . }}
         resources:
