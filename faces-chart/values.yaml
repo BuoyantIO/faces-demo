@@ -33,39 +33,39 @@ backend:
   delayBuckets: "0,5,10,15,20,50,200,500,1500"
 
 smiley:
-  image: ""                     # If set, overrides the imageName/imageTag pair
-  imageName: ""                 # If not set, uses backend.imageName
-  imageTag: ""                  # If not set, uses backend.imageTag
-  imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
-  errorFraction: ""             # If not set, uses backend.errorFraction
-  delayBuckets: ""              # If not set, uses backend.delayBuckets
   smiley: ""                    # Override if desired
+  # image: ""                     # If set, overrides the imageName/imageTag pair
+  # imageName: ""                 # If not set, uses backend.imageName
+  # imageTag: ""                  # If not set, uses backend.imageTag
+  # imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
+  # errorFraction: ""             # If not set, uses backend.errorFraction
+  # delayBuckets: ""              # If not set, uses backend.delayBuckets
 
 smiley2:
   enabled: False                # If set to True, enables the second smiley workload
-  image: ""                     # If set, overrides the imageName/imageTag pair
-  imageName: ""                 # If not set, uses backend.imageName
-  imageTag: ""                  # If not set, uses backend.imageTag
-  imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
-  errorFraction: ""             # If not set, uses backend.errorFraction
-  delayBuckets: ""              # If not set, uses backend.delayBuckets
   smiley: "HeartEyes"           # Override if desired
+  # image: ""                     # If set, overrides the imageName/imageTag pair
+  # imageName: ""                 # If not set, uses backend.imageName
+  # imageTag: ""                  # If not set, uses backend.imageTag
+  # imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
+  # errorFraction: ""             # If not set, uses backend.errorFraction
+  # delayBuckets: ""              # If not set, uses backend.delayBuckets
 
 color:
-  image: ""                     # If set, overrides the imageName/imageTag pair
-  imageName: ""                 # If not set, uses backend.imageName
-  imageTag: ""                  # If not set, uses backend.imageTag
-  imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
-  errorFraction: ""             # If not set, uses backend.errorFraction
-  delayBuckets: ""              # If not set, uses backend.delayBuckets
   color: ""                     # Override if desired, defaults to colorblind-friendly light blue from the Tol palette
+  # image: ""                     # If set, overrides the imageName/imageTag pair
+  # imageName: ""                 # If not set, uses backend.imageName
+  # imageTag: ""                  # If not set, uses backend.imageTag
+  # imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
+  # errorFraction: ""             # If not set, uses backend.errorFraction
+  # delayBuckets: ""              # If not set, uses backend.delayBuckets
 
 color2:
   enabled: False                # If set to True, enables the second color workload
-  image: ""                     # If set, overrides the imageName/imageTag pair
-  imageName: ""                 # If not set, uses backend.imageName
-  imageTag: ""                  # If not set, uses backend.imageTag
-  imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
-  errorFraction: ""             # If not set, uses backend.errorFraction
-  delayBuckets: ""              # If not set, uses backend.delayBuckets
   color: "green"                # Override if desired, defaults to colorblind-friendly green from the Tol palette
+  # image: ""                     # If set, overrides the imageName/imageTag pair
+  # imageName: ""                 # If not set, uses backend.imageName
+  # imageTag: ""                  # If not set, uses backend.imageTag
+  # imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
+  # errorFraction: ""             # If not set, uses backend.errorFraction
+  # delayBuckets: ""              # If not set, uses backend.delayBuckets
