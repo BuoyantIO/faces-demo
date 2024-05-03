@@ -337,7 +337,13 @@ class UserController {
 	}
 
 	start() {
-		this.userDiv.innerHTML = `<span style="color:${Cell.colors.grey}">User: ${this.user}</span>`
+		let color = "#000000";
+
+		if (this.user == "unknown") {
+			color = Cell.colors.grey;
+		}
+
+		this.userDiv.innerHTML = `<span style="color:${color}">User: ${this.user}</span>`
 	}
 
 	// stop() {
