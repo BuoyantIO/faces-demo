@@ -153,6 +153,7 @@ func (srv *BaseServer) SetupFromEnvironment() {
 	}
 
 	srv.RegisterCustom("/rl", srv.rlGetHandler)
+	srv.RegisterCustom("/ready", srv.readyHandler)
 
 	srv.userHeaderName = utils.StringFromEnv("USER_HEADER_NAME", "X-Faces-User")
 	srv.hostIP = utils.StringFromEnv("HOST_IP", utils.StringFromEnv("HOSTNAME", "unknown"))
@@ -346,6 +347,15 @@ func (srv *BaseServer) rlGetHandler(w http.ResponseWriter, r *http.Request) {
 		StatusCode: http.StatusOK,
 		Data: map[string]interface{}{
 			"rl": rateStr,
+		},
+	})
+}
+
+func (srv *BaseServer) readyHandler(w http.ResponseWriter, r *http.Request) {
+	srv.StandardResponse(w, r, &BaseServerResponse{
+		StatusCode: http.StatusOK,
+		Data: map[string]interface{}{
+			"ready": true,
 		},
 	})
 }

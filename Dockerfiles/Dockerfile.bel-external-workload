@@ -26,4 +26,4 @@ FROM $EXTERNAL_BASE AS final
 LABEL org.opencontainers.image.source=https://github.com/BuoyantIO/faces-demo
 
 # Copy the compiled binary from the builder stage into the final image
-COPY workload /workload/start
+COPY --chmod=0755 workload /workload/start
