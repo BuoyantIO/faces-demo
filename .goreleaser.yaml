@@ -25,6 +25,8 @@ version: 1
 env:
   - REGISTRY={{ if index .Env "REGISTRY"  }}{{ .Env.REGISTRY }}{{ else }}ghcr.io/buoyantio{{ end }}
   - IMAGE_NAME={{ if index .Env "IMAGE_NAME"  }}{{ .Env.IMAGE_NAME }}{{ else }}faces{{ end }}
+  - EXTERNAL_BASE={{ if index .Env "EXTERNAL_BASE"  }}{{ .Env.EXTERNAL_BASE }}{{ else }}ghcr.io/buoyantio/demo-external-base:0.3.0{{ end }}
+  - BEL_EXTERNAL_BASE={{ if index .Env "BEL_EXTERNAL_BASE"  }}{{ .Env.BEL_EXTERNAL_BASE }}{{ else }}ghcr.io/buoyantio/demo-bel-external-base:0.3.0{{ end }}
 
 before:
   hooks:
@@ -121,6 +123,7 @@ dockers:
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest-arm64"
     build_flag_templates:
       - "--platform=linux/arm64"
+      - "--build-arg=EXTERNAL_BASE={{ .Env.EXTERNAL_BASE }}"
   - use: buildx
     goos: linux
     goarch: amd64
@@ -132,6 +135,31 @@ dockers:
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest-amd64"
     build_flag_templates:
       - "--platform=linux/amd64"
+      - "--build-arg=EXTERNAL_BASE={{ .Env.EXTERNAL_BASE }}"
+  - use: buildx
+    goos: linux
+    goarch: arm64
+    dockerfile: Dockerfiles/Dockerfile.bel-external-workload
+    ids:
+      - generic
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:{{ .Version }}-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:latest-arm64"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--build-arg=EXTERNAL_BASE={{ .Env.BEL_EXTERNAL_BASE }}"
+  - use: buildx
+    goos: linux
+    goarch: amd64
+    dockerfile: Dockerfiles/Dockerfile.bel-external-workload
+    ids:
+      - generic
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:{{ .Version }}-amd64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:latest-amd64"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--build-arg=EXTERNAL_BASE={{ .Env.BEL_EXTERNAL_BASE }}"
 
   # For the Pi, we only build an external-workload image for arm64. The Pi itself
   # is arm64, so there's no point in building for amd64, and we're not going to try
@@ -152,6 +180,24 @@ dockers:
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-workload:latest"
     build_flag_templates:
       - "--platform=linux/arm64"
+      - "--build-arg=EXTERNAL_BASE={{ .Env.EXTERNAL_BASE }}"
+  - use: buildx
+    goos: linux
+    goarch: arm64
+    # Not a typo! We really do use the same Dockerfile as the generic external
+    # workload, we're just copying in our workload binary from the Pi build
+    # rather than the generic build.
+    dockerfile: Dockerfiles/Dockerfile.bel-external-workload
+    ids:
+      - pi
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-workload:{{ .Version }}-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-workload:latest-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-workload:{{ .Version }}"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-workload:latest"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--build-arg=EXTERNAL_BASE={{ .Env.BEL_EXTERNAL_BASE }}"
 
 docker_manifests:
   - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}"
@@ -203,6 +249,24 @@ docker_manifests:
     image_templates:
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:{{ .Version }}-arm64"
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:{{ .Version }}-amd64"
+    create_flags:
+      - --insecure
+    push_flags:
+      - --insecure
+
+  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:latest"
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:latest-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:latest-amd64"
+    create_flags:
+      - --insecure
+    push_flags:
+      - --insecure
+
+  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:{{ .Version }}"
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:{{ .Version }}-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:{{ .Version }}-amd64"
     create_flags:
       - --insecure
     push_flags:
