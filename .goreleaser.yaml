@@ -254,6 +254,24 @@ docker_manifests:
     push_flags:
       - --insecure
 
+  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:latest"
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:latest-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:latest-amd64"
+    create_flags:
+      - --insecure
+    push_flags:
+      - --insecure
+
+  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:{{ .Version }}"
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:{{ .Version }}-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:{{ .Version }}-amd64"
+    create_flags:
+      - --insecure
+    push_flags:
+      - --insecure
+
 archives:
   - id: generic
     name_template: '{{ .ProjectName }}_generic_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
