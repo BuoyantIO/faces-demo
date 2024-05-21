@@ -4,6 +4,8 @@ kind: Service
 metadata:
   name: faces-gui
   namespace: {{ .Release.Namespace }}
+  labels:
+    service: faces-gui
 spec:
   type: {{ .Values.gui.serviceType }}
   selector:
@@ -17,6 +19,8 @@ kind: Deployment
 metadata:
   name: faces-gui
   namespace: {{ .Release.Namespace }}
+  labels:
+    service: faces-gui
 spec:
   replicas: 1
   selector:

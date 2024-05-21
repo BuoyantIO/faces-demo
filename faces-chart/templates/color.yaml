@@ -4,6 +4,8 @@ kind: Service
 metadata:
   name: color
   namespace: {{ .Release.Namespace }}
+  labels:
+    service: color
 spec:
   type: ClusterIP
   selector:
@@ -17,6 +19,8 @@ kind: Deployment
 metadata:
   name: color
   namespace: {{ .Release.Namespace }}
+  labels:
+    service: color
 spec:
   replicas: 1
   selector:
