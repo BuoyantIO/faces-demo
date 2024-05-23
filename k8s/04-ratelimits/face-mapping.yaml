@@ -13,9 +13,7 @@ spec:
     retry_on: 5xx
     num_retries: 1
   labels:
-    emissary:
-    - request_label_group:
-      - x-emissary-test-allow:
-        generic_key:
-          key: mykey
-          value: myvalue  
+    ambassador:
+      - face-service-label-group:
+        - generic_key:
+            value: face-service

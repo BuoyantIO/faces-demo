@@ -12,16 +12,13 @@ In here you will find:
   running `setup-cluster.sh`.
 
 - `setup-cluster.sh`, a shell script to set up an empty cluster with [Linkerd],
-  [Emissary-ingress], and the Faces app.
-   - These things are installed in a demo configuration: read and think
+  [Edge Stack], and the Faces app.
+  - These things are installed in a demo configuration: read and think
      **carefully** before using this demo as background for a production
      installation! In particular:
 
-      - We deploy Emissary with only one replica of everything, using a
-        currently-unofficial chart to also skip support for `v1` and `v2`
-        Emissary CRDs.
-
-      - We only configure HTTP, not HTTPS.
+    - We deploy Edge Stack with only one replica of everything
+    - We use the default self-signed certificate for HTTPS
 
      These are likely both bad ideas for a production installation.
 
@@ -29,30 +26,30 @@ In here you will find:
   couple of events. The easiest way to use `DEMO.md` is to run it with
   [demosh].
 
-   - (You can also run `create-cluster.sh` and `setup-cluster.sh` with
+  - (You can also run `create-cluster.sh` and `setup-cluster.sh` with
      [demosh], but they're fine with `bash` as well. Realize that all the
      `#@` comments are special to [demosh] and ignored by `bash`.)
 
-## To try this yourself:
+## To try this yourself
 
 - Make sure `$KUBECONFIG` is set correctly.
 
 - If you need to, run `bash create-cluster.sh` to create a new `k3d` cluster to
   use.
-   - **Note:** `create-cluster.sh` will delete any existing `k3d` cluster named
+  - **Note:** `create-cluster.sh` will delete any existing `k3d` cluster named
      "faces".
 
 - If you already have an empty cluster to use, you can run `bash setup-cluster.sh`
   to initialize it.
 
 - Play around!! Assuming that you're using k3d, the Faces app is reachable at
-  http://localhost/faces/ and the Linkerd Viz dashboard is available at
-  http://localhost/
+  <http://localhost/faces/> and the Linkerd Viz dashboard is available at
+  <http://localhost/>
 
-   - If you're not using k3d, instead of `localhost` use the IP or DNS name of
-     the `emissary-ingress` service in the `emissary` namespace.
+  - If you're not using k3d, instead of `localhost` use the IP or DNS name of
+     the `edge-stack` service in the `ambassador` namespace.
 
-   - Remember, HTTPS is **not** configured.
+  - Remember, HTTPS is **not** configured.
 
 - To run the demo as we've given it before, check out [DEMO.md]. The easiest
   way to use that is to run it with [demosh].
@@ -82,11 +79,11 @@ The Faces architecture is fairly simple:
   The named colors in the `Colors` map are meant to work for normal color
   vision and for various kinds of colorblindness, and are taken from the
   "Bright" color scheme shown in the "Qualitative // Color Schemes" section of
-  https://personal.sron.nl/~pault/. For (much) more information, read the
+  <https://personal.sron.nl/~pault/>. For (much) more information, read the
   comments in `pkg/faces/constants.go`. Feedback here is welcome, since the
   Faces authors have normal color vision...
 
+[Edge Stack]: https://www.getambassador.io/docs/edge-stack
 [Linkerd]: https://linkerd.io
-[Emissary-ingress]: https://www.getambassador.io/docs/emissary/
 [DEMO.md]: DEMO.md
 [demosh]: https://github.com/BuoyantIO/demosh

@@ -1,0 +1,11 @@
+---
+apiVersion: getambassador.io/v3alpha1
+kind: RateLimit
+metadata:
+  name: face-service-rate-limit
+spec:
+  domain: ambassador
+  limits:
+   - pattern: [{generic_key: "face-service"}]
+     rate: 8
+     unit: second

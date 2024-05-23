@@ -40,36 +40,24 @@ linkerd check
 
 #@wait
 #@clear
-# Next up: install Emissary-ingress 3.9.1 as the ingress.
+# Next up: install Ambassador Edge Stack as the ingress.
 #
-# This is actually cheating quite a bit, by using an unofficial Helm chart
-# for the CRDs so that we can disable Emissary's conversion webhook to speed
-# up the deployment. We also force every Deployment to one replica to reduce
-# the load on k3d.
 
-kubectl create ns emissary
-kubectl annotate ns emissary linkerd.io/inject=enabled
 
-helm install emissary-crds \
-  oci://registry-1.docker.io/dwflynn/emissary-ingress-crds-chart \
-  -n emissary \
-  --version 3.9.1 \
-  --wait
-
-helm install emissary-ingress \
-  oci://ghcr.io/emissary-ingress/emissary-chart \
-  -n emissary \
-  --version 0.0.0-test \
-  --set nameOverride=emissary \
-  --set fullnameOverride=emissary \
-  --set replicaCount=1
-
-kubectl -n emissary wait --for condition=available --timeout=90s deploy -lproduct=aes
+kubectl create namespace ambassador
+kubectl annotate namespace ambassador linkerd.io/inject=enabled
+kubectl apply -f https://app.getambassador.io/yaml/edge-stack/3.10.2/aes-crds.yaml && \
+kubectl wait --timeout=90s --for=condition=available deployment emissary-apiext -n emissary-system
+helm repo add datawire https://app.getambassador.io && \
+helm repo update && \
+helm install edge-stack --namespace ambassador datawire/edge-stack \
+  --set emissary-ingress.replicaCount=1 \
+  --set emissary-ingress.agent.cloudConnectToken=$CLOUD_CONNECT_TOKEN && \
+kubectl -n ambassador wait --for condition=available --timeout=90s deploy -l product=aes
 
 #@wait
 #@clear
-# Finally, configure Emissary for HTTP - not HTTPS! - routing to our cluster.
-kubectl apply -f emissary-yaml
+kubectl apply -f aes-yaml
 
 #@wait
 #@clear
