@@ -23,16 +23,13 @@ clear
 CLUSTER=${CLUSTER:-faces}
 # echo "CLUSTER is $CLUSTER"
 
-SETUP=${SETUP:-setup-cluster.sh}
-# echo "SETUP is $SETUP"
-
 # Ditch any old cluster...
 k3d cluster delete $CLUSTER &>/dev/null
 
 #@SHOW
 
 # Expose ports 80 and 443 to the local host, so that our ingress can work.
-# Also, don't install traefik, since we'll be putting Linkerd on instead.
+# Also, don't install traefik, since we don't need it.
 k3d cluster create $CLUSTER \
     -p "80:80@loadbalancer" -p "443:443@loadbalancer" \
     --k3s-arg '--disable=traefik@server:*;agents:*'
@@ -42,5 +39,3 @@ k3d cluster create $CLUSTER \
 
 # if [ -f images.tar ]; then k3d image import -c ${CLUSTER} images.tar; fi
 # #@wait
-
-# $SHELL $SETUP
