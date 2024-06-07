@@ -8,30 +8,23 @@ of the demo is let you try to fix things.
 
 In here you will find:
 
-- `create-cluster.sh`, a shell script to create a `k3d` cluster and prep it by
-  running `setup-cluster.sh`.
+- `DEMO.md`, a Markdown file containing the resilience demo presented live at
+  a couple of events. This uses [Emissary-ingress] and the latest edge release
+  of [Linkerd].
 
-- `setup-cluster.sh`, a shell script to set up an empty cluster with [Linkerd],
-  [Emissary-ingress], and the Faces app.
-   - These things are installed in a demo configuration: read and think
-     **carefully** before using this demo as background for a production
-     installation! In particular:
+- `DEMO-BEL.md`, a Markdown file for the same resilience demo, but using
+  [Buoyant Enterprise for Linkerd].
 
-      - We deploy Emissary with only one replica of everything, using a
-        currently-unofficial chart to also skip support for `v1` and `v2`
-        Emissary CRDs.
+The easiest way to use either demo is to run it with [demosh]. Both demos
+assume that you have an empty k3d cluster to play with! If you don't have one,
+you can create one with `bash create-cluster.sh` (this will delete any
+existing `k3d` cluster named "faces").
 
-      - We only configure HTTP, not HTTPS.
-
-     These are likely both bad ideas for a production installation.
-
-- `DEMO.md`, a Markdown file for the resilience demo presented live for a
-  couple of events. The easiest way to use `DEMO.md` is to run it with
-  [demosh].
-
-   - (You can also run `create-cluster.sh` and `setup-cluster.sh` with
-     [demosh], but they're fine with `bash` as well. Realize that all the
-     `#@` comments are special to [demosh] and ignored by `bash`.)
+**Note**: most of the demo doesn't actually care what kind of cluster you use.
+The sole dependency is that, as written, the demo assumes that it will be able
+to reach the `emissary-ingress` service in the `emissary` namespace on
+localhost port 80. If you're using something other than k3d, you'll need to
+tweak the demo to talk to the correct URL.
 
 ## To try this yourself:
 
@@ -41,18 +34,6 @@ In here you will find:
   use.
    - **Note:** `create-cluster.sh` will delete any existing `k3d` cluster named
      "faces".
-
-- If you already have an empty cluster to use, you can run `bash setup-cluster.sh`
-  to initialize it.
-
-- Play around!! Assuming that you're using k3d, the Faces app is reachable at
-  http://localhost/faces/ and the Linkerd Viz dashboard is available at
-  http://localhost/
-
-   - If you're not using k3d, instead of `localhost` use the IP or DNS name of
-     the `emissary-ingress` service in the `emissary` namespace.
-
-   - Remember, HTTPS is **not** configured.
 
 - To run the demo as we've given it before, check out [DEMO.md]. The easiest
   way to use that is to run it with [demosh].
@@ -87,6 +68,7 @@ The Faces architecture is fairly simple:
   Faces authors have normal color vision...
 
 [Linkerd]: https://linkerd.io
+[Buoyant Enterprise for Linkerd]: https://buoyant.io/linkerd-enterprise
 [Emissary-ingress]: https://www.getambassador.io/docs/emissary/
 [DEMO.md]: DEMO.md
 [demosh]: https://github.com/BuoyantIO/demosh

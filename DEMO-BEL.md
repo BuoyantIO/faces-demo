@@ -52,20 +52,22 @@ always have the latest and greatest features and fixes directly from the
 `main` branch. Stable releases are produced by the vendor community around
 Linkerd, and are the way to go for full support.
 
-We're going to use the latest edge release for this demo, but **either will
-work**. (If you want to use a stable release instead, check out
-`https://linkerd.io/releases/` for more information.)
+For this demo, we'll use the stable Buoyant Enterprise for Linkerd (BEL)
+distribution. You'll need a free Buoyant account for this -- if you don't
+already have one, hit up https://enterprise.buoyant.io to get set up.
 
 <!-- @wait_clear -->
 
 ### Installing the CLI
 
-Installing Linkerd starts with installing the Linkerd CLI. This command-line
-tool makes it easy to work with Linkerd, and it's installed with this
-one-liner that will download the latest edge CLI and get it set up to run.
+Once you have your Buoyant account set up, and you've set the environment
+variables it'll tell you about, it's time to get the Linkerd CLI installed!
+The CLI makes it easy to work with Linkerd, and it's installed with this
+one-liner that will download the latest BEL CLI and get it set up to run:
 
 ```bash
-curl --proto '=https' --tlsv1.2 -sSfL https://run.linkerd.io/install-edge | sh
+curl --proto '=https' --tlsv1.2 -sSfL https://enterprise.buoyant.io/install | sh
+linkerd version --proxy --client --short
 ```
 
 Once that's done, you'll need to add the CLI directory to your PATH:
@@ -113,8 +115,10 @@ We're also going to install Linkerd Viz: this is an optional component that
 provides a web-based dashboard for Linkerd. It's a great way to see what's
 happening in your cluster, so we'll install it as well.
 
+(For the moment, we need to tell the CLI to explicitly install Viz 2.14.10.)
+
 ```bash
-linkerd viz install | kubectl apply -f -
+linkerd viz install --set linkerdVersion=stable-2.14.10 | kubectl apply -f -
 ```
 
 Just like Linkerd itself, this will start the installation and return
