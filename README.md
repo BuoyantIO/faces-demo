@@ -6,6 +6,8 @@ background. Spoiler alert: installed exactly as committed to this repo, that
 isn't what you'll get -- many, many things can go wrong, and will. The point
 of the demo is let you try to fix things.
 
+![Faces Screenshot](assets/faces-screenshot.png)
+
 In here you will find:
 
 - `DEMO.md`, a Markdown file containing the resilience demo presented live at
