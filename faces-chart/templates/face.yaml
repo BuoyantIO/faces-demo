@@ -4,6 +4,8 @@ kind: Service
 metadata:
   name: face
   namespace: {{ .Release.Namespace }}
+  labels:
+    service: face
 spec:
   type: ClusterIP
   selector:
@@ -17,6 +19,8 @@ kind: Deployment
 metadata:
   name: face
   namespace: {{ .Release.Namespace }}
+  labels:
+    service: face
 spec:
   replicas: 1
   selector:
