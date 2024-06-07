@@ -224,7 +224,7 @@ kubectl create namespace faces
 kubectl annotate namespace faces linkerd.io/inject=enabled
 
 helm install faces -n faces \
-     oci://ghcr.io/buoyantio/faces-chart --version 1.3.0
+     oci://ghcr.io/buoyantio/faces-chart --version 1.4.0
 
 kubectl rollout status -n faces deploy
 ```
