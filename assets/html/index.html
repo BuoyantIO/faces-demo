@@ -1259,7 +1259,10 @@ window.onload = () => {
 
 	for (row = 0; row < 4; row++) {
 		for (col = 0; col < 4; col++) {
-			let cell = new Cell(logger, sw, podSet, `../face/cell/`, $("cells"), row, col)
+			let isCenter = ((row === 1 || row === 2) && (col === 1 || col === 2))
+			let cellURL = isCenter ? `../face/center/` : `../face/edge/`
+
+			let cell = new Cell(logger, sw, podSet, cellURL, $("cells"), row, col)
 			cells.push(cell)
 		}
 		$("cells").innerHTML += "<br/>"
