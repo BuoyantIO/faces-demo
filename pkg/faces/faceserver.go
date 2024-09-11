@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/BuoyantIO/faces-demo/v2/pkg/utils"
@@ -63,10 +64,10 @@ func (srv *FaceServer) SetupFromEnvironment() {
 	fmt.Printf("%s %s: colorService %v\n", time.Now().Format(time.RFC3339), srv.Name, srv.colorService)
 }
 
-func (srv *FaceServer) makeRequest(user string, userAgent string, service string, keyword string) *FaceResponse {
+func (srv *FaceServer) makeRequest(user string, userAgent string, service string, keyword string, subrequest string) *FaceResponse {
 	start := time.Now()
 
-	url := fmt.Sprintf("http://%s/", service)
+	url := fmt.Sprintf("http://%s/%s/", service, subrequest)
 
 	if srv.debugEnabled {
 		fmt.Printf("%s %s: %s starting\n", time.Now().Format(time.RFC3339), srv.Name, url)
@@ -178,6 +179,10 @@ func (srv *FaceServer) faceGetHandler(r *http.Request, rstat *BaseRequestStatus)
 		StatusCode: http.StatusOK,
 	}
 
+	// Our request URL should start with /center/ or /edge/, and we want to
+	// propagate that to our smiley and color services.
+	subrequest := strings.Split(r.URL.Path, "/")[1]
+
 	errors := []string{}
 	var smiley string
 	var color string
@@ -207,11 +212,11 @@ func (srv *FaceServer) faceGetHandler(r *http.Request, rstat *BaseRequestStatus)
 		colorCh := make(chan *FaceResponse)
 
 		go func() {
-			smileyCh <- srv.makeRequest(user, userAgent, srv.smileyService, "smiley")
+			smileyCh <- srv.makeRequest(user, userAgent, srv.smileyService, "smiley", subrequest)
 		}()
 
 		go func() {
-			colorCh <- srv.makeRequest(user, userAgent, srv.colorService, "color")
+			colorCh <- srv.makeRequest(user, userAgent, srv.colorService, "color", subrequest)
 		}()
 
 		// Wait for the responses from both services
