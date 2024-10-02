@@ -92,6 +92,14 @@
   {{- include "partials.select-errorFraction" (dict "source" .Values.face) -}}
 {{- end -}}
 
+{{- define "partials.ingress-image" -}}
+  {{- include "partials.select-image" (dict "source" .Values.ingress "root" .) -}}
+{{- end -}}
+
+{{- define "partials.ingress-imagePullPolicy" -}}
+  {{- include "partials.select-imagePullPolicy" (dict "source" .Values.ingress "root" .) -}}
+{{- end -}}
+
 {{- define "partials.color-image" -}}
   {{- include "partials.select-image" (dict "source" .Values.color "default" .Values.backend "root" .) -}}
 {{- end -}}

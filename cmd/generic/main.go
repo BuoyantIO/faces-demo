@@ -55,6 +55,9 @@ func main() {
 	case "color":
 		server = &faces.NewColorServer("ColorServer").BaseServer
 
+	case "ingress":
+		server = &faces.NewIngressServer("IngressServer").BaseServer
+
 	case "load":
 		fmt.Printf("Running load generator")
 

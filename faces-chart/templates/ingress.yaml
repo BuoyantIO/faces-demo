@@ -1,0 +1,56 @@
+{{- if .Values.ingress.enabled -}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: face
+  namespace: {{ .Release.Namespace }}
+  labels:
+    service: face
+spec:
+  type: ClusterIP
+  selector:
+    service: face
+  ports:
+  - port: 80
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: face
+  namespace: {{ .Release.Namespace }}
+  labels:
+    service: face
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      service: face
+  template:
+    metadata:
+      labels:
+        service: face
+    spec:
+      containers:
+      - name: face
+        image: {{ include "partials.ingress-image" . }}
+        imagePullPolicy: {{ include "partials.ingress-imagePullPolicy" . }}
+        ports:
+        - name: http
+          containerPort: 8000
+        env:
+        - name: FACES_SERVICE
+          value: "ingress"
+        - name: USER_HEADER_NAME
+          value: {{ .Values.authHeader | quote }}
+        - name: CELL_SERVICE
+          value: {{ .Values.ingress.cellService | quote }}
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 250m
+            memory: 128Mi
+{{- end -}}
