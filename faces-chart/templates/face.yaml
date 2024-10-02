@@ -1,15 +1,19 @@
+{{- $name := "face" -}}
+{{- if .Values.ingress.enabled -}}
+  {{- $name = "cell" -}}
+{{- end -}}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: face
+  name: {{ $name }}
   namespace: {{ .Release.Namespace }}
   labels:
-    service: face
+    service: {{ $name }}
 spec:
   type: ClusterIP
   selector:
-    service: face
+    service: {{ $name }}
   ports:
   - port: 80
     targetPort: http
@@ -17,22 +21,22 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: face
+  name: {{ $name }}
   namespace: {{ .Release.Namespace }}
   labels:
-    service: face
+    service: {{ $name }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      service: face
+      service: {{ $name }}
   template:
     metadata:
       labels:
-        service: face
+        service: {{ $name }}
     spec:
       containers:
-      - name: face
+      - name: {{ $name }}
         image: {{ include "partials.face-image" . }}
         imagePullPolicy: {{ include "partials.face-imagePullPolicy" . }}
         ports:

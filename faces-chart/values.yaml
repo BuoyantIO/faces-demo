@@ -27,6 +27,14 @@ face:
   errorFraction: "20"
   delayBuckets: ""
 
+ingress:
+  enabled: False                # If set to True, enables the ingress workload
+  image: ""                     # If set, overrides the imageName/imageTag pair
+  imageName: ghcr.io/buoyantio/faces-workload
+  imageTag: ""                  # If not set, uses the defaultImageTag
+  imagePullPolicy: ""           # If not set, uses the default imagePullPolicy
+  cellService: "cell"           # Override if desired
+
 backend:
   image: ""                     # If set, overrides the imageName/imageTag pair
   imageName: ghcr.io/buoyantio/faces-workload

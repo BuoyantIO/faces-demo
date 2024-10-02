@@ -1,3 +1,7 @@
+{{- $serviceType := .Values.gui.serviceType -}}
+{{- if .Values.ingress.enabled -}}
+  {{- $serviceType = "LoadBalancer" -}}
+{{- end -}}
 ---
 apiVersion: v1
 kind: Service
@@ -7,7 +11,7 @@ metadata:
   labels:
     service: faces-gui
 spec:
-  type: {{ .Values.gui.serviceType }}
+  type: {{ $serviceType }}
   selector:
     service: faces-gui
   ports:
