@@ -1,0 +1,21 @@
+// If you modify this file, you'll need to rerun 'make proto'!
+
+syntax = "proto3";
+
+option go_package="github.com/BuoyantIO/faces-demo/v2/pkg/faces";
+
+service ColorService {
+  rpc Center (ColorRequest) returns (ColorResponse);
+  rpc Edge (ColorRequest) returns (ColorResponse);
+}
+
+message ColorRequest {
+  int32 row = 1;
+  int32 column = 2;
+}
+
+message ColorResponse {
+  string color = 1;
+  string rate = 2;
+  repeated string errors = 3;
+}

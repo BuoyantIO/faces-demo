@@ -18,14 +18,19 @@
 package faces
 
 import (
+	context "context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/BuoyantIO/faces-demo/v2/pkg/utils"
+	grpc "google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type FaceServer struct {
@@ -59,6 +64,25 @@ func (srv *FaceServer) SetupFromEnvironment() {
 
 	srv.smileyService = utils.StringFromEnv("SMILEY_SERVICE", "smiley")
 	srv.colorService = utils.StringFromEnv("COLOR_SERVICE", "color")
+
+	_, _, err := net.SplitHostPort(srv.colorService)
+
+	if err != nil {
+		// Most likely we're missing the port, so try to default it.
+		addr := net.ParseIP(srv.colorService)
+
+		if addr != nil {
+			// Is this an IPv6 address?
+			if strings.Contains(srv.colorService, ":") {
+				srv.colorService = fmt.Sprintf("[%s]:80", srv.colorService)
+			} else {
+				srv.colorService = fmt.Sprintf("%s:80", srv.colorService)
+			}
+		} else {
+			// Probably a hostname.
+			srv.colorService = fmt.Sprintf("%s:80", srv.colorService)
+		}
+	}
 
 	fmt.Printf("%s %s: smileyService %v\n", time.Now().Format(time.RFC3339), srv.Name, srv.smileyService)
 	fmt.Printf("%s %s: colorService %v\n", time.Now().Format(time.RFC3339), srv.Name, srv.colorService)
@@ -179,6 +203,8 @@ func (srv *FaceServer) faceGetHandler(r *http.Request, rstat *BaseRequestStatus)
 		StatusCode: http.StatusOK,
 	}
 
+	fmt.Printf("%s %s: request path: %s, query string: %s\n", time.Now().Format(time.RFC3339), srv.Name, r.URL.Path, r.URL.RawQuery)
+
 	// Our request URL should start with /center/ or /edge/, and we want to
 	// propagate that to our smiley and color services.
 	subrequest := strings.Split(r.URL.Path, "/")[1]
@@ -189,6 +215,33 @@ func (srv *FaceServer) faceGetHandler(r *http.Request, rstat *BaseRequestStatus)
 	var smileyOK bool
 
 	rateStr := fmt.Sprintf("%.1f RPS", srv.CurrentRate())
+
+	query := r.URL.Query()
+	query_row := query.Get("row")
+	query_column := query.Get("col")
+
+	row := -1
+	column := -1
+
+	if query_row != "" {
+		r, err := strconv.Atoi(query_row)
+
+		if err == nil {
+			row = r
+		} else {
+			fmt.Printf("%s %s: couldn't parse row %s, using -1: %s\n", time.Now().Format(time.RFC3339), srv.Name, query_row, err)
+		}
+	}
+
+	if query_column != "" {
+		c, err := strconv.Atoi(query_column)
+
+		if err == nil {
+			column = c
+		} else {
+			fmt.Printf("%s %s: couldn't parse column %s, using -1: %s\n", time.Now().Format(time.RFC3339), srv.Name, query_column, err)
+		}
+	}
 
 	if rstat.IsRateLimited() {
 		errors = append(errors, rstat.Message())
@@ -216,7 +269,62 @@ func (srv *FaceServer) faceGetHandler(r *http.Request, rstat *BaseRequestStatus)
 		}()
 
 		go func() {
-			colorCh <- srv.makeRequest(user, userAgent, srv.colorService, "color", subrequest)
+			opts := []grpc.DialOption{
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
+			}
+
+			conn, err := grpc.NewClient(srv.colorService, opts...)
+
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("color: %s", err))
+				colorCh <- &FaceResponse{
+					statusCode: http.StatusInternalServerError,
+					data:       fmt.Sprintf("couldn't connect to %s: %s", srv.colorService, err),
+				}
+				return
+			}
+
+			defer conn.Close()
+
+			client := NewColorServiceClient(conn)
+			colorReq := &ColorRequest{
+				Row:    int32(row),
+				Column: int32(column),
+			}
+
+			var colorResp *ColorResponse
+
+			if srv.debugEnabled {
+				fmt.Printf("%s %s: starting gRPC to %s for %s (row %d col %d)\n",
+					time.Now().Format(time.RFC3339), srv.Name, srv.colorService, subrequest, colorReq.Row, colorReq.Column)
+			}
+
+			if subrequest == "center" {
+				colorResp, err = client.Center(context.Background(), colorReq)
+			} else {
+				colorResp, err = client.Edge(context.Background(), colorReq)
+			}
+
+			if err != nil {
+				if srv.debugEnabled {
+					fmt.Printf("%s %s: gRPC failed: %s\n", time.Now().Format(time.RFC3339), srv.Name, err)
+				}
+
+				errors = append(errors, fmt.Sprintf("color: %s", err))
+				colorCh <- &FaceResponse{
+					statusCode: http.StatusInternalServerError,
+					data:       fmt.Sprintf("couldn't get color from %s: %s", srv.colorService, err),
+				}
+			} else {
+				if srv.debugEnabled {
+					fmt.Printf("%s %s: gRPC got %#v\n", time.Now().Format(time.RFC3339), srv.Name, colorResp)
+				}
+
+				colorCh <- &FaceResponse{
+					statusCode: http.StatusOK,
+					data:       colorResp.Color,
+				}
+			}
 		}()
 
 		// Wait for the responses from both services
