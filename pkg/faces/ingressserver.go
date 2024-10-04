@@ -83,6 +83,12 @@ func (srv *IngressServer) ingressGetHandler(r *http.Request, rstat *BaseRequestS
 	} else {
 		url := fmt.Sprintf("http://%s%s", srv.faceService, r.URL.Path)
 
+		rq := r.URL.RawQuery
+
+		if rq != "" {
+			url = fmt.Sprintf("%s?%s", url, rq)
+		}
+
 		if srv.debugEnabled {
 			fmt.Printf("%s %s: %s starting\n", time.Now().Format(time.RFC3339), srv.Name, url)
 		}

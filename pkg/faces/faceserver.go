@@ -88,10 +88,10 @@ func (srv *FaceServer) SetupFromEnvironment() {
 	fmt.Printf("%s %s: colorService %v\n", time.Now().Format(time.RFC3339), srv.Name, srv.colorService)
 }
 
-func (srv *FaceServer) makeRequest(user string, userAgent string, service string, keyword string, subrequest string) *FaceResponse {
+func (srv *FaceServer) makeRequest(user string, userAgent string, service string, keyword string, subrequest string, row int, col int) *FaceResponse {
 	start := time.Now()
 
-	url := fmt.Sprintf("http://%s/%s/", service, subrequest)
+	url := fmt.Sprintf("http://%s/%s/?row=%d&col=%d", service, subrequest, row, col)
 
 	if srv.debugEnabled {
 		fmt.Printf("%s %s: %s starting\n", time.Now().Format(time.RFC3339), srv.Name, url)
@@ -265,7 +265,7 @@ func (srv *FaceServer) faceGetHandler(r *http.Request, rstat *BaseRequestStatus)
 		colorCh := make(chan *FaceResponse)
 
 		go func() {
-			smileyCh <- srv.makeRequest(user, userAgent, srv.smileyService, "smiley", subrequest)
+			smileyCh <- srv.makeRequest(user, userAgent, srv.smileyService, "smiley", subrequest, row, column)
 		}()
 
 		go func() {

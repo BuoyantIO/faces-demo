@@ -133,6 +133,13 @@ func (srv *GUIServer) guiGetHandler(w http.ResponseWriter, r *http.Request) {
 		reqStart := time.Now()
 
 		url := fmt.Sprintf("http://face/%s", r.URL.Path[6:])
+
+		rq := r.URL.RawQuery
+
+		if rq != "" {
+			url = fmt.Sprintf("%s?%s", url, rq)
+		}
+
 		user := r.Header.Get(srv.userHeaderName)
 		if user == "" {
 			user = "unknown"
