@@ -19,7 +19,7 @@
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 # vim: set ts=2 sw=2 tw=0 fo=cnqoj
 
-version: 1
+version: 2
 
 # Allow overriding the registry and image name with environment variables.
 env:
@@ -35,9 +35,9 @@ before:
     - make VERSION={{ .Version }} chart
 
 builds:
-  # "generic" is our build for any random hardware out there.
-  - id: generic
-    main: ./cmd/generic
+  # "generic-" builds are for any random hardware out there.
+  - id: generic-workload
+    main: ./cmd/generic/workload
     binary: workload
     env:
       - CGO_ENABLED=0
@@ -62,12 +62,13 @@ builds:
 # We build GUI and workload images for both arm64 and amd64, then build a
 # multiarch manifest from them.
 dockers:
+  ### GUI images
   - use: buildx
     goos: linux
     goarch: arm64
     dockerfile: Dockerfiles/Dockerfile.gui
     ids:
-      - generic
+      - generic-workload
     image_templates:
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}-arm64"
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest-arm64"
@@ -80,7 +81,7 @@ dockers:
     goarch: amd64
     dockerfile: Dockerfiles/Dockerfile.gui
     ids:
-      - generic
+      - generic-workload
     image_templates:
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}-amd64"
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest-amd64"
@@ -89,12 +90,13 @@ dockers:
     extra_files:
       - assets/html
 
+  ### Generic workload images: this is the multifunction image that can be any HTTP workload.
   - use: buildx
     goos: linux
     goarch: arm64
     dockerfile: Dockerfiles/Dockerfile.workload
     ids:
-      - generic
+      - generic-workload
     image_templates:
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:{{ .Version }}-arm64"
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:latest-arm64"
@@ -105,7 +107,7 @@ dockers:
     goarch: amd64
     dockerfile: Dockerfiles/Dockerfile.workload
     ids:
-      - generic
+      - generic-workload
     image_templates:
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:{{ .Version }}-amd64"
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:latest-amd64"
@@ -117,49 +119,53 @@ dockers:
     goarch: arm64
     dockerfile: Dockerfiles/Dockerfile.external-workload
     ids:
-      - generic
+      - generic-workload
     image_templates:
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:{{ .Version }}-arm64"
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest-arm64"
     build_flag_templates:
       - "--platform=linux/arm64"
       - "--build-arg=EXTERNAL_BASE={{ .Env.EXTERNAL_BASE }}"
+      - "--build-arg=WORKLOAD=workload"
   - use: buildx
     goos: linux
     goarch: amd64
     dockerfile: Dockerfiles/Dockerfile.external-workload
     ids:
-      - generic
+      - generic-workload
     image_templates:
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:{{ .Version }}-amd64"
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest-amd64"
     build_flag_templates:
       - "--platform=linux/amd64"
       - "--build-arg=EXTERNAL_BASE={{ .Env.EXTERNAL_BASE }}"
+      - "--build-arg=WORKLOAD=workload"
   - use: buildx
     goos: linux
     goarch: arm64
     dockerfile: Dockerfiles/Dockerfile.bel-external-workload
     ids:
-      - generic
+      - generic-workload
     image_templates:
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:{{ .Version }}-arm64"
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:latest-arm64"
     build_flag_templates:
       - "--platform=linux/arm64"
       - "--build-arg=EXTERNAL_BASE={{ .Env.BEL_EXTERNAL_BASE }}"
+      - "--build-arg=WORKLOAD=workload"
   - use: buildx
     goos: linux
     goarch: amd64
     dockerfile: Dockerfiles/Dockerfile.bel-external-workload
     ids:
-      - generic
+      - generic-workload
     image_templates:
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:{{ .Version }}-amd64"
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:latest-amd64"
     build_flag_templates:
       - "--platform=linux/amd64"
       - "--build-arg=EXTERNAL_BASE={{ .Env.BEL_EXTERNAL_BASE }}"
+      - "--build-arg=WORKLOAD=workload"
 
   # For the Pi, we only build an external-workload image for arm64. The Pi itself
   # is arm64, so there's no point in building for amd64, and we're not going to try
@@ -276,7 +282,7 @@ archives:
   - id: generic
     name_template: '{{ .ProjectName }}_generic_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
     builds:
-      - generic
+      - generic-workload
   - id: pi
     name_template: '{{ .ProjectName }}_pi_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
     builds:
