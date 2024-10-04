@@ -19,12 +19,13 @@
 
 # Use a minimal base image for the final image
 FROM scratch AS final
+ARG WORKLOAD
 
 # This is associated with the faces-demo repo.
 LABEL org.opencontainers.image.source=https://github.com/BuoyantIO/faces-demo
 
 # Copy the compiled binary from the builder stage into the final image
-COPY workload /workload
+COPY ${WORKLOAD} /workload
 
 # Set the entrypoint to the compiled binary
 ENTRYPOINT ["/workload"]

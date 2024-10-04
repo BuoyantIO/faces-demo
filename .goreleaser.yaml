@@ -47,6 +47,17 @@ builds:
       - arm64
       - amd64
 
+  - id: generic-color
+    main: ./cmd/generic/color
+    binary: color-workload
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - arm64
+      - amd64
+
   # "pi" is our build specifically for the Raspberry Pi (it uses Pi GPIO for
   # some LEDs and a knob).
   - id: pi
@@ -102,6 +113,7 @@ dockers:
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:latest-arm64"
     build_flag_templates:
       - "--platform=linux/arm64"
+      - "--build-arg=WORKLOAD=workload"
   - use: buildx
     goos: linux
     goarch: amd64
@@ -113,6 +125,33 @@ dockers:
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:latest-amd64"
     build_flag_templates:
       - "--platform=linux/amd64"
+      - "--build-arg=WORKLOAD=workload"
+
+  ### Color workload images: this can only be a gRPC color workload.
+  - use: buildx
+    goos: linux
+    goarch: arm64
+    dockerfile: Dockerfiles/Dockerfile.workload
+    ids:
+      - generic-color
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:{{ .Version }}-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:latest-arm64"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--build-arg=WORKLOAD=color-workload"
+  - use: buildx
+    goos: linux
+    goarch: amd64
+    dockerfile: Dockerfiles/Dockerfile.workload
+    ids:
+      - generic-color
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:{{ .Version }}-amd64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:latest-amd64"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--build-arg=WORKLOAD=color-workload"
 
   - use: buildx
     goos: linux
@@ -283,6 +322,7 @@ archives:
     name_template: '{{ .ProjectName }}_generic_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
     builds:
       - generic-workload
+      - generic-color
   - id: pi
     name_template: '{{ .ProjectName }}_pi_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
     builds:
