@@ -53,6 +53,8 @@ The Faces architecture is fairly simple:
   then composes the responses together and returns the smiley/color
   combination to the GUI for display.
 
+  `face` uses HTTP to talk to `smiley` and gRPC to talk to `color`.
+
 - The `smiley` workload returns a smiley face. By default, this is a grinning
   smiley, U+1F603, but you can set the `SMILEY` environment variable to any
   key in the `Smileys` map from `constants.go` to get a different smiley.
