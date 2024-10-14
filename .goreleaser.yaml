@@ -281,6 +281,24 @@ docker_manifests:
     push_flags:
       - --insecure
 
+  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:{{ .Version }}"
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:{{ .Version }}-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:{{ .Version }}-amd64"
+    create_flags:
+      - --insecure
+    push_flags:
+      - --insecure
+
+  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:latest"
+    image_templates:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:latest-arm64"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:latest-amd64"
+    create_flags:
+      - --insecure
+    push_flags:
+      - --insecure
+
   - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest"
     image_templates:
       - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest-arm64"
