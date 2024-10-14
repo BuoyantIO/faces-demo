@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/warthog618/gpiod"
+	"github.com/warthog618/go-gpiocdev"
 )
 
 type RotaryEvent struct {
@@ -43,8 +43,8 @@ type rotaryDebugEvent struct {
 type RotaryEncoder struct {
 	Name     string
 	Debounce time.Duration
-	LineA    *gpiod.Line
-	LineB    *gpiod.Line
+	LineA    *gpiocdev.Line
+	LineB    *gpiocdev.Line
 	Position int
 
 	Debug bool
@@ -52,7 +52,7 @@ type RotaryEncoder struct {
 	lock sync.Mutex
 
 	evtChan       chan RotaryEvent
-	gpioChan      chan gpiod.LineEvent
+	gpioChan      chan gpiocdev.LineEvent
 	debounceChan  chan interface{}
 	debounceTimer *time.Timer
 	state         int
@@ -70,13 +70,13 @@ func NewRotaryEncoder(chip string, pinA int, pinB int, debounce time.Duration, n
 		state:        3, // Assume we're starting with the knob stationary with both pins high.
 		evtChan:      evtChan,
 		debounceChan: make(chan interface{}),
-		gpioChan:     make(chan gpiod.LineEvent),
+		gpioChan:     make(chan gpiocdev.LineEvent),
 
 		debugEvents: make([]rotaryDebugEvent, 0, 10),
 	}
 
-	lineA, err := gpiod.RequestLine(chip, pinA, gpiod.WithBothEdges, gpiod.WithPullUp,
-		gpiod.WithEventHandler(func(evt gpiod.LineEvent) {
+	lineA, err := gpiocdev.RequestLine(chip, pinA, gpiocdev.WithBothEdges, gpiocdev.WithPullUp,
+		gpiocdev.WithEventHandler(func(evt gpiocdev.LineEvent) {
 			enc.gpioChan <- evt
 		}))
 
@@ -84,8 +84,8 @@ func NewRotaryEncoder(chip string, pinA int, pinB int, debounce time.Duration, n
 		return nil, err
 	}
 
-	lineB, err := gpiod.RequestLine(chip, pinB, gpiod.WithBothEdges, gpiod.WithPullUp,
-		gpiod.WithEventHandler(func(evt gpiod.LineEvent) {
+	lineB, err := gpiocdev.RequestLine(chip, pinB, gpiocdev.WithBothEdges, gpiocdev.WithPullUp,
+		gpiocdev.WithEventHandler(func(evt gpiocdev.LineEvent) {
 			enc.gpioChan <- evt
 		}))
 

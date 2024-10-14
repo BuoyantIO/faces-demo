@@ -20,7 +20,7 @@ package main
 import (
 	"time"
 
-	"github.com/warthog618/gpiod"
+	"github.com/warthog618/go-gpiocdev"
 )
 
 type ButtonEvent struct {
@@ -32,13 +32,13 @@ type ButtonEvent struct {
 type Button struct {
 	Name       string
 	Debounce   time.Duration
-	Line       *gpiod.Line
+	Line       *gpiocdev.Line
 	PressCount int
 
 	btnChan   chan ButtonEvent
-	evtChan   chan gpiod.LineEvent
+	evtChan   chan gpiocdev.LineEvent
 	state     int
-	lastEvent gpiod.LineEvent
+	lastEvent gpiocdev.LineEvent
 }
 
 func NewButton(chip string, pin int, debounce time.Duration, name string, btnChan chan ButtonEvent) (*Button, error) {
@@ -48,14 +48,14 @@ func NewButton(chip string, pin int, debounce time.Duration, name string, btnCha
 		PressCount: 0,
 		state:      0,
 		btnChan:    btnChan,
-		evtChan:    make(chan gpiod.LineEvent),
-		lastEvent: gpiod.LineEvent{
-			Type: gpiod.LineEventRisingEdge,
+		evtChan:    make(chan gpiocdev.LineEvent),
+		lastEvent: gpiocdev.LineEvent{
+			Type: gpiocdev.LineEventRisingEdge,
 		},
 	}
 
-	line, err := gpiod.RequestLine(chip, pin, gpiod.WithBothEdges, gpiod.WithPullDown,
-		gpiod.WithEventHandler(func(evt gpiod.LineEvent) {
+	line, err := gpiocdev.RequestLine(chip, pin, gpiocdev.WithBothEdges, gpiocdev.WithPullDown,
+		gpiocdev.WithEventHandler(func(evt gpiocdev.LineEvent) {
 			btn.evtChan <- evt
 		}))
 
@@ -74,7 +74,7 @@ func (btn *Button) Close() {
 }
 
 func (btn *Button) watch() {
-	events := make([]gpiod.LineEvent, 0, 2)
+	events := make([]gpiocdev.LineEvent, 0, 2)
 
 	// Wait for button presses
 	for {
@@ -83,14 +83,14 @@ func (btn *Button) watch() {
 			if btn.lastEvent.Type == evt.Type {
 				// Insert an event of the other type, 'cause we can't
 				// get two of the same edge in a row!
-				if evt.Type == gpiod.LineEventRisingEdge {
-					events = append(events, gpiod.LineEvent{
-						Type:      gpiod.LineEventFallingEdge,
+				if evt.Type == gpiocdev.LineEventRisingEdge {
+					events = append(events, gpiocdev.LineEvent{
+						Type:      gpiocdev.LineEventFallingEdge,
 						Timestamp: evt.Timestamp,
 					})
 				} else {
-					events = append(events, gpiod.LineEvent{
-						Type:      gpiod.LineEventRisingEdge,
+					events = append(events, gpiocdev.LineEvent{
+						Type:      gpiocdev.LineEventRisingEdge,
 						Timestamp: evt.Timestamp,
 					})
 				}
@@ -102,7 +102,7 @@ func (btn *Button) watch() {
 				delta := evt.Timestamp - btn.lastEvent.Timestamp
 				btn.lastEvent = evt
 
-				fallingEdge := (evt.Type == gpiod.LineEventFallingEdge)
+				fallingEdge := (evt.Type == gpiocdev.LineEventFallingEdge)
 
 				// edge := "UP"
 
