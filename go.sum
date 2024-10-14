@@ -34,10 +34,10 @@ github.com/prometheus/procfs v0.15.1 h1:YagwOFzUgYfKKHX6Dr+sHT7km/hxC76UB0leargg
 github.com/prometheus/procfs v0.15.1/go.mod h1:fB45yRUv8NstnjriLhBQLuOUt+WW4BsoGhij/e3PBqk=
 github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOfJA=
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
+github.com/warthog618/go-gpiocdev v0.9.0 h1:AZWUq1WObgKCO9cJCACFpwWQw6yu8vJbIE6fRZ+6cbY=
+github.com/warthog618/go-gpiocdev v0.9.0/go.mod h1:GV4NZC82fWJERqk7Gu0+KfLSDIBEDNm6aPGiHlmT5fY=
 github.com/warthog618/go-gpiosim v0.1.0 h1:2rTMTcKUVZxpUuvRKsagnKAbKpd3Bwffp87xywEDVGI=
 github.com/warthog618/go-gpiosim v0.1.0/go.mod h1:Ngx/LYI5toxHr4E+Vm6vTgCnt0of0tktsSuMUEJ2wCI=
-github.com/warthog618/gpiod v0.8.3 h1:hGFm/zf5PUyXU2LBG4fiZyRnbSSiPEajuOtQzQ3vkLo=
-github.com/warthog618/gpiod v0.8.3/go.mod h1:YHsKSpTHebSDGnKNQKfQp9t/0JxQCyXyYtCF3F+78dc=
 go.opentelemetry.io/auto/sdk v1.1.0 h1:cH53jehLUN6UFLY71z+NDOiNJqDdPRaXzTel0sJySYA=
 go.opentelemetry.io/auto/sdk v1.1.0/go.mod h1:3wSPjt5PWp2RhlCcmmOial7AvC4DQqZb7a7wCow3W8A=
 go.opentelemetry.io/otel v1.34.0 h1:zRLXxLCgL1WyKsPVrgbSdMN4c0FMkDAskSTQP+0hdUY=

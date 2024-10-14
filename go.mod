@@ -6,7 +6,7 @@ toolchain go1.23.3
 
 require (
 	github.com/prometheus/client_golang v1.21.1
-	github.com/warthog618/gpiod v0.8.3
+	github.com/warthog618/go-gpiocdev v0.9.0
 	google.golang.org/grpc v1.71.0
 	google.golang.org/protobuf v1.36.5
 )
