@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/warthog618/gpiod"
+	"github.com/warthog618/go-gpiocdev"
 )
 
 type HardwareStuff struct {
@@ -34,7 +34,7 @@ type HardwareStuff struct {
 	button *Button
 	rotary *RotaryEncoder
 
-	leds map[string]*gpiod.Line
+	leds map[string]*gpiocdev.Line
 
 	btnChan    chan ButtonEvent
 	rotaryChan chan RotaryEvent
@@ -59,7 +59,7 @@ func NewHardwareStuff(rotaryAPin, rotaryBPin, buttonPin, ledGreenPin, ledRedPin 
 		return nil, fmt.Errorf("could not create rotary encoder on lines %d and %d: %s", rotaryAPin, rotaryBPin, err)
 	}
 
-	redLED, err := gpiod.RequestLine("gpiochip0", ledRedPin, gpiod.AsOutput(1), gpiod.LineDrivePushPull)
+	redLED, err := gpiocdev.RequestLine("gpiochip0", ledRedPin, gpiocdev.AsOutput(1), gpiocdev.LineDrivePushPull)
 
 	if err != nil {
 		btn.Close()
@@ -68,7 +68,7 @@ func NewHardwareStuff(rotaryAPin, rotaryBPin, buttonPin, ledGreenPin, ledRedPin 
 		return nil, fmt.Errorf("could not create red LED on line %d: %s", ledRedPin, err)
 	}
 
-	greenLED, err := gpiod.RequestLine("gpiochip0", ledGreenPin, gpiod.AsOutput(1), gpiod.LineDrivePushPull)
+	greenLED, err := gpiocdev.RequestLine("gpiochip0", ledGreenPin, gpiocdev.AsOutput(1), gpiocdev.LineDrivePushPull)
 
 	if err != nil {
 		btn.Close()
@@ -87,7 +87,7 @@ func NewHardwareStuff(rotaryAPin, rotaryBPin, buttonPin, ledGreenPin, ledRedPin 
 
 		button: btn,
 		rotary: rotary,
-		leds: map[string]*gpiod.Line{
+		leds: map[string]*gpiocdev.Line{
 			"red":   redLED,
 			"green": greenLED,
 		},
