@@ -1,0 +1,239 @@
+# This file contains some sample data to model the services which are deployed with the emojivoto demo
+# from linkerd into the Backstage Software Catalog.
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: faces
+  namespace: faces
+  description: The Faces Demo
+  links:
+    - url: https://github.com/BuoyantIO/faces-demo
+      title: Faces Demo on GitHub
+  annotations:
+    backstage.io/source-location: url:https://github.com/BuoyantIO/faces-demo
+    github.com/project-slug: BuoyantIO/faces-demo
+spec:
+  owner: user:default/guest
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: faces-gui
+  description: The Faces GUI
+  namespace: faces
+  annotations:
+    backstage.io/kubernetes-label-selector: service=faces-gui
+    backstage.io/kubernetes-namespace: faces
+    github.com/project-slug: BuoyantIO/faces-demo
+  links:
+    - url: http://localhost/faces/
+      title: Faces GUI
+spec:
+  type: website
+  lifecycle: production
+  owner: user:default/guest
+  system: faces
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: face
+  description: Face workload
+  namespace: faces
+  annotations:
+    backstage.io/kubernetes-label-selector: service=face
+    backstage.io/kubernetes-namespace: faces
+    backstage.io/source-location: url:https://github.com/BuoyantIO/faces-demo
+    github.com/project-slug: BuoyantIO/faces-demo
+  links:
+    - url: http://localhost/faces/
+      title: Faces GUI
+spec:
+  type: service
+  lifecycle: production
+  owner: user:default/guest
+  system: faces
+  providesApis: [face-api]
+  consumesApis: [smiley-api, color-api]
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: smiley
+  description: The smiley workload
+  namespace: faces
+  annotations:
+    backstage.io/kubernetes-label-selector: service=smiley
+    backstage.io/kubernetes-namespace: faces
+    github.com/project-slug: BuoyantIO/faces-demo
+  links: []
+spec:
+  type: service
+  lifecycle: production
+  owner: user:default/guest
+  system: faces
+  providesApis: [smiley-api]
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: color
+  description: The color workload
+  namespace: faces
+  annotations:
+    backstage.io/kubernetes-label-selector: service=color
+    backstage.io/kubernetes-namespace: faces
+    github.com/project-slug: BuoyantIO/faces-demo
+  links: []
+spec:
+  type: service
+  lifecycle: production
+  owner: user:default/guest
+  system: faces
+  providesApis: [color-api]
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: face-api
+  namespace: faces
+  description: Retrieve a Face cell
+spec:
+  type: openapi
+  lifecycle: production
+  owner: user:default/guest
+  system: faces
+  definition: |
+    openapi: "3.0.0"
+    info:
+      version: 1.5.0
+      title: Face API
+      license:
+        name: Apache2
+    servers:
+      - url: http://face.faces/
+    paths:
+      /cell:
+        get:
+          summary: Retrieve a Face cell
+          parameters:
+          - in: query
+            name: row
+            required: true
+            schema:
+              type: integer
+            description: The row number of the desired cell, starting from 0
+          - in: query
+            name: col
+            required: true
+            schema:
+              type: integer
+            description: The column number of the desired cell, starting from 0
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: smiley-api
+  namespace: faces
+  description: Retrieve a smiley for a Face cell
+spec:
+  type: openapi
+  lifecycle: production
+  owner: user:default/guest
+  system: faces
+  definition: |
+    openapi: "3.0.0"
+    info:
+      version: 1.5.0
+      title: Smiley API
+      license:
+        name: Apache2
+    servers:
+      - url: http://smiley.faces/
+    paths:
+      /center:
+        get:
+          summary: Retrieve a smiley for a central Face cell
+          parameters:
+          - in: query
+            name: row
+            required: true
+            schema:
+              type: integer
+            description: The row number of the desired cell, starting from 0
+          - in: query
+            name: col
+            required: true
+            schema:
+              type: integer
+            description: The column number of the desired cell, starting from 0
+      /edge:
+        get:
+          summary: Retrieve a smiley for an edge Face cell
+          parameters:
+          - in: query
+            name: row
+            required: true
+            schema:
+              type: integer
+            description: The row number of the desired cell, starting from 0
+          - in: query
+            name: col
+            required: true
+            schema:
+              type: integer
+            description: The column number of the desired cell, starting from 0
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: color-api
+  namespace: faces
+  description: Retrieve a color for a Face cell
+spec:
+  type: openapi
+  lifecycle: production
+  owner: user:default/guest
+  system: faces
+  definition: |
+    openapi: "3.0.0"
+    info:
+      version: 1.5.0
+      title: Color API
+      license:
+        name: Apache2
+    servers:
+      - url: http://color.faces/
+    paths:
+      /center:
+        get:
+          summary: Retrieve a color for a central Face cell
+          parameters:
+          - in: query
+            name: row
+            required: true
+            schema:
+              type: integer
+            description: The row number of the desired cell, starting from 0
+          - in: query
+            name: col
+            required: true
+            schema:
+              type: integer
+            description: The column number of the desired cell, starting from 0
+      /edge:
+        get:
+          summary: Retrieve a color for an edge Face cell
+          parameters:
+          - in: query
+            name: row
+            required: true
+            schema:
+              type: integer
+            description: The row number of the desired cell, starting from 0
+          - in: query
+            name: col
+            required: true
+            schema:
+              type: integer
+            description: The column number of the desired cell, starting from 0
