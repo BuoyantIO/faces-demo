@@ -65,7 +65,7 @@ smiley2:
 
 smiley3:
   enabled: False                  # If set to True, enables the second smiley workload
-  smiley: "HeartEyes"            # Override if desired
+  smiley: "RollingEyes"           # Override if desired
   # image: ""                     # If set, overrides the imageName/imageTag pair
   # imageName: ""                 # If not set, uses backend.imageName
   # imageTag: ""                  # If not set, uses backend.imageTag
@@ -95,7 +95,7 @@ color2:
 
 color3:
   enabled: False                  # If set to True, enables the second color workload
-  color: "green"                  # Override if desired, defaults to colorblind-friendly green from the Tol palette
+  color: "darkblue"               # Override if desired, defaults to colorblind-friendly green from the Tol palette
   # image: ""                     # If set, overrides the imageName/imageTag pair
   imageName: ghcr.io/buoyantio/faces-color
   # imageTag: ""                  # If not set, uses backend.imageTag
