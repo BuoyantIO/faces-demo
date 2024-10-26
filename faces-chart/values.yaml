@@ -44,7 +44,8 @@ backend:
   delayBuckets: "0,5,10,15,20,50,200,500,1500"
 
 smiley:
-  smiley: ""                    # Override if desired
+  enabled: True                   # If set to True, enables the second smiley workload
+  smiley: ""                      # Override if desired
   # image: ""                     # If set, overrides the imageName/imageTag pair
   # imageName: ""                 # If not set, uses backend.imageName
   # imageTag: ""                  # If not set, uses backend.imageTag
@@ -53,8 +54,18 @@ smiley:
   # delayBuckets: ""              # If not set, uses backend.delayBuckets
 
 smiley2:
-  enabled: False                # If set to True, enables the second smiley workload
-  smiley: "HeartEyes"           # Override if desired
+  enabled: False                  # If set to True, enables the second smiley workload
+  smiley: "HeartEyes"            # Override if desired
+  # image: ""                     # If set, overrides the imageName/imageTag pair
+  # imageName: ""                 # If not set, uses backend.imageName
+  # imageTag: ""                  # If not set, uses backend.imageTag
+  # imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
+  # errorFraction: ""             # If not set, uses backend.errorFraction
+  # delayBuckets: ""              # If not set, uses backend.delayBuckets
+
+smiley3:
+  enabled: False                  # If set to True, enables the second smiley workload
+  smiley: "HeartEyes"            # Override if desired
   # image: ""                     # If set, overrides the imageName/imageTag pair
   # imageName: ""                 # If not set, uses backend.imageName
   # imageTag: ""                  # If not set, uses backend.imageTag
@@ -63,7 +74,8 @@ smiley2:
   # delayBuckets: ""              # If not set, uses backend.delayBuckets
 
 color:
-  color: ""                     # Override if desired, defaults to colorblind-friendly light blue from the Tol palette
+  enabled: True                   # If set to True, enables the second smiley workload
+  color: ""                       # Override if desired, defaults to colorblind-friendly light blue from the Tol palette
   # image: ""                     # If set, overrides the imageName/imageTag pair
   imageName: ghcr.io/buoyantio/faces-color
   # imageTag: ""                  # If not set, uses backend.imageTag
@@ -72,8 +84,18 @@ color:
   # delayBuckets: ""              # If not set, uses backend.delayBuckets
 
 color2:
-  enabled: False                # If set to True, enables the second color workload
-  color: "green"                # Override if desired, defaults to colorblind-friendly green from the Tol palette
+  enabled: False                  # If set to True, enables the second color workload
+  color: "green"                  # Override if desired, defaults to colorblind-friendly green from the Tol palette
+  # image: ""                     # If set, overrides the imageName/imageTag pair
+  imageName: ghcr.io/buoyantio/faces-color
+  # imageTag: ""                  # If not set, uses backend.imageTag
+  # imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
+  # errorFraction: ""             # If not set, uses backend.errorFraction
+  # delayBuckets: ""              # If not set, uses backend.delayBuckets
+
+color3:
+  enabled: False                  # If set to True, enables the second color workload
+  color: "green"                  # Override if desired, defaults to colorblind-friendly green from the Tol palette
   # image: ""                     # If set, overrides the imageName/imageTag pair
   imageName: ghcr.io/buoyantio/faces-color
   # imageTag: ""                  # If not set, uses backend.imageTag

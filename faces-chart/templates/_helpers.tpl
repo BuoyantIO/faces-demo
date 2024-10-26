@@ -1,15 +1,29 @@
-{{- define "partials.default-image" -}}
-  {{- if .root.Values.defaultImage -}}
-    {{- .root.Values.defaultImage -}}
+# partials.select-image builds a Docker image name, with optional defaulting.
+#
+# params: .root for the root, .source for the source dict, .default (optional)
+# for the default dict
+{{- define "partials.select-image" -}}
+  {{- if .source.image -}}
+    {{- .source.image -}}
+  {{- else if .source.imageName -}}
+    {{- .source.imageName -}}:{{- include "partials.image-tag" . -}}
+  {{- else if .default -}}
+    {{- include "partials.select-image"
+        (dict "root" .root
+              "source" .default) -}}
   {{- else -}}
-    {{- .root.Values.defaultRegistry -}}/{{- .root.Values.defaultImageName -}}:{{- .root.Values.defaultImageTag -}}
+    {{- include "partials.default-image" . -}}
   {{- end -}}
 {{- end -}}
 
+# partials.image-tag finds an appropriate Docker tag, with optional defaulting.
+#
+# params: .root for the root, .source for the source dict, .default (optional)
+# for the default dict
 {{- define "partials.image-tag" -}}
   {{- if .source.imageTag -}}
     {{- .source.imageTag -}}
-  {{- else if (and .default .default.imageTag) }}
+  {{- else if (and .default .default.imageTag) -}}
     {{- .default.imageTag -}}
   {{- else if .root.Values.defaultImageTag -}}
     {{- .root.Values.defaultImageTag -}}
@@ -18,148 +32,44 @@
   {{- end -}}
 {{- end -}}
 
-{{- define "partials.select-image" -}}
-  {{- if .source.image -}}
-    {{- .source.image -}}
-  {{- else if .source.imageName -}}
-    {{- .source.imageName -}}:{{- include "partials.image-tag" . -}}
-  {{- else if .default -}}
-    {{- include "partials.select-image" (dict "source" .default "root" .root) -}}
+# partials.default-image finds the default Docker image name.
+#
+# params: .root for the root
+{{- define "partials.default-image" -}}
+  {{- if .root.Values.defaultImage -}}
+    {{- .root.Values.defaultImage -}}
   {{- else -}}
-    {{- include "partials.default-image" . -}}
+    {{- .root.Values.defaultRegistry -}}/{{- .root.Values.defaultImageName -}}:{{- .root.Values.defaultImageTag -}}
   {{- end -}}
 {{- end -}}
 
-{{- define "partials.select-imagePullPolicy" -}}
-  {{- if .source.imagePullPolicy -}}
-    {{- .source.imagePullPolicy -}}
+# partials.select-key finds a value in a dict, with optional defaulting.
+#
+# params: .root for the root, .source for the source dict, .key for the key,
+# .default (optional) for the default dict
+{{- define "partials.select-key" -}}
+  {{- $primary := index .source .key -}}
+  {{- if $primary -}}
+    {{- $primary -}}
   {{- else if .default -}}
-    {{- include "partials.select-imagePullPolicy" (dict "source" .default "root" .root) -}}
+    {{- include "partials.select-key"
+        (dict "root" .root "source" .default "key" .key) -}}
   {{- else -}}
-    {{ .root.Values.defaultImagePullPolicy -}}
+    {{- $capitalizedKey := camelcase .key -}}
+    {{- $defaultKey := printf "default%s" $capitalizedKey -}}
+    {{- index .root.Values $defaultKey -}}
   {{- end -}}
 {{- end -}}
 
-{{- define "partials.select-delayBuckets" -}}
-  {{ $buckets := "" }}
-  {{- if .source.delayBuckets -}}
-    {{- $buckets = .source.delayBuckets -}}
-  {{- else if (and .default .default.delayBuckets) -}}
-    {{- $buckets = .default.delayBuckets -}}
-  {{- end -}}
-  {{- if $buckets }}
-        - name: DELAY_BUCKETS
-          value: {{ $buckets | quote }}
-  {{- end -}}
-{{- end -}}
-
-{{- define "partials.select-errorFraction" -}}
-  {{ $fraction := "" }}
-  {{ $srcFraction := .source.errorFraction }}
-  {{- if or ($srcFraction) (eq $srcFraction 0) -}}
-    {{- $fraction = $srcFraction -}}
-  {{- else if (and .default .default.errorFraction) -}}
-    {{- $fraction = .default.errorFraction -}}
-  {{- end -}}
-  {{- if $fraction }}
-        - name: ERROR_FRACTION
-          value: {{ $fraction | quote }}
-  {{- end -}}
-{{- end -}}
-
-# Use all the above to provide nicer helpers for each of the workloads...
-{{- define "partials.gui-image" -}}
-  {{- include "partials.select-image" (dict "source" .Values.gui "root" .) -}}
-{{- end -}}
-
-{{- define "partials.gui-imagePullPolicy" -}}
-  {{- include "partials.select-imagePullPolicy" (dict "source" .Values.gui "root" .) -}}
-{{- end -}}
-
-{{- define "partials.face-image" -}}
-  {{- include "partials.select-image" (dict "source" .Values.face "root" .) -}}
-{{- end -}}
-
-{{- define "partials.face-imagePullPolicy" -}}
-  {{- include "partials.select-imagePullPolicy" (dict "source" .Values.face "root" .) -}}
-{{- end -}}
-
-{{- define "partials.face-delayBuckets" -}}
-  {{- include "partials.select-delayBuckets" (dict "source" .Values.face) -}}
-{{- end -}}
-
-{{- define "partials.face-errorFraction" -}}
-  {{- include "partials.select-errorFraction" (dict "source" .Values.face) -}}
-{{- end -}}
-
-{{- define "partials.ingress-image" -}}
-  {{- include "partials.select-image" (dict "source" .Values.ingress "root" .) -}}
-{{- end -}}
-
-{{- define "partials.ingress-imagePullPolicy" -}}
-  {{- include "partials.select-imagePullPolicy" (dict "source" .Values.ingress "root" .) -}}
-{{- end -}}
-
-{{- define "partials.color-image" -}}
-  {{- include "partials.select-image" (dict "source" .Values.color "default" .Values.backend "root" .) -}}
-{{- end -}}
-
-{{- define "partials.color-imagePullPolicy" -}}
-  {{- include "partials.select-imagePullPolicy" (dict "source" .Values.color "default" .Values.backend "root" .) -}}
-{{- end -}}
-
-{{- define "partials.color-delayBuckets" -}}
-  {{- include "partials.select-delayBuckets" (dict "source" .Values.color "default" .Values.backend) -}}
-{{- end -}}
-
-{{- define "partials.color-errorFraction" -}}
-  {{- include "partials.select-errorFraction" (dict "source" .Values.color "default" .Values.backend) -}}
-{{- end -}}
-
-{{- define "partials.color2-image" -}}
-  {{- include "partials.select-image" (dict "source" .Values.color2 "default" .Values.backend "root" .) -}}
-{{- end -}}
-
-{{- define "partials.color2-imagePullPolicy" -}}
-  {{- include "partials.select-imagePullPolicy" (dict "source" .Values.color2 "default" .Values.backend "root" .) -}}
-{{- end -}}
-
-{{- define "partials.color2-delayBuckets" -}}
-  {{- include "partials.select-delayBuckets" (dict "source" .Values.color2 "default" .Values.backend) -}}
-{{- end -}}
-
-{{- define "partials.color2-errorFraction" -}}
-  {{- include "partials.select-errorFraction" (dict "source" .Values.color2 "default" .Values.backend) -}}
-{{- end -}}
-
-{{- define "partials.smiley-image" -}}
-  {{- include "partials.select-image" (dict "source" .Values.smiley "default" .Values.backend "root" .) -}}
-{{- end -}}
-
-{{- define "partials.smiley-imagePullPolicy" -}}
-  {{- include "partials.select-imagePullPolicy" (dict "source" .Values.smiley "default" .Values.backend "root" .) -}}
-{{- end -}}
-
-{{- define "partials.smiley-delayBuckets" -}}
-  {{- include "partials.select-delayBuckets" (dict "source" .Values.smiley "default" .Values.backend) -}}
-{{- end -}}
-
-{{- define "partials.smiley-errorFraction" -}}
-  {{- include "partials.select-errorFraction" (dict "source" .Values.smiley "default" .Values.backend) -}}
-{{- end -}}
-
-{{- define "partials.smiley2-image" -}}
-  {{- include "partials.select-image" (dict "source" .Values.smiley2 "default" .Values.backend "root" .) -}}
-{{- end -}}
-
-{{- define "partials.smiley2-imagePullPolicy" -}}
-  {{- include "partials.select-imagePullPolicy" (dict "source" .Values.smiley2 "default" .Values.backend "root" .) -}}
-{{- end -}}
-
-{{- define "partials.smiley2-delayBuckets" -}}
-  {{- include "partials.select-delayBuckets" (dict "source" .Values.smiley2 "default" .Values.backend) -}}
-{{- end -}}
-
-{{- define "partials.smiley2-errorFraction" -}}
-  {{- include "partials.select-errorFraction" (dict "source" .Values.smiley2 "default" .Values.backend) -}}
+# partials.select-env finds a value in a dict, with optional defaulting, and
+# if present, formats it as an environment variable.
+#
+# params: .root for the root, .source for the source dict, .key for the key,
+# .name for the env name, .default (optional) for the default dict
+{{- define "partials.select-env" -}}
+  {{- $value := include "partials.select-key" . -}}
+  {{- if $value }}
+        - name: {{ .name }}
+          value: {{ $value | quote }}
+  {{ end -}}
 {{- end -}}
