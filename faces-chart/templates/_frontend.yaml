@@ -1,0 +1,107 @@
+# The frontend-* partials are used to grab things with no defaults except for
+# .Values.defaultImage and .Values.defaultImagePullPolicy for image and
+# imagePullPolicy respectively. This is because the frontend workloads (face,
+# faces-gui, and the poor-man's ingress if configured) don't really have much
+# in common.
+#
+# params: .root for the root, .which for the name of the workload
+{{- define "partials.frontend-image" -}}
+  {{- $source := index .root.Values .which -}}
+  {{- include "partials.select-image"
+      (dict "root" .root
+            "source" $source) -}}
+{{- end -}}
+
+# params: .root for the root, .which for the name of the workload
+{{- define "partials.frontend-imagePullPolicy" -}}
+  {{- $source := index .root.Values .which -}}
+  {{- include "partials.select-key"
+      (dict "root" .root
+            "source" $source
+            "key" "imagePullPolicy") -}}
+{{- end -}}
+
+# params: .root for the root, .which for the name of the workload
+{{- define "partials.frontend-delayBuckets" -}}
+  {{- $source := index .root.Values .which -}}
+  {{- include "partials.select-env"
+      (dict "root" .root
+            "source" $source
+            "key" "delayBuckets"
+            "name" "DELAY_BUCKETS") -}}
+{{- end -}}
+
+# params: .root for the root, .which for the name of the workload
+{{- define "partials.frontend-errorFraction" -}}
+  {{- $source := index .root.Values .which -}}
+  {{- include "partials.select-env"
+      (dict "root" .root
+            "source" $source
+            "key" "errorFraction"
+            "name" "ERROR_FRACTION") -}}
+{{- end -}}
+
+# We use all the above to provide nicer helpers for each of the workloads.
+# Given that the frontend workloads are all different enough that it's not
+# worth having the equivalent of partials-backend, we need to include a lot
+# more partials in the frontend workload templates, so we provide these to
+# make them easier to read.
+{{- define "partials.gui-image" -}}
+  {{- include "partials.frontend-image"
+      (dict "root" .
+            "which" "gui") -}}
+{{- end -}}
+
+{{- define "partials.gui-imagePullPolicy" -}}
+  {{- include "partials.frontend-imagePullPolicy"
+      (dict "root" .
+            "which" "gui") -}}
+{{- end -}}
+
+{{- define "partials.face-image" -}}
+  {{- include "partials.frontend-image"
+      (dict "root" .
+            "which" "face") -}}
+{{- end -}}
+
+{{- define "partials.face-imagePullPolicy" -}}
+  {{- include "partials.frontend-imagePullPolicy"
+      (dict "root" .
+            "which" "face") -}}
+{{- end -}}
+
+{{- define "partials.face-delayBuckets" -}}
+  {{- include "partials.frontend-delayBuckets"
+      (dict "root" .
+            "which" "face") -}}
+{{- end -}}
+
+{{- define "partials.face-errorFraction" -}}
+  {{- include "partials.frontend-errorFraction"
+      (dict "root" .
+            "which" "face") -}}
+{{- end -}}
+
+{{- define "partials.ingress-image" -}}
+  {{- include "partials.frontend-image"
+      (dict "root" .
+            "which" "ingress") -}}
+{{- end -}}
+
+{{- define "partials.ingress-imagePullPolicy" -}}
+  {{- include "partials.frontend-imagePullPolicy"
+      (dict "root" .
+            "which" "ingress") -}}
+{{- end -}}
+
+{{- define "partials.ingress-delayBuckets" -}}
+  {{- include "partials.frontend-delayBuckets"
+      (dict "root" .
+            "which" "ingress") -}}
+{{- end -}}
+
+{{- define "partials.ingress-errorFraction" -}}
+  {{- include "partials.frontend-errorFraction"
+      (dict "root" .
+            "which" "ingress") -}}
+{{- end -}}

@@ -1,58 +1,12 @@
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: smiley
-  namespace: {{ .Release.Namespace }}
-  labels:
-    service: smiley
-spec:
-  type: ClusterIP
-  selector:
-    service: smiley
-  ports:
-  - port: 80
-    targetPort: http
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: smiley
-  namespace: {{ .Release.Namespace }}
-  labels:
-    service: smiley
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      service: smiley
-  template:
-    metadata:
-      labels:
-        service: smiley
-    spec:
-      containers:
-      - name: smiley
-        image: {{ include "partials.smiley-image" . }}
-        imagePullPolicy: {{ include "partials.smiley-imagePullPolicy" . }}
-        ports:
-        - name: http
-          containerPort: 8000
-        env:
-        - name: FACES_SERVICE
-          value: "smiley"
-        - name: USER_HEADER_NAME
-          value: {{ .Values.authHeader | quote }}
-        {{- if .Values.smiley.smiley }}
-        - name: SMILEY
-          value: {{ .Values.smiley.smiley }}
-        {{- end -}}
-        {{- include "partials.smiley-errorFraction" . }}
-        {{- include "partials.smiley-delayBuckets" . }}
-        resources:
-          requests:
-            cpu: 100m
-            memory: 64Mi
-          limits:
-            cpu: 250m
-            memory: 128Mi
+{{- include "partials.backend"
+    (dict "name" "smiley"
+          "workload" "smiley"
+          "root" .) }}
+{{- include "partials.backend"
+    (dict "name" "smiley2"
+          "workload" "smiley"
+          "root" .) }}
+{{- include "partials.backend"
+    (dict "name" "smiley3"
+          "workload" "smiley"
+          "root" .) }}

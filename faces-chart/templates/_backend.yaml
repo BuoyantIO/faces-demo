@@ -1,0 +1,113 @@
+# The backend-* partials are used to grab things with defaults taken first by
+# looking in .Values.backend, and then (for image and imagePullPolicy) from
+# .Values.defaultImage and .Values.defaultImagePullPolicy if needed. This
+# makes sense in that the backend workloads are similar (though honestly,
+# backend-image is making less sense now that color has its own image).
+#
+# params: .root for the root, .which for the name of the workload
+{{- define "partials.backend-image" -}}
+  {{- $source := index .root.Values .which -}}
+  {{- include "partials.select-image"
+      (dict "root" .root
+            "source" $source
+            "default" .root.Values.backend) -}}
+{{- end -}}
+
+# params: .root for the root, .which for the name of the workload
+{{- define "partials.backend-imagePullPolicy" -}}
+  {{- $source := index .root.Values .which -}}
+  {{- include "partials.select-key"
+      (dict "root" .root "source" $source "key" "imagePullPolicy" "default" .root.Values.backend) -}}
+{{- end -}}
+
+# params: .root for the root, .which for the name of the workload
+{{- define "partials.backend-delayBuckets" -}}
+  {{- $source := index .root.Values .which -}}
+  {{- include "partials.select-env"
+      (dict "root" .root
+            "source" $source
+            "key" "delayBuckets"
+            "name" "DELAY_BUCKETS"
+            "default" .root.Values.backend) -}}
+{{- end -}}
+
+# params: .root for the root, .which for the name of the workload
+{{- define "partials.backend-errorFraction" -}}
+  {{- $source := index .root.Values .which -}}
+  {{- include "partials.select-env"
+      (dict "root" .root
+            "source" $source
+            "key" "errorFraction"
+            "name" "ERROR_FRACTION"
+            "default" .root.Values.backend) -}}
+{{- end -}}
+
+# partials.backend does all the heavy lifting for a backend workload
+# params: .root for the root, .name for the name of the workload,
+# .workload for what kind of workload -- so e.g. you might see "color2"
+# for .name, but .workload would still be "color" in that case.
+{{- define "partials.backend" -}}
+{{- $info := index .root.Values .name -}}
+{{- if $info -}}
+{{- if $info.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .name | quote }}
+  namespace: {{ .root.Release.Namespace }}
+  labels:
+    service: {{ .name | quote }}
+spec:
+  type: ClusterIP
+  selector:
+    service: {{ .name | quote }}
+  ports:
+  - port: 80
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .name | quote }}
+  namespace: {{ .root.Release.Namespace }}
+  labels:
+    service: {{ .name | quote }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      service: {{ .name | quote }}
+  template:
+    metadata:
+      labels:
+        service: {{ .name | quote }}
+    spec:
+      containers:
+      - name: {{ .name | quote }}
+        image: {{ include "partials.backend-image" (dict "root" .root "which" .name) }}
+        imagePullPolicy: {{ include "partials.backend-imagePullPolicy" (dict "root" .root "which" .name) }}
+        ports:
+        - name: http
+          containerPort: 8000
+        env:
+        - name: FACES_SERVICE
+          value: {{ .workload | quote }}
+        - name: USER_HEADER_NAME
+          value: {{ .root.Values.authHeader | quote }}
+        {{- if index $info .workload }}
+        - name: {{ .workload | upper | quote }}
+          value: {{ index $info .workload }}
+        {{- end -}}
+        {{- include "partials.backend-delayBuckets" (dict "root" .root "which" .name) }}
+        {{- include "partials.backend-errorFraction" (dict "root" .root "which" .name) }}
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 250m
+            memory: 128Mi
+{{- end -}}
+{{- end -}}
+{{- end -}}
