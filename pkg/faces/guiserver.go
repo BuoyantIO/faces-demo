@@ -74,10 +74,10 @@ func (srv *GUIServer) guiGetHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("  userHeaderName: %s\n", srv.userHeaderName)
 	fmt.Printf("  headers: %s\n", r.Header)
 
+	// Default user comes from the header value used to load the GUI, which
+	// might be "".
 	user := r.Header.Get(srv.userHeaderName)
-	if user == "" {
-		user = "unknown"
-	}
+
 	userAgent := r.Header.Get("User-Agent")
 	if userAgent == "" {
 		userAgent = "unknown"

@@ -31,6 +31,7 @@ import (
 	"github.com/BuoyantIO/faces-demo/v2/pkg/utils"
 	grpc "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 type FaceServer struct {
@@ -287,6 +288,11 @@ func (srv *FaceServer) faceGetHandler(r *http.Request, rstat *BaseRequestStatus)
 			defer conn.Close()
 
 			client := NewColorServiceClient(conn)
+
+			// Anything linked to this variable will transmit request headers.
+			md := metadata.New(map[string]string{"x-faces-user": user})
+			ctx := metadata.NewOutgoingContext(context.Background(), md)
+
 			colorReq := &ColorRequest{
 				Row:    int32(row),
 				Column: int32(column),
@@ -300,9 +306,9 @@ func (srv *FaceServer) faceGetHandler(r *http.Request, rstat *BaseRequestStatus)
 			}
 
 			if subrequest == "center" {
-				colorResp, err = client.Center(context.Background(), colorReq)
+				colorResp, err = client.Center(ctx, colorReq)
 			} else {
-				colorResp, err = client.Edge(context.Background(), colorReq)
+				colorResp, err = client.Edge(ctx, colorReq)
 			}
 
 			if err != nil {

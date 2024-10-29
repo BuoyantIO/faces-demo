@@ -198,7 +198,9 @@
 <input id="btnToggle" type="button" value="Init..." class="roundedButton margins" />
 <input id="btnCounters" type="button" value="Init..." class="roundedButton margins" />
 <input id="btnShowPods" type="button" value="Init..." class="roundedButton margins" />
-<div id="userDiv" class="inline margins"></div>
+<div id="userDiv" class="inline margins">
+	User: <input id="userName" contenteditable="true" placeholder="unknown"></span>
+</div>
 
 <div id="timer" class="inline margins"></div>
 
@@ -329,28 +331,38 @@ class StartStop {
 // UserController is a class to (totally insecurely) manage the username.
 
 class UserController {
-	constructor(logger, userDiv, initialUser, onchange) {
-		this.userDiv = userDiv	// not an ID, the div itself
-		// this.button.onclick = () => { this.toggle() }
-		this.user = initialUser
-		this.start()
+	constructor(logger, userDiv, userInput, initialUser) {
+		this.logger = logger;
+		this.logger.info("Starting UserController")
+		this.userDiv = userDiv;		// not an ID, the div itself
+		this.userInput = userInput;	// not an ID, the element itself
+		this.userInput.addEventListener("keydown",
+			(event) => {
+				this.keydownHandler(event)
+			}
+		);
+
+		this.start(initialUser)
 	}
 
-	start() {
-		let color = "#000000";
-
-		if (this.user == "unknown") {
-			color = Cell.colors.grey;
+	keydownHandler(event) {
+		if (event.key === "Enter") {
+			event.preventDefault();
+			this.updateUser(this.userInput.value.trim());
 		}
-
-		this.userDiv.innerHTML = `<span style="color:${color}">User: ${this.user}</span>`
 	}
 
-	// stop() {
-	// 	this.active = false
-	// 	this.button.value = this.stopLabel
-	// 	this.onstop()
-	// }
+	updateUser(user) {
+		this.user = user;
+		this.logger.info(`User: ${this.user}`);
+
+		this.userInput.value = this.user;
+		this.userInput.blur();
+	}
+
+	start(initialUser) {
+		this.updateUser(initialUser);
+	}
 }
 
 //////// CounterSwitch
@@ -1216,12 +1228,7 @@ window.onload = () => {
 	logger.info(`Page loaded; user ${initialUser}`)
 	logger.info(`User-Agent: %%{user_agent}`)
 
-	let userControl = new UserController(
-		logger, $("userDiv"), initialUser,
-		(user) => {
-			logger.info(`User changed to ${user}`)
-		}
-	)
+	let userControl = new UserController(logger, $("userDiv"), $("userName"), initialUser)
 
 	let sw = new StartStop($("btnToggle"), userControl)
 
