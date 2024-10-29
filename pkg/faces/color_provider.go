@@ -56,6 +56,8 @@ func (cprv *ColorProvider) Get(row, col int) ProviderResponse {
 	cprv.CheckUnlatch(start)
 	rstat := cprv.CheckRequestStatus()
 
+	cprv.DelayIfNeeded()
+
 	if rstat.IsRateLimited() {
 		cprv.Warnf("RATELIMIT(%d, %d) => %s\n", row, col, rstat.Message())
 
