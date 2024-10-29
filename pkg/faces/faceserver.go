@@ -85,8 +85,8 @@ func (srv *FaceServer) SetupFromEnvironment() {
 		}
 	}
 
-	fmt.Printf("%s %s: smileyService %v\n", time.Now().Format(time.RFC3339), srv.Name, srv.smileyService)
-	fmt.Printf("%s %s: colorService %v\n", time.Now().Format(time.RFC3339), srv.Name, srv.colorService)
+	fmt.Printf("%s %s: smileyService http://%s\n", time.Now().Format(time.RFC3339), srv.Name, srv.smileyService)
+	fmt.Printf("%s %s: colorService grpc://%s\n", time.Now().Format(time.RFC3339), srv.Name, srv.colorService)
 }
 
 func (srv *FaceServer) makeRequest(user string, userAgent string, service string, keyword string, subrequest string, row int, col int) *FaceResponse {
@@ -204,7 +204,9 @@ func (srv *FaceServer) faceGetHandler(r *http.Request, rstat *BaseRequestStatus)
 		StatusCode: http.StatusOK,
 	}
 
-	fmt.Printf("%s %s: request path: %s, query string: %s\n", time.Now().Format(time.RFC3339), srv.Name, r.URL.Path, r.URL.RawQuery)
+	if srv.debugEnabled {
+		fmt.Printf("%s %s: request path: %s, query string: %s\n", time.Now().Format(time.RFC3339), srv.Name, r.URL.Path, r.URL.RawQuery)
+	}
 
 	// Our request URL should start with /center/ or /edge/, and we want to
 	// propagate that to our smiley and color services.
