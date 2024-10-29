@@ -30,6 +30,7 @@ import (
 	"github.com/BuoyantIO/faces-demo/v2/pkg/faces"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -45,9 +46,17 @@ type colorServer struct {
 }
 
 func (srv *colorServer) Center(ctx context.Context, req *faces.ColorRequest) (*faces.ColorResponse, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+
+	if !ok {
+		return nil, status.Errorf(codes.DataLoss, "failed to get metadata")
+	}
+
+	user := md.Get("user")
+
 	baseResp := srv.provider.Get(int(req.Row), int(req.Column))
 
-	slog.Debug(fmt.Sprintf("CENTER: %d, %d => %d, %s\n", req.Row, req.Column, baseResp.StatusCode, baseResp.Body))
+	slog.Debug(fmt.Sprintf("CENTER: %d, %d (%s) => %d, %s\n", req.Row, req.Column, user, baseResp.StatusCode, baseResp.Body))
 
 	switch baseResp.StatusCode {
 	case http.StatusOK:
@@ -66,9 +75,22 @@ func (srv *colorServer) Center(ctx context.Context, req *faces.ColorRequest) (*f
 }
 
 func (srv *colorServer) Edge(ctx context.Context, req *faces.ColorRequest) (*faces.ColorResponse, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+
+	if !ok {
+		return nil, status.Errorf(codes.DataLoss, "failed to get metadata")
+	}
+
+	user := ""
+	users := md.Get("x-faces-user")
+
+	if len(users) > 0 {
+		user = users[0]
+	}
+
 	baseResp := srv.provider.Get(int(req.Row), int(req.Column))
 
-	slog.Debug(fmt.Sprintf("EDGE: %d, %d => %d, %s\n", req.Row, req.Column, baseResp.StatusCode, baseResp.Body))
+	slog.Debug(fmt.Sprintf("EDGE: %d, %d (%s) => %d, %s\n", req.Row, req.Column, user, baseResp.StatusCode, baseResp.Body))
 
 	switch baseResp.StatusCode {
 	case http.StatusOK:
