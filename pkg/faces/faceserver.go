@@ -95,7 +95,8 @@ func (srv *FaceServer) makeRequest(user string, userAgent string, service string
 	url := fmt.Sprintf("http://%s/%s/?row=%d&col=%d", service, subrequest, row, col)
 
 	if srv.debugEnabled {
-		fmt.Printf("%s %s: %s starting\n", time.Now().Format(time.RFC3339), srv.Name, url)
+		fmt.Printf("%s %s: HTTP starting (%s, r%d c%d, %s) %s\n",
+			time.Now().Format(time.RFC3339), srv.Name, subrequest, row, col, user, url)
 	}
 
 	failed := false
@@ -131,7 +132,7 @@ func (srv *FaceServer) makeRequest(user string, userAgent string, service string
 		body, _ := io.ReadAll(response.Body)
 
 		if srv.debugEnabled {
-			fmt.Printf("%s %s: %s status %d\n", time.Now().Format(time.RFC3339), srv.Name, url, rcode)
+			fmt.Printf("%s %s: HTTP %s status %d\n", time.Now().Format(time.RFC3339), srv.Name, url, rcode)
 		}
 
 		if rcode != http.StatusOK {
@@ -171,7 +172,7 @@ func (srv *FaceServer) makeRequest(user string, userAgent string, service string
 	latency := end.Sub(start)
 
 	if srv.debugEnabled {
-		fmt.Printf("%s %s: %s done (%d, %dms -- %s)\n", time.Now().Format(time.RFC3339), srv.Name, url, rcode, latency.Milliseconds(), rtext)
+		fmt.Printf("%s %s: HTTP %s done (%d, %dms -- %s)\n", time.Now().Format(time.RFC3339), srv.Name, url, rcode, latency.Milliseconds(), rtext)
 	}
 
 	return &FaceResponse{
@@ -206,6 +207,7 @@ func (srv *FaceServer) faceGetHandler(r *http.Request, rstat *BaseRequestStatus)
 
 	if srv.debugEnabled {
 		fmt.Printf("%s %s: request path: %s, query string: %s\n", time.Now().Format(time.RFC3339), srv.Name, r.URL.Path, r.URL.RawQuery)
+		fmt.Printf("%s %s: request headers %#v\n", time.Now().Format(time.RFC3339), srv.Name, r.Header)
 	}
 
 	// Our request URL should start with /center/ or /edge/, and we want to
@@ -303,8 +305,8 @@ func (srv *FaceServer) faceGetHandler(r *http.Request, rstat *BaseRequestStatus)
 			var colorResp *ColorResponse
 
 			if srv.debugEnabled {
-				fmt.Printf("%s %s: starting gRPC to %s for %s (row %d col %d)\n",
-					time.Now().Format(time.RFC3339), srv.Name, srv.colorService, subrequest, colorReq.Row, colorReq.Column)
+				fmt.Printf("%s %s: gRPC starting (%s, r%d c%d, %s) %s\n",
+					time.Now().Format(time.RFC3339), srv.Name, subrequest, colorReq.Row, colorReq.Column, user, srv.colorService)
 			}
 
 			if subrequest == "center" {
