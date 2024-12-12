@@ -46,14 +46,29 @@ type colorServer struct {
 	provider *faces.ColorProvider
 }
 
-func (srv *colorServer) Center(ctx context.Context, req *faces.ColorRequest) (*faces.ColorResponse, error) {
+func (srv *colorServer) GetUserName(ctx context.Context) (string, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 
 	if !ok {
-		return nil, status.Errorf(codes.DataLoss, "failed to get metadata")
+		return "", status.Errorf(codes.DataLoss, "failed to get metadata")
 	}
 
-	user := md.Get("user")
+	user := ""
+	users := md.Get(srv.provider.BaseProvider.GetUserHeaderName())
+
+	if len(users) > 0 {
+		user = users[0]
+	}
+
+	return user, nil
+}
+
+func (srv *colorServer) Center(ctx context.Context, req *faces.ColorRequest) (*faces.ColorResponse, error) {
+	user, err := srv.GetUserName(ctx)
+
+	if err != nil {
+		return nil, err
+	}
 
 	baseResp := srv.provider.Get(int(req.Row), int(req.Column))
 
@@ -76,17 +91,10 @@ func (srv *colorServer) Center(ctx context.Context, req *faces.ColorRequest) (*f
 }
 
 func (srv *colorServer) Edge(ctx context.Context, req *faces.ColorRequest) (*faces.ColorResponse, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
+	user, err := srv.GetUserName(ctx)
 
-	if !ok {
-		return nil, status.Errorf(codes.DataLoss, "failed to get metadata")
-	}
-
-	user := ""
-	users := md.Get("x-faces-user")
-
-	if len(users) > 0 {
-		user = users[0]
+	if err != nil {
+		return nil, err
 	}
 
 	baseResp := srv.provider.Get(int(req.Row), int(req.Column))
