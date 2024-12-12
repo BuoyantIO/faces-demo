@@ -144,44 +144,59 @@ func (srv *GUIServer) guiGetHandler(w http.ResponseWriter, r *http.Request) {
 		if user == "" {
 			user = "unknown"
 		}
+
 		userAgent := r.Header.Get("User-Agent")
 		if userAgent == "" {
 			userAgent = "unknown"
 		}
 
-		if srv.debugEnabled {
-			fmt.Printf("...%s: starting\n", url)
-		}
-
-		response, err := http.Get(url)
+		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
 			rcode = http.StatusInternalServerError
-			rtext = err.Error()
+			rtext = fmt.Sprintf("could not create new Request? %s", err.Error())
 			rtype = "text/plain"
 		} else {
-			rcode = response.StatusCode
-			rtextBytes, err := io.ReadAll(response.Body)
+			for key, values := range r.Header {
+				for _, value := range values {
+					req.Header.Add(key, value)
+				}
+			}
+
+			if srv.debugEnabled {
+				fmt.Printf("...%s: starting\n", url)
+			}
+
+			response, err := http.DefaultClient.Do(req)
+
 			if err != nil {
 				rcode = http.StatusInternalServerError
 				rtext = err.Error()
 				rtype = "text/plain"
 			} else {
-				rtext = string(rtextBytes)
-				rtype = response.Header.Get("Content-Type")
+				rcode = response.StatusCode
+				rtextBytes, err := io.ReadAll(response.Body)
+				if err != nil {
+					rcode = http.StatusInternalServerError
+					rtext = err.Error()
+					rtype = "text/plain"
+				} else {
+					rtext = string(rtextBytes)
+					rtype = response.Header.Get("Content-Type")
 
-				podID = response.Header.Get("X-Faces-Pod")
-				if podID == "" {
-					podID = srv.hostIP
+					podID = response.Header.Get("X-Faces-Pod")
+					if podID == "" {
+						podID = srv.hostIP
+					}
 				}
+				response.Body.Close()
 			}
-			response.Body.Close()
-		}
 
-		reqEnd := time.Now()
-		reqLatencyMs := reqEnd.Sub(reqStart).Milliseconds()
+			reqEnd := time.Now()
+			reqLatencyMs := reqEnd.Sub(reqStart).Milliseconds()
 
-		if srv.debugEnabled {
-			fmt.Printf("...%s (%dms): %d\n", url, reqLatencyMs, rcode)
+			if srv.debugEnabled {
+				fmt.Printf("...%s (%dms): %d\n", url, reqLatencyMs, rcode)
+			}
 		}
 	} else if strings.HasSuffix(r.URL.Path, ".svg") {
 		// We'll serve SVG files from the dataPath, though really we don't
