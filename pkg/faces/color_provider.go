@@ -42,7 +42,7 @@ func NewColorProviderFromEnvironment() *ColorProvider {
 	colorName := utils.StringFromEnv("COLOR", "blue")
 	cprv.color = Colors.Lookup(colorName)
 
-	cprv.Infof("Using %s => %s\n", colorName, cprv.color)
+	cprv.Infof("Using %s => %s", colorName, cprv.color)
 	return cprv
 }
 
@@ -75,7 +75,7 @@ func (cprv *ColorProvider) Get(row, col int) ProviderResponse {
 		resp.StatusCode = rstat.StatusCode()
 		resp.Body = msg
 	} else {
-		cprv.Infof("OK(%d, %d) => %d, %s\n", row, col, rstat.StatusCode(), cprv.color)
+		cprv.Debugf("OK(%d, %d) => %d, %s\n", row, col, rstat.StatusCode(), cprv.color)
 
 		resp.StatusCode = rstat.StatusCode()
 		resp.Body = cprv.color

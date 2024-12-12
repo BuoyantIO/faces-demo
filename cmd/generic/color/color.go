@@ -28,6 +28,7 @@ import (
 	"fmt"
 
 	"github.com/BuoyantIO/faces-demo/v2/pkg/faces"
+	"github.com/BuoyantIO/faces-demo/v2/pkg/utils"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -45,18 +46,33 @@ type colorServer struct {
 	provider *faces.ColorProvider
 }
 
-func (srv *colorServer) Center(ctx context.Context, req *faces.ColorRequest) (*faces.ColorResponse, error) {
+func (srv *colorServer) GetUserName(ctx context.Context) (string, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 
 	if !ok {
-		return nil, status.Errorf(codes.DataLoss, "failed to get metadata")
+		return "", status.Errorf(codes.DataLoss, "failed to get metadata")
 	}
 
-	user := md.Get("user")
+	user := ""
+	users := md.Get(srv.provider.BaseProvider.GetUserHeaderName())
+
+	if len(users) > 0 {
+		user = users[0]
+	}
+
+	return user, nil
+}
+
+func (srv *colorServer) Center(ctx context.Context, req *faces.ColorRequest) (*faces.ColorResponse, error) {
+	user, err := srv.GetUserName(ctx)
+
+	if err != nil {
+		return nil, err
+	}
 
 	baseResp := srv.provider.Get(int(req.Row), int(req.Column))
 
-	slog.Debug(fmt.Sprintf("CENTER: %d, %d (%s) => %d, %s\n", req.Row, req.Column, user, baseResp.StatusCode, baseResp.Body))
+	srv.provider.Debugf("CENTER: %d, %d (%s) => %d, %s\n", req.Row, req.Column, user, baseResp.StatusCode, baseResp.Body)
 
 	switch baseResp.StatusCode {
 	case http.StatusOK:
@@ -75,22 +91,15 @@ func (srv *colorServer) Center(ctx context.Context, req *faces.ColorRequest) (*f
 }
 
 func (srv *colorServer) Edge(ctx context.Context, req *faces.ColorRequest) (*faces.ColorResponse, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
+	user, err := srv.GetUserName(ctx)
 
-	if !ok {
-		return nil, status.Errorf(codes.DataLoss, "failed to get metadata")
-	}
-
-	user := ""
-	users := md.Get("x-faces-user")
-
-	if len(users) > 0 {
-		user = users[0]
+	if err != nil {
+		return nil, err
 	}
 
 	baseResp := srv.provider.Get(int(req.Row), int(req.Column))
 
-	slog.Debug(fmt.Sprintf("EDGE: %d, %d (%s) => %d, %s\n", req.Row, req.Column, user, baseResp.StatusCode, baseResp.Body))
+	srv.provider.Debugf("EDGE: %d, %d (%s) => %d, %s\n", req.Row, req.Column, user, baseResp.StatusCode, baseResp.Body)
 
 	switch baseResp.StatusCode {
 	case http.StatusOK:
@@ -118,7 +127,9 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, slogOpts))
 	slog.SetDefault(logger)
 
-	logLevel.Set(slog.LevelDebug)
+	if utils.BoolFromEnv("DEBUG_ENABLED", false) {
+		logLevel.Set(slog.LevelDebug)
+	}
 
 	// Define a command-line flag for the port number
 	port := flag.Int("port", 8000, "the port number to listen on")

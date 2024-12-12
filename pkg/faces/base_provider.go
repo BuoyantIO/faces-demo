@@ -127,6 +127,10 @@ func (bprv *BaseProvider) SetLatched(latched bool) {
 	bprv.latched = latched
 }
 
+func (bprv *BaseProvider) GetUserHeaderName() string {
+	return bprv.userHeaderName
+}
+
 // CheckUnlatch checks to see if we should unlatch the provider.
 func (bprv *BaseProvider) CheckUnlatch(now time.Time) {
 	bprv.lock.Lock()
