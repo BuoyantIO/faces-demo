@@ -15,16 +15,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package raspberry_pi
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 
+	"github.com/BuoyantIO/faces-demo/v2/pkg/faces"
+	"github.com/BuoyantIO/faces-demo/v2/pkg/utils"
 	"github.com/warthog618/gpiod"
 )
 
 type HardwareStuff struct {
+	logger      *slog.Logger
 	rotaryAPin  int
 	rotaryBPin  int
 	buttonPin   int
@@ -41,6 +45,16 @@ type HardwareStuff struct {
 
 	serverErrorFraction int
 	serverLatched       bool
+}
+
+func NewAutomaticHardwareStuff() (*HardwareStuff, error) {
+	rotaryAPin := utils.IntFromEnv("ROTARY_A_PIN", 5)
+	rotaryBPin := utils.IntFromEnv("ROTARY_B_PIN", 6)
+	buttonPin := utils.IntFromEnv("BUTTON_PIN", 4)
+	ledGreenPin := utils.IntFromEnv("LED_GREEN_PIN", 19)
+	ledRedPin := utils.IntFromEnv("LED_RED_PIN", 13)
+
+	return NewHardwareStuff(rotaryAPin, rotaryBPin, buttonPin, ledGreenPin, ledRedPin)
 }
 
 func NewHardwareStuff(rotaryAPin, rotaryBPin, buttonPin, ledGreenPin, ledRedPin int) (*HardwareStuff, error) {
@@ -85,6 +99,8 @@ func NewHardwareStuff(rotaryAPin, rotaryBPin, buttonPin, ledGreenPin, ledRedPin 
 		ledGreenPin: ledGreenPin,
 		ledRedPin:   ledRedPin,
 
+		logger: slog.Default().With("provider", "hw"),
+
 		button: btn,
 		rotary: rotary,
 		leds: map[string]*gpiod.Line{
@@ -96,6 +112,12 @@ func NewHardwareStuff(rotaryAPin, rotaryBPin, buttonPin, ledGreenPin, ledRedPin 
 		rotaryChan: rotaryChan,
 	}
 
+	hw.Infof("rotaryAPin %d", hw.rotaryAPin)
+	hw.Infof("rotaryBPin %d", hw.rotaryBPin)
+	hw.Infof("buttonPin %d", hw.buttonPin)
+	hw.Infof("ledGreenPin %d", hw.ledGreenPin)
+	hw.Infof("ledRedPin %d", hw.ledRedPin)
+
 	return hw, nil
 }
 
@@ -104,6 +126,18 @@ func (hw *HardwareStuff) Close() {
 	hw.rotary.Close()
 	hw.leds["red"].Close()
 	hw.leds["green"].Close()
+}
+
+func (hw *HardwareStuff) Infof(format string, args ...interface{}) {
+	hw.logger.Info("hw: " + fmt.Sprintf(format, args...))
+}
+
+func (hw *HardwareStuff) Debugf(format string, args ...interface{}) {
+	hw.logger.Debug("hw: " + fmt.Sprintf(format, args...))
+}
+
+func (hw *HardwareStuff) Warnf(format string, args ...interface{}) {
+	hw.logger.Warn("hw: " + fmt.Sprintf(format, args...))
 }
 
 // ledOn turns on the LED of the specified color.
@@ -149,4 +183,34 @@ func (hw *HardwareStuff) Watch(startingErrorFraction int, startingLatched bool) 
 			fmt.Printf("hardware: latched now %v\n", hw.serverLatched)
 		}
 	}()
+}
+
+func (hw *HardwareStuff) PreHook(bprv *faces.BaseProvider, prvReq *faces.ProviderRequest, rstat *faces.BaseRequestStatus) bool {
+	bprv.Lock()
+	defer bprv.Unlock()
+
+	if bprv.ErrorFraction() != hw.serverErrorFraction {
+		bprv.SetErrorFraction(hw.serverErrorFraction)
+		bprv.Infof("errorFraction %d", bprv.ErrorFraction())
+	}
+
+	if bprv.IsLatched() != hw.serverLatched {
+		bprv.SetLatched(hw.serverLatched)
+		bprv.Infof("latched %v", bprv.IsLatched())
+	}
+
+	if rstat.IsErrored() || rstat.IsRateLimited() {
+		hw.ledOn("red")
+	} else {
+		hw.ledOn("green")
+	}
+
+	return true
+}
+
+func (hw *HardwareStuff) PostHook(bprv *faces.BaseProvider, prvReq *faces.ProviderRequest, rstat *faces.BaseRequestStatus) bool {
+	hw.ledOff("red")
+	hw.ledOff("green")
+
+	return true
 }

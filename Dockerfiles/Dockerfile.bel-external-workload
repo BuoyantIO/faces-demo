@@ -21,9 +21,10 @@ ARG EXTERNAL_BASE=you-must-set-the-external-base-arg
 
 # Build over the external-workload base image.
 FROM $EXTERNAL_BASE AS final
+ARG WORKLOAD
 
 # This is associated with the faces-demo repo.
 LABEL org.opencontainers.image.source=https://github.com/BuoyantIO/faces-demo
 
 # Copy the compiled binary from the builder stage into the final image
-COPY --chmod=0755 workload /workload/start
+COPY --chmod=0755 ${WORKLOAD} /workload/start

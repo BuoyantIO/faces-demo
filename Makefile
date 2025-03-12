@@ -39,13 +39,13 @@ help:
 	@echo "or 'make clobber' to smite everything and completely start over."
 .PHONY: help
 
-proto: pkg/faces/color_grpc.pb.go pkg/faces/color.pb.go
+proto: pkg/color/color_grpc.pb.go pkg/color/color.pb.go
 
-pkg/faces/color_grpc.pb.go pkg/faces/color.pb.go: pkg/faces/color.proto
+pkg/color/color_grpc.pb.go pkg/color/color.pb.go: pkg/color/color.proto
 	protoc \
 		--go_out=. --go_opt=paths=source_relative \
 		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
-		pkg/faces/color.proto
+		pkg/color/color.proto
 
 images: .goreleaser.yaml
 	goreleaser release --snapshot --clean

@@ -24,7 +24,7 @@ FROM scratch AS final
 LABEL org.opencontainers.image.source=https://github.com/BuoyantIO/faces-demo
 
 # Copy the compiled binary from the builder stage into the final image
-COPY workload /workload
+COPY gui-workload /workload
 
 # Also copy HTML files to be served.
 COPY assets/html /app/data

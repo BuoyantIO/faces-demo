@@ -25,7 +25,7 @@ ARG WORKLOAD
 LABEL org.opencontainers.image.source=https://github.com/BuoyantIO/faces-demo
 
 # Copy the compiled binary from the builder stage into the final image
-COPY ${WORKLOAD} /workload
+COPY --chmod=0755 ${WORKLOAD} /workload
 
 # Set the entrypoint to the compiled binary
 ENTRYPOINT ["/workload"]

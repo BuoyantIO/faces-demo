@@ -23,39 +23,42 @@ import (
 	"github.com/BuoyantIO/faces-demo/v2/pkg/utils"
 )
 
-type ColorProvider struct {
+type SmileyProvider struct {
 	BaseProvider
-	color string
+	smiley string
 }
 
-func NewColorProviderFromEnvironment() *ColorProvider {
-	cprv := &ColorProvider{
+func NewSmileyProviderFromEnvironment() *SmileyProvider {
+	sprv := &SmileyProvider{
 		BaseProvider: BaseProvider{
-			Name: "Color",
+			Name: "Smiley",
 		},
 	}
 
-	cprv.SetLogger(slog.Default().With(
-		"provider", "ColorProvider",
+	sprv.SetLogger(slog.Default().With(
+		"provider", "SmileyProvider",
 	))
 
-	cprv.SetGetHandler(cprv.Get)
+	sprv.SetGetHandler(sprv.Get)
 
-	cprv.BaseProvider.SetupFromEnvironment()
+	sprv.BaseProvider.SetupFromEnvironment()
 
-	colorName := utils.StringFromEnv("COLOR", "blue")
-	cprv.Key = colorName
-	cprv.color = utils.Colors.Lookup(colorName)
+	smileyName := utils.StringFromEnv("SMILEY", "Grinning")
+	sprv.Key = smileyName
+	sprv.smiley = utils.Smileys.Lookup(smileyName)
 
-	cprv.Infof("Using color %s => %s", colorName, cprv.color)
-	return cprv
+	smileyNameUsed := utils.Smileys.LookupValue(sprv.smiley)
+
+	sprv.Infof("Using smiley %s", smileyNameUsed)
+	return sprv
 }
 
-func (cprv *ColorProvider) Get(prvReq *ProviderRequest) ProviderResponse {
+func (sprv *SmileyProvider) Get(prvReq *ProviderRequest) ProviderResponse {
 	// Error fraction, latching, and rate limiting are all handled by the base
 	// provider
 
 	resp := ProviderResponseEmpty()
-	resp.Add("color", cprv.color)
+	resp.Add("smiley", sprv.smiley)
+
 	return resp
 }
