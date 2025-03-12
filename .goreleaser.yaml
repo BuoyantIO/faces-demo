@@ -34,307 +34,6 @@ before:
     # Make the chart as part of the build process.
     - make VERSION={{ .Version }} chart
 
-builds:
-  # "generic-" builds are for any random hardware out there.
-  - id: generic-workload
-    main: ./cmd/generic/workload
-    binary: workload
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-    goarch:
-      - arm64
-      - amd64
-
-  - id: generic-color
-    main: ./cmd/generic/color
-    binary: color-workload
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-    goarch:
-      - arm64
-      - amd64
-
-  # "pi" is our build specifically for the Raspberry Pi (it uses Pi GPIO for
-  # some LEDs and a knob).
-  - id: pi
-    main: ./cmd/raspberry-pi
-    binary: workload
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-    goarch:
-      - arm64
-
-# We build GUI and workload images for both arm64 and amd64, then build a
-# multiarch manifest from them.
-dockers:
-  ### GUI images
-  - use: buildx
-    goos: linux
-    goarch: arm64
-    dockerfile: Dockerfiles/Dockerfile.gui
-    ids:
-      - generic-workload
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}-arm64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest-arm64"
-    build_flag_templates:
-      - "--platform=linux/arm64"
-    extra_files:
-      - assets/html
-  - use: buildx
-    goos: linux
-    goarch: amd64
-    dockerfile: Dockerfiles/Dockerfile.gui
-    ids:
-      - generic-workload
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}-amd64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest-amd64"
-    build_flag_templates:
-      - "--platform=linux/amd64"
-    extra_files:
-      - assets/html
-
-  ### Generic workload images: this is the multifunction image that can be any HTTP workload.
-  - use: buildx
-    goos: linux
-    goarch: arm64
-    dockerfile: Dockerfiles/Dockerfile.workload
-    ids:
-      - generic-workload
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:{{ .Version }}-arm64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:latest-arm64"
-    build_flag_templates:
-      - "--platform=linux/arm64"
-      - "--build-arg=WORKLOAD=workload"
-  - use: buildx
-    goos: linux
-    goarch: amd64
-    dockerfile: Dockerfiles/Dockerfile.workload
-    ids:
-      - generic-workload
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:{{ .Version }}-amd64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:latest-amd64"
-    build_flag_templates:
-      - "--platform=linux/amd64"
-      - "--build-arg=WORKLOAD=workload"
-
-  ### Color workload images: this can only be a gRPC color workload.
-  - use: buildx
-    goos: linux
-    goarch: arm64
-    dockerfile: Dockerfiles/Dockerfile.workload
-    ids:
-      - generic-color
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:{{ .Version }}-arm64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:latest-arm64"
-    build_flag_templates:
-      - "--platform=linux/arm64"
-      - "--build-arg=WORKLOAD=color-workload"
-  - use: buildx
-    goos: linux
-    goarch: amd64
-    dockerfile: Dockerfiles/Dockerfile.workload
-    ids:
-      - generic-color
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:{{ .Version }}-amd64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:latest-amd64"
-    build_flag_templates:
-      - "--platform=linux/amd64"
-      - "--build-arg=WORKLOAD=color-workload"
-
-  - use: buildx
-    goos: linux
-    goarch: arm64
-    dockerfile: Dockerfiles/Dockerfile.external-workload
-    ids:
-      - generic-workload
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:{{ .Version }}-arm64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest-arm64"
-    build_flag_templates:
-      - "--platform=linux/arm64"
-      - "--build-arg=EXTERNAL_BASE={{ .Env.EXTERNAL_BASE }}"
-      - "--build-arg=WORKLOAD=workload"
-  - use: buildx
-    goos: linux
-    goarch: amd64
-    dockerfile: Dockerfiles/Dockerfile.external-workload
-    ids:
-      - generic-workload
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:{{ .Version }}-amd64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest-amd64"
-    build_flag_templates:
-      - "--platform=linux/amd64"
-      - "--build-arg=EXTERNAL_BASE={{ .Env.EXTERNAL_BASE }}"
-      - "--build-arg=WORKLOAD=workload"
-  - use: buildx
-    goos: linux
-    goarch: arm64
-    dockerfile: Dockerfiles/Dockerfile.bel-external-workload
-    ids:
-      - generic-workload
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:{{ .Version }}-arm64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:latest-arm64"
-    build_flag_templates:
-      - "--platform=linux/arm64"
-      - "--build-arg=EXTERNAL_BASE={{ .Env.BEL_EXTERNAL_BASE }}"
-      - "--build-arg=WORKLOAD=workload"
-  - use: buildx
-    goos: linux
-    goarch: amd64
-    dockerfile: Dockerfiles/Dockerfile.bel-external-workload
-    ids:
-      - generic-workload
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:{{ .Version }}-amd64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:latest-amd64"
-    build_flag_templates:
-      - "--platform=linux/amd64"
-      - "--build-arg=EXTERNAL_BASE={{ .Env.BEL_EXTERNAL_BASE }}"
-      - "--build-arg=WORKLOAD=workload"
-
-  # For the Pi, we only build an external-workload image for arm64. The Pi itself
-  # is arm64, so there's no point in building for amd64, and we're not going to try
-  # to access Pi GPIO from inside Kubernetes.
-  - use: buildx
-    goos: linux
-    goarch: arm64
-    # Not a typo! We really do use the same Dockerfile as the generic external
-    # workload, we're just copying in our workload binary from the Pi build
-    # rather than the generic build.
-    dockerfile: Dockerfiles/Dockerfile.external-workload
-    ids:
-      - pi
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-workload:{{ .Version }}-arm64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-workload:latest-arm64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-workload:{{ .Version }}"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-workload:latest"
-    build_flag_templates:
-      - "--platform=linux/arm64"
-      - "--build-arg=EXTERNAL_BASE={{ .Env.EXTERNAL_BASE }}"
-  - use: buildx
-    goos: linux
-    goarch: arm64
-    # Not a typo! We really do use the same Dockerfile as the generic external
-    # workload, we're just copying in our workload binary from the Pi build
-    # rather than the generic build.
-    dockerfile: Dockerfiles/Dockerfile.bel-external-workload
-    ids:
-      - pi
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-workload:{{ .Version }}-arm64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-workload:latest-arm64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-workload:{{ .Version }}"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-workload:latest"
-    build_flag_templates:
-      - "--platform=linux/arm64"
-      - "--build-arg=EXTERNAL_BASE={{ .Env.BEL_EXTERNAL_BASE }}"
-
-docker_manifests:
-  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}"
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}-arm64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}-amd64"
-    create_flags:
-      - --insecure
-    push_flags:
-      - --insecure
-
-  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest"
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest-arm64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest-amd64"
-    create_flags:
-      - --insecure
-    push_flags:
-      - --insecure
-
-  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:{{ .Version }}"
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:{{ .Version }}-arm64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:{{ .Version }}-amd64"
-    create_flags:
-      - --insecure
-    push_flags:
-      - --insecure
-
-  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:latest"
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:latest-arm64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-workload:latest-amd64"
-    create_flags:
-      - --insecure
-    push_flags:
-      - --insecure
-
-  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:{{ .Version }}"
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:{{ .Version }}-arm64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:{{ .Version }}-amd64"
-    create_flags:
-      - --insecure
-    push_flags:
-      - --insecure
-
-  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:latest"
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:latest-arm64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:latest-amd64"
-    create_flags:
-      - --insecure
-    push_flags:
-      - --insecure
-
-  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest"
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest-arm64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:latest-amd64"
-    create_flags:
-      - --insecure
-    push_flags:
-      - --insecure
-
-  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:{{ .Version }}"
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:{{ .Version }}-arm64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-workload:{{ .Version }}-amd64"
-    create_flags:
-      - --insecure
-    push_flags:
-      - --insecure
-
-  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:latest"
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:latest-arm64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:latest-amd64"
-    create_flags:
-      - --insecure
-    push_flags:
-      - --insecure
-
-  - name_template: "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:{{ .Version }}"
-    image_templates:
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:{{ .Version }}-arm64"
-      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-workload:{{ .Version }}-amd64"
-    create_flags:
-      - --insecure
-    push_flags:
-      - --insecure
-
 archives:
   - id: generic
     name_template: '{{ .ProjectName }}_generic_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
@@ -352,3 +51,599 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
+
+builds:
+- binary: gui-workload
+  env:
+  - CGO_ENABLED=0
+  goarch:
+  - arm64
+  - amd64
+  goos:
+  - linux
+  id: generic-gui
+  main: ./cmd/generic/gui
+- binary: face-workload
+  env:
+  - CGO_ENABLED=0
+  goarch:
+  - arm64
+  - amd64
+  goos:
+  - linux
+  id: generic-face
+  main: ./cmd/generic/face
+- binary: color-workload
+  env:
+  - CGO_ENABLED=0
+  goarch:
+  - arm64
+  - amd64
+  goos:
+  - linux
+  id: generic-color
+  main: ./cmd/generic/color
+- binary: color-workload
+  env:
+  - CGO_ENABLED=0
+  goarch:
+  - arm64
+  goos:
+  - linux
+  id: pi-color
+  main: ./cmd/pi/color
+- binary: smiley-workload
+  env:
+  - CGO_ENABLED=0
+  goarch:
+  - arm64
+  - amd64
+  goos:
+  - linux
+  id: generic-smiley
+  main: ./cmd/generic/smiley
+- binary: smiley-workload
+  env:
+  - CGO_ENABLED=0
+  goarch:
+  - arm64
+  goos:
+  - linux
+  id: pi-smiley
+  main: ./cmd/pi/smiley
+docker_manifests:
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face:{{ .Version }}-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face:{{ .Version }}'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face:latest-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face:latest-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face:latest'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-face:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-face:{{ .Version }}-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-face:{{ .Version
+    }}'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-face:latest-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-face:latest-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-face:latest'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-face:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-face:{{ .Version }}-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-face:{{ .Version
+    }}'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-face:latest-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-face:latest-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-face:latest'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:{{ .Version }}-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:{{ .Version }}'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:latest-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:latest-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:latest'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-color:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-color:{{ .Version }}-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-color:{{ .Version
+    }}'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-color:latest-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-color:latest-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-color:latest'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-color:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-color:{{ .Version }}-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-color:{{
+    .Version }}'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-color:latest-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-color:latest-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-color:latest'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-color:{{ .Version }}-arm64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-color:{{ .Version }}'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-color:latest-arm64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-color:latest'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-color:{{ .Version }}-arm64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-color:{{ .Version
+    }}'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-color:latest-arm64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-color:latest'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-smiley:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-smiley:{{ .Version }}-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-smiley:{{ .Version }}'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-smiley:latest-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-smiley:latest-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-smiley:latest'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-smiley:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-smiley:{{ .Version }}-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-smiley:{{ .Version
+    }}'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-smiley:latest-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-smiley:latest-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-smiley:latest'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-smiley:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-smiley:{{ .Version }}-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-smiley:{{
+    .Version }}'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-smiley:latest-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-smiley:latest-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-smiley:latest'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-smiley:{{ .Version }}-arm64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-smiley:{{ .Version
+    }}'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-smiley:latest-arm64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-smiley:latest'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-smiley:{{ .Version }}-arm64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-smiley:{{ .Version
+    }}'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-smiley:latest-arm64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-smiley:latest'
+  push_flags:
+  - --insecure
+dockers:
+- build_flag_templates:
+  - --platform=linux/arm64
+  - --build-arg=WORKLOAD=gui-workload
+  dockerfile: Dockerfiles/Dockerfile.gui
+  extra_files:
+  - assets/html
+  goarch: arm64
+  goos: linux
+  ids:
+  - generic-gui
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest-arm64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/amd64
+  - --build-arg=WORKLOAD=gui-workload
+  dockerfile: Dockerfiles/Dockerfile.gui
+  extra_files:
+  - assets/html
+  goarch: amd64
+  goos: linux
+  ids:
+  - generic-gui
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}-amd64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest-amd64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/arm64
+  - --build-arg=WORKLOAD=face-workload
+  dockerfile: Dockerfiles/Dockerfile.workload
+  goarch: arm64
+  goos: linux
+  ids:
+  - generic-face
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face:latest-arm64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/amd64
+  - --build-arg=WORKLOAD=face-workload
+  dockerfile: Dockerfiles/Dockerfile.workload
+  goarch: amd64
+  goos: linux
+  ids:
+  - generic-face
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face:{{ .Version }}-amd64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face:latest-amd64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/arm64
+  - --build-arg=EXTERNAL_BASE={{ .Env.EXTERNAL_BASE }}
+  - --build-arg=WORKLOAD=face-workload
+  dockerfile: Dockerfiles/Dockerfile.external-workload
+  goarch: arm64
+  goos: linux
+  ids:
+  - generic-face
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-face:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-face:latest-arm64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/amd64
+  - --build-arg=EXTERNAL_BASE={{ .Env.EXTERNAL_BASE }}
+  - --build-arg=WORKLOAD=face-workload
+  dockerfile: Dockerfiles/Dockerfile.external-workload
+  goarch: amd64
+  goos: linux
+  ids:
+  - generic-face
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-face:{{ .Version }}-amd64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-face:latest-amd64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/arm64
+  - --build-arg=EXTERNAL_BASE={{ .Env.BEL_EXTERNAL_BASE }}
+  - --build-arg=WORKLOAD=face-workload
+  dockerfile: Dockerfiles/Dockerfile.bel-external-workload
+  goarch: arm64
+  goos: linux
+  ids:
+  - generic-face
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-face:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-face:latest-arm64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/amd64
+  - --build-arg=EXTERNAL_BASE={{ .Env.BEL_EXTERNAL_BASE }}
+  - --build-arg=WORKLOAD=face-workload
+  dockerfile: Dockerfiles/Dockerfile.bel-external-workload
+  goarch: amd64
+  goos: linux
+  ids:
+  - generic-face
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-face:{{ .Version }}-amd64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-face:latest-amd64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/arm64
+  - --build-arg=WORKLOAD=color-workload
+  dockerfile: Dockerfiles/Dockerfile.workload
+  goarch: arm64
+  goos: linux
+  ids:
+  - generic-color
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:latest-arm64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/amd64
+  - --build-arg=WORKLOAD=color-workload
+  dockerfile: Dockerfiles/Dockerfile.workload
+  goarch: amd64
+  goos: linux
+  ids:
+  - generic-color
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:{{ .Version }}-amd64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:latest-amd64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/arm64
+  - --build-arg=EXTERNAL_BASE={{ .Env.EXTERNAL_BASE }}
+  - --build-arg=WORKLOAD=color-workload
+  dockerfile: Dockerfiles/Dockerfile.external-workload
+  goarch: arm64
+  goos: linux
+  ids:
+  - generic-color
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-color:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-color:latest-arm64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/amd64
+  - --build-arg=EXTERNAL_BASE={{ .Env.EXTERNAL_BASE }}
+  - --build-arg=WORKLOAD=color-workload
+  dockerfile: Dockerfiles/Dockerfile.external-workload
+  goarch: amd64
+  goos: linux
+  ids:
+  - generic-color
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-color:{{ .Version }}-amd64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-color:latest-amd64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/arm64
+  - --build-arg=EXTERNAL_BASE={{ .Env.BEL_EXTERNAL_BASE }}
+  - --build-arg=WORKLOAD=color-workload
+  dockerfile: Dockerfiles/Dockerfile.bel-external-workload
+  goarch: arm64
+  goos: linux
+  ids:
+  - generic-color
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-color:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-color:latest-arm64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/amd64
+  - --build-arg=EXTERNAL_BASE={{ .Env.BEL_EXTERNAL_BASE }}
+  - --build-arg=WORKLOAD=color-workload
+  dockerfile: Dockerfiles/Dockerfile.bel-external-workload
+  goarch: amd64
+  goos: linux
+  ids:
+  - generic-color
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-color:{{ .Version }}-amd64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-color:latest-amd64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/arm64
+  - --build-arg=EXTERNAL_BASE={{ .Env.EXTERNAL_BASE }}
+  - --build-arg=WORKLOAD=color-workload
+  dockerfile: Dockerfiles/Dockerfile.external-workload
+  goarch: arm64
+  goos: linux
+  ids:
+  - pi-color
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-color:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-color:latest-arm64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/arm64
+  - --build-arg=EXTERNAL_BASE={{ .Env.BEL_EXTERNAL_BASE }}
+  - --build-arg=WORKLOAD=color-workload
+  dockerfile: Dockerfiles/Dockerfile.bel-external-workload
+  goarch: arm64
+  goos: linux
+  ids:
+  - pi-color
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-color:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-color:latest-arm64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/arm64
+  - --build-arg=WORKLOAD=smiley-workload
+  dockerfile: Dockerfiles/Dockerfile.workload
+  goarch: arm64
+  goos: linux
+  ids:
+  - generic-smiley
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-smiley:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-smiley:latest-arm64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/amd64
+  - --build-arg=WORKLOAD=smiley-workload
+  dockerfile: Dockerfiles/Dockerfile.workload
+  goarch: amd64
+  goos: linux
+  ids:
+  - generic-smiley
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-smiley:{{ .Version }}-amd64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-smiley:latest-amd64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/arm64
+  - --build-arg=EXTERNAL_BASE={{ .Env.EXTERNAL_BASE }}
+  - --build-arg=WORKLOAD=smiley-workload
+  dockerfile: Dockerfiles/Dockerfile.external-workload
+  goarch: arm64
+  goos: linux
+  ids:
+  - generic-smiley
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-smiley:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-smiley:latest-arm64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/amd64
+  - --build-arg=EXTERNAL_BASE={{ .Env.EXTERNAL_BASE }}
+  - --build-arg=WORKLOAD=smiley-workload
+  dockerfile: Dockerfiles/Dockerfile.external-workload
+  goarch: amd64
+  goos: linux
+  ids:
+  - generic-smiley
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-smiley:{{ .Version }}-amd64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-smiley:latest-amd64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/arm64
+  - --build-arg=EXTERNAL_BASE={{ .Env.BEL_EXTERNAL_BASE }}
+  - --build-arg=WORKLOAD=smiley-workload
+  dockerfile: Dockerfiles/Dockerfile.bel-external-workload
+  goarch: arm64
+  goos: linux
+  ids:
+  - generic-smiley
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-smiley:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-smiley:latest-arm64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/amd64
+  - --build-arg=EXTERNAL_BASE={{ .Env.BEL_EXTERNAL_BASE }}
+  - --build-arg=WORKLOAD=smiley-workload
+  dockerfile: Dockerfiles/Dockerfile.bel-external-workload
+  goarch: amd64
+  goos: linux
+  ids:
+  - generic-smiley
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-smiley:{{ .Version }}-amd64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-smiley:latest-amd64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/arm64
+  - --build-arg=EXTERNAL_BASE={{ .Env.EXTERNAL_BASE }}
+  - --build-arg=WORKLOAD=smiley-workload
+  dockerfile: Dockerfiles/Dockerfile.external-workload
+  goarch: arm64
+  goos: linux
+  ids:
+  - pi-smiley
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-smiley:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-smiley:latest-arm64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/arm64
+  - --build-arg=EXTERNAL_BASE={{ .Env.BEL_EXTERNAL_BASE }}
+  - --build-arg=WORKLOAD=smiley-workload
+  dockerfile: Dockerfiles/Dockerfile.bel-external-workload
+  goarch: arm64
+  goos: linux
+  ids:
+  - pi-smiley
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-smiley:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-smiley:latest-arm64'
+  use: buildx
+

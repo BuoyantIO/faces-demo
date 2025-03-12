@@ -47,8 +47,11 @@ pkg/faces/color_grpc.pb.go pkg/faces/color.pb.go: pkg/faces/color.proto
 		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
 		pkg/faces/color.proto
 
-images:
+images: .goreleaser.yaml
 	goreleaser release --snapshot --clean
+
+.goreleaser.yaml: make-gorel.py gorel.template
+	python make-gorel.py < gorel.template > .goreleaser.yaml
 
 clean:
 	rm -rf faces-chart-*
