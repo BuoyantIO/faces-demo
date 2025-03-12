@@ -1,7 +1,7 @@
-// SPDX-FileCopyrightText: 2024 Buoyant Inc.
+// SPDX-FileCopyrightText: 2025 Buoyant Inc.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Copyright 2022-2024 Buoyant Inc.
+// Copyright 2022-2025 Buoyant Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License.  You may obtain
@@ -68,7 +68,4 @@ func main() {
 		slog.Error(fmt.Sprintf("Unable to serve gRPC: %v", err))
 		os.Exit(1)
 	}
-
-	// Wait for servers to finish
-	select {}
 }
