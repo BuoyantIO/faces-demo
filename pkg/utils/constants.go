@@ -1,7 +1,7 @@
-// SPDX-FileCopyrightText: 2024 Buoyant Inc.
+// SPDX-FileCopyrightText: 2025 Buoyant Inc.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Copyright 2022-2024 Buoyant Inc.
+// Copyright 2022-2025 Buoyant Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License.  You may obtain
@@ -15,7 +15,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package faces
+package utils
 
 type SmileyMap struct {
 	smileys map[string]string
@@ -36,13 +36,23 @@ var Smileys = SmileyMap{
 }
 
 // Lookup a smiley by name. If found, return the HTML entity for the smiley
-// and true; if not found, return an empty string and false.
-func (sm *SmileyMap) Lookup(name string) (string, bool) {
+// and true; if not found, return Vomiting.
+func (sm *SmileyMap) Lookup(name string) string {
 	if smiley, ok := sm.smileys[name]; ok {
-		return smiley, true
+		return smiley
 	}
 
-	return "", false
+	return sm.smileys["Vomiting"]
+}
+
+func (sm *SmileyMap) LookupValue(value string) string {
+	for k, v := range sm.smileys {
+		if v == value {
+			return k
+		}
+	}
+
+	return "UNKNOWN"
 }
 
 type Palette struct {
@@ -84,9 +94,9 @@ type Palette struct {
 var Colors = Palette{
 	colors: map[string]string{
 		// Include grey/black/white because they're sometimes convenient.
-		"grey":      "#BBBBBB",
-		"black":     "#000000",
-		"white":     "#FFFFFF",
+		"grey":  "#BBBBBB",
+		"black": "#000000",
+		"white": "#FFFFFF",
 
 		// See lots of notes above.
 		"darkblue": "#4477AA",

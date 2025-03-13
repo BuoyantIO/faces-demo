@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: 2022 Buoyant Inc.
 # SPDX-License-Identifier: Apache-2.0
 #
-# Copyright 2022-2024 Buoyant Inc.
+# Copyright 2022-2025 Buoyant Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License.  You may obtain
@@ -24,7 +24,7 @@ FROM scratch AS final
 LABEL org.opencontainers.image.source=https://github.com/BuoyantIO/faces-demo
 
 # Copy the compiled binary from the builder stage into the final image
-COPY workload /workload
+COPY gui-workload /workload
 
 # Also copy HTML files to be served.
 COPY assets/html /app/data

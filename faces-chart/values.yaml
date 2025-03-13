@@ -21,7 +21,7 @@ gui:
 
 face:
   image: ""                     # If set, overrides the imageName/imageTag pair
-  imageName: ghcr.io/buoyantio/faces-workload
+  imageName: ghcr.io/buoyantio/faces-face
   imageTag: ""                  # If not set, uses the defaultImageTag
   imagePullPolicy: ""           # If not set, uses the default imagePullPolicy
   errorFraction: "20"
@@ -30,14 +30,14 @@ face:
 ingress:
   enabled: False                # If set to True, enables the ingress workload
   image: ""                     # If set, overrides the imageName/imageTag pair
-  imageName: ghcr.io/buoyantio/faces-workload
+  imageName: ghcr.io/buoyantio/faces-ingress
   imageTag: ""                  # If not set, uses the defaultImageTag
   imagePullPolicy: ""           # If not set, uses the default imagePullPolicy
   cellService: "cell"           # Override if desired
 
 backend:
   image: ""                     # If set, overrides the imageName/imageTag pair
-  imageName: ghcr.io/buoyantio/faces-workload
+  imageName: ""
   imageTag: ""                  # If not set, uses the defaultImageTag
   imagePullPolicy: ""           # If not set, uses the default imagePullPolicy
   errorFraction: "20"
@@ -47,7 +47,7 @@ smiley:
   enabled: True                   # If set to True, enables the second smiley workload
   smiley: ""                      # Override if desired
   # image: ""                     # If set, overrides the imageName/imageTag pair
-  # imageName: ""                 # If not set, uses backend.imageName
+  imageName: ghcr.io/buoyantio/faces-smiley
   # imageTag: ""                  # If not set, uses backend.imageTag
   # imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
   # errorFraction: ""             # If not set, uses backend.errorFraction
@@ -57,7 +57,7 @@ smiley2:
   enabled: False                  # If set to True, enables the second smiley workload
   smiley: "HeartEyes"            # Override if desired
   # image: ""                     # If set, overrides the imageName/imageTag pair
-  # imageName: ""                 # If not set, uses backend.imageName
+  imageName: ghcr.io/buoyantio/faces-smiley
   # imageTag: ""                  # If not set, uses backend.imageTag
   # imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
   # errorFraction: ""             # If not set, uses backend.errorFraction
@@ -67,7 +67,7 @@ smiley3:
   enabled: False                  # If set to True, enables the second smiley workload
   smiley: "RollingEyes"           # Override if desired
   # image: ""                     # If set, overrides the imageName/imageTag pair
-  # imageName: ""                 # If not set, uses backend.imageName
+  imageName: ghcr.io/buoyantio/faces-smiley
   # imageTag: ""                  # If not set, uses backend.imageTag
   # imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
   # errorFraction: ""             # If not set, uses backend.errorFraction

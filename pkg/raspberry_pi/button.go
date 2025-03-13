@@ -1,7 +1,7 @@
-// SPDX-FileCopyrightText: 2024 Buoyant Inc.
+// SPDX-FileCopyrightText: 2025 Buoyant Inc.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Copyright 2022-2024 Buoyant Inc.
+// Copyright 2022-2025 Buoyant Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may
 // not use this file except in compliance with the License.  You may obtain
@@ -15,7 +15,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package raspberry_pi
 
 import (
 	"time"

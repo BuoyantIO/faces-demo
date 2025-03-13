@@ -2,7 +2,7 @@
 
 syntax = "proto3";
 
-option go_package="github.com/BuoyantIO/faces-demo/v2/pkg/faces";
+option go_package="github.com/BuoyantIO/faces-demo/v2/pkg/color";
 
 service ColorService {
   rpc Center (ColorRequest) returns (ColorResponse);

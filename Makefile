@@ -25,30 +25,33 @@ help:
 	@echo "'latest-arm64' and 'latest-amd64')."
 	@echo ""
 	@echo "'VERSION=... make chart' will package up the Helm chart into"
-	@echo "'faces-chart-$$VERSION.tgz'. You must set VERSION in order to use
+	@echo "'faces-chart-$$VERSION.tgz'. You must set VERSION in order to use"
 	@echo "this target."
 	@echo ""
 	@echo "'HELM_REGISTRY=... VERSION=... make push-chart' will push the chart"
 	@echo "to the given HELM_REGISTRY. You must set both HELM_REGISTRY and VERSION"
 	@echo "in order to use this target."
 	@echo ""
-	@echo "'make proto" will regenerate Go code from protobuf definitions for"
+	@echo "'make proto' will regenerate Go code from protobuf definitions for"
 	@echo "the color workload. Requires protoc-gen-go to be installed."
 	@echo ""
 	@echo "You can also 'make clean' to remove all the Docker-image stuff,"
 	@echo "or 'make clobber' to smite everything and completely start over."
 .PHONY: help
 
-proto: pkg/faces/color_grpc.pb.go pkg/faces/color.pb.go
+proto: pkg/color/color_grpc.pb.go pkg/color/color.pb.go
 
-pkg/faces/color_grpc.pb.go pkg/faces/color.pb.go: pkg/faces/color.proto
+pkg/color/color_grpc.pb.go pkg/color/color.pb.go: pkg/color/color.proto
 	protoc \
 		--go_out=. --go_opt=paths=source_relative \
 		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
-		pkg/faces/color.proto
+		pkg/color/color.proto
 
-images:
+images: .goreleaser.yaml
 	goreleaser release --snapshot --clean
+
+.goreleaser.yaml: make-gorel.py gorel.template
+	python make-gorel.py < gorel.template > .goreleaser.yaml
 
 clean:
 	rm -rf faces-chart-*

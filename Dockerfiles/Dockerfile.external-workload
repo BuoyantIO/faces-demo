@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: 2022 Buoyant Inc.
 # SPDX-License-Identifier: Apache-2.0
 #
-# Copyright 2022-2024 Buoyant Inc.
+# Copyright 2022-2025 Buoyant Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License.  You may obtain
@@ -21,9 +21,10 @@ ARG EXTERNAL_BASE=you-must-set-the-external-base-arg
 
 # Build over the external-workload base image.
 FROM $EXTERNAL_BASE AS final
+ARG WORKLOAD
 
 # This is associated with the faces-demo repo.
 LABEL org.opencontainers.image.source=https://github.com/BuoyantIO/faces-demo
 
 # Copy the compiled binary from the builder stage into the final image
-COPY workload /workload/start
+COPY --chmod=0755 ${WORKLOAD} /workload/start
