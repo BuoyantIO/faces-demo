@@ -63,6 +63,16 @@ builds:
   - linux
   id: generic-gui
   main: ./cmd/generic/gui
+- binary: load-workload
+  env:
+  - CGO_ENABLED=0
+  goarch:
+  - arm64
+  - amd64
+  goos:
+  - linux
+  id: generic-load
+  main: ./cmd/generic/load
 - binary: face-workload
   env:
   - CGO_ENABLED=0
@@ -126,6 +136,22 @@ docker_manifests:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest-arm64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest-amd64'
   name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-load:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-load:{{ .Version }}-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-load:{{ .Version }}'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-load:latest-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-load:latest-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-load:latest'
   push_flags:
   - --insecure
 - create_flags:
@@ -365,6 +391,30 @@ dockers:
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}-amd64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest-amd64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/arm64
+  - --build-arg=WORKLOAD=load-workload
+  dockerfile: Dockerfiles/Dockerfile.workload
+  goarch: arm64
+  goos: linux
+  ids:
+  - generic-load
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-load:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-load:latest-arm64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/amd64
+  - --build-arg=WORKLOAD=load-workload
+  dockerfile: Dockerfiles/Dockerfile.workload
+  goarch: amd64
+  goos: linux
+  ids:
+  - generic-load
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-load:{{ .Version }}-amd64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-load:latest-amd64'
   use: buildx
 - build_flag_templates:
   - --platform=linux/arm64
