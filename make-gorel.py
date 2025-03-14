@@ -87,6 +87,8 @@ BUILDS = [
           build_styles=[ BuildStyleGUI("gui") ],
           extra_files=[ "assets/html" ],
     ),
+    Build("load",
+          build_styles=[ BuildStyleGeneric("load") ]),
     Build("face",
           build_styles=[ BuildStyleGeneric("face"),
                          BuildStyleExternal("face") ]),
