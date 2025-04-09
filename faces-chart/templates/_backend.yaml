@@ -66,6 +66,7 @@
 # for .name, but .workload would still be "color" in that case.
 {{- define "partials.backend" -}}
 {{- $info := index .root.Values .name -}}
+{{- $portname := (default "http" .portname ) -}}
 {{- if $info -}}
 {{- if $info.enabled }}
 ---
@@ -86,6 +87,7 @@ spec:
     faces.buoyant.io/component: {{ .name | quote }}
   ports:
   - port: 80
+    name: {{ $portname }}
     targetPort: http
 ---
 apiVersion: apps/v1

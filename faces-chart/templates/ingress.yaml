@@ -17,6 +17,7 @@ spec:
     faces.buoyant.io/component: faces-gui
   ports:
   - port: 80
+    name: http
     targetPort: http
 ---
 apiVersion: apps/v1
