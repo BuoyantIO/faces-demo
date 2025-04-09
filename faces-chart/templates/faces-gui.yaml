@@ -26,7 +26,7 @@ metadata:
   labels:
     service: faces-gui
 spec:
-  replicas: 1
+  replicas: {{ include "partials.gui-replicas" . }}
   selector:
     matchLabels:
       service: faces-gui
@@ -35,6 +35,7 @@ spec:
       labels:
         service: faces-gui
     spec:
+      {{ include "partials.gui-affinityclause" . }}
       containers:
       - name: faces-gui
         image: {{ include "partials.gui-image" . }}

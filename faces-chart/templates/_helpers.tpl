@@ -73,3 +73,42 @@
           value: {{ $value | quote }}
   {{ end -}}
 {{- end -}}
+
+# params: .antiaffinity, .affinity, .which
+{{- define "partials.affinityclause" -}}
+  {{- if (or .antiaffinity .affinity) -}}
+      affinity:
+        {{- if .antiaffinity }}
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: faces.buoyant.io/component
+                  operator: In
+                  values:
+                  - {{ .which | quote }}
+              topologyKey: kubernetes.io/hostname
+          - weight: 50
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: buoyant.io/application
+                  operator: In
+                  values:
+                  - faces
+              topologyKey: kubernetes.io/hostname
+        {{- end -}}
+        {{- if .affinity }}
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: {{ .affinity.key | quote }}
+                  operator: In
+                  values:
+                  - {{ .affinity.value | quote }}
+        {{- end -}}
+  {{- end -}}
+{{- end -}}

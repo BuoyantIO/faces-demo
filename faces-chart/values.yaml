@@ -9,6 +9,9 @@ defaultImageTag: ""             # If not set, uses the appVersion
 # Default imagePullPolicy. This is used only if not set in the sections below.
 defaultImagePullPolicy: IfNotPresent
 
+# Default replica count. This is used only if not set in the sections below.
+defaultReplicas: 1
+
 # User auth header.
 authHeader: "X-Faces-User"
 

@@ -21,6 +21,13 @@
 {{- end -}}
 
 # params: .root for the root, .which for the name of the workload
+{{- define "partials.backend-replicas" -}}
+  {{- $source := index .root.Values .which -}}
+  {{- include "partials.select-key"
+      (dict "root" .root "source" $source "key" "replicas" "default" .root.Values.backend) -}}
+{{- end -}}
+
+# params: .root for the root, .which for the name of the workload
 {{- define "partials.backend-delayBuckets" -}}
   {{- $source := index .root.Values .which -}}
   {{- include "partials.select-env"
@@ -40,6 +47,17 @@
             "key" "errorFraction"
             "name" "ERROR_FRACTION"
             "default" .root.Values.backend) -}}
+{{- end -}}
+
+# params: .root for the root, .which for the name of the workload
+{{- define "partials.backend-affinityclause" -}}
+  {{- $source := index .root.Values .which -}}
+  {{- $antiaffinity := (default .root.Values.backend.antiaffinity $source.antiaffinity) }}
+  {{- $affinity := (default .root.Values.backend.affinity $source.affinity) }}
+  {{- include "partials.affinityclause"
+      (dict "antiaffinity" $antiaffinity
+            "affinity" $affinity
+            "which" .which) -}}
 {{- end -}}
 
 # partials.backend does all the heavy lifting for a backend workload
@@ -74,7 +92,7 @@ metadata:
   labels:
     service: {{ .name | quote }}
 spec:
-  replicas: 1
+  replicas: {{ include "partials.backend-replicas" (dict "root" .root "which" .name) }}
   selector:
     matchLabels:
       service: {{ .name | quote }}
@@ -83,6 +101,7 @@ spec:
       labels:
         service: {{ .name | quote }}
     spec:
+      {{ include "partials.backend-affinityclause" (dict "root" .root "which" .name) }}
       containers:
       - name: {{ .name | quote }}
         image: {{ include "partials.backend-image" (dict "root" .root "which" .name) }}
