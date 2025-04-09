@@ -75,11 +75,15 @@ metadata:
   name: {{ .name | quote }}
   namespace: {{ .root.Release.Namespace }}
   labels:
-    service: {{ .name | quote }}
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: backend
+    faces.buoyant.io/component: {{ .name | quote }}
 spec:
   type: ClusterIP
   selector:
-    service: {{ .name | quote }}
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: backend
+    faces.buoyant.io/component: {{ .name | quote }}
   ports:
   - port: 80
     targetPort: http
@@ -90,16 +94,22 @@ metadata:
   name: {{ .name | quote }}
   namespace: {{ .root.Release.Namespace }}
   labels:
-    service: {{ .name | quote }}
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: backend
+    faces.buoyant.io/component: {{ .name | quote }}
 spec:
   replicas: {{ include "partials.backend-replicas" (dict "root" .root "which" .name) }}
   selector:
     matchLabels:
-      service: {{ .name | quote }}
+      buoyant.io/application: faces
+      faces.buoyant.io/component-type: backend
+      faces.buoyant.io/component: {{ .name | quote }}
   template:
     metadata:
       labels:
-        service: {{ .name | quote }}
+        buoyant.io/application: faces
+        faces.buoyant.io/component-type: backend
+        faces.buoyant.io/component: {{ .name | quote }}
     spec:
       {{ include "partials.backend-affinityclause" (dict "root" .root "which" .name) }}
       containers:

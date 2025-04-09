@@ -9,11 +9,15 @@ metadata:
   name: faces-gui
   namespace: {{ .Release.Namespace }}
   labels:
-    service: faces-gui
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: frontend
+    faces.buoyant.io/component: faces-gui
 spec:
   type: {{ $serviceType }}
   selector:
-    service: faces-gui
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: frontend
+    faces.buoyant.io/component: faces-gui
   ports:
   - port: 80
     targetPort: http
@@ -24,16 +28,22 @@ metadata:
   name: faces-gui
   namespace: {{ .Release.Namespace }}
   labels:
-    service: faces-gui
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: frontend
+    faces.buoyant.io/component: faces-gui
 spec:
   replicas: {{ include "partials.gui-replicas" . }}
   selector:
     matchLabels:
-      service: faces-gui
+      buoyant.io/application: faces
+      faces.buoyant.io/component-type: frontend
+      faces.buoyant.io/component: faces-gui
   template:
     metadata:
       labels:
-        service: faces-gui
+        buoyant.io/application: faces
+        faces.buoyant.io/component-type: frontend
+        faces.buoyant.io/component: faces-gui
     spec:
       {{ include "partials.gui-affinityclause" . }}
       containers:
