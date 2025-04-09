@@ -22,6 +22,15 @@
 {{- end -}}
 
 # params: .root for the root, .which for the name of the workload
+{{- define "partials.frontend-replicas" -}}
+  {{- $source := index .root.Values .which -}}
+  {{- include "partials.select-key"
+      (dict "root" .root
+            "source" $source
+            "key" "replicas") -}}
+{{- end -}}
+
+# params: .root for the root, .which for the name of the workload
 {{- define "partials.frontend-delayBuckets" -}}
   {{- $source := index .root.Values .which -}}
   {{- include "partials.select-env"
@@ -41,6 +50,15 @@
             "name" "ERROR_FRACTION") -}}
 {{- end -}}
 
+# params: .root for the root, .which for the name of the workload
+{{- define "partials.frontend-affinityclause" -}}
+  {{- $source := index .root.Values .which -}}
+  {{- include "partials.affinityclause"
+      (dict ".antiaffinity" $source.antiaffinity
+            ".affinity" $source.affinity
+            "which" .which) -}}
+{{- end -}}
+
 # We use all the above to provide nicer helpers for each of the workloads.
 # Given that the frontend workloads are all different enough that it's not
 # worth having the equivalent of partials-backend, we need to include a lot
@@ -58,6 +76,18 @@
             "which" "gui") -}}
 {{- end -}}
 
+{{- define "partials.gui-replicas" -}}
+  {{- include "partials.frontend-replicas"
+      (dict "root" .
+            "which" "gui") -}}
+{{- end -}}
+
+{{- define "partials.gui-affinityclause" -}}
+  {{- include "partials.frontend-affinityclause"
+      (dict "root" .
+            "which" "gui") -}}
+{{- end -}}
+
 {{- define "partials.face-image" -}}
   {{- include "partials.frontend-image"
       (dict "root" .
@@ -66,6 +96,18 @@
 
 {{- define "partials.face-imagePullPolicy" -}}
   {{- include "partials.frontend-imagePullPolicy"
+      (dict "root" .
+            "which" "face") -}}
+{{- end -}}
+
+{{- define "partials.face-replicas" -}}
+  {{- include "partials.frontend-replicas"
+      (dict "root" .
+            "which" "face") -}}
+{{- end -}}
+
+{{- define "partials.face-affinityclause" -}}
+  {{- include "partials.frontend-affinityclause"
       (dict "root" .
             "which" "face") -}}
 {{- end -}}

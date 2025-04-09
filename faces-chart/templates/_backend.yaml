@@ -21,6 +21,13 @@
 {{- end -}}
 
 # params: .root for the root, .which for the name of the workload
+{{- define "partials.backend-replicas" -}}
+  {{- $source := index .root.Values .which -}}
+  {{- include "partials.select-key"
+      (dict "root" .root "source" $source "key" "replicas" "default" .root.Values.backend) -}}
+{{- end -}}
+
+# params: .root for the root, .which for the name of the workload
 {{- define "partials.backend-delayBuckets" -}}
   {{- $source := index .root.Values .which -}}
   {{- include "partials.select-env"
@@ -42,12 +49,24 @@
             "default" .root.Values.backend) -}}
 {{- end -}}
 
+# params: .root for the root, .which for the name of the workload
+{{- define "partials.backend-affinityclause" -}}
+  {{- $source := index .root.Values .which -}}
+  {{- $antiaffinity := (default .root.Values.backend.antiaffinity $source.antiaffinity) }}
+  {{- $affinity := (default .root.Values.backend.affinity $source.affinity) }}
+  {{- include "partials.affinityclause"
+      (dict "antiaffinity" $antiaffinity
+            "affinity" $affinity
+            "which" .which) -}}
+{{- end -}}
+
 # partials.backend does all the heavy lifting for a backend workload
 # params: .root for the root, .name for the name of the workload,
 # .workload for what kind of workload -- so e.g. you might see "color2"
 # for .name, but .workload would still be "color" in that case.
 {{- define "partials.backend" -}}
 {{- $info := index .root.Values .name -}}
+{{- $portname := (default "http" .portname ) -}}
 {{- if $info -}}
 {{- if $info.enabled }}
 ---
@@ -57,13 +76,18 @@ metadata:
   name: {{ .name | quote }}
   namespace: {{ .root.Release.Namespace }}
   labels:
-    service: {{ .name | quote }}
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: backend
+    faces.buoyant.io/component: {{ .name | quote }}
 spec:
   type: ClusterIP
   selector:
-    service: {{ .name | quote }}
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: backend
+    faces.buoyant.io/component: {{ .name | quote }}
   ports:
   - port: 80
+    name: {{ $portname }}
     targetPort: http
 ---
 apiVersion: apps/v1
@@ -72,17 +96,24 @@ metadata:
   name: {{ .name | quote }}
   namespace: {{ .root.Release.Namespace }}
   labels:
-    service: {{ .name | quote }}
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: backend
+    faces.buoyant.io/component: {{ .name | quote }}
 spec:
-  replicas: 1
+  replicas: {{ include "partials.backend-replicas" (dict "root" .root "which" .name) }}
   selector:
     matchLabels:
-      service: {{ .name | quote }}
+      buoyant.io/application: faces
+      faces.buoyant.io/component-type: backend
+      faces.buoyant.io/component: {{ .name | quote }}
   template:
     metadata:
       labels:
-        service: {{ .name | quote }}
+        buoyant.io/application: faces
+        faces.buoyant.io/component-type: backend
+        faces.buoyant.io/component: {{ .name | quote }}
     spec:
+      {{ include "partials.backend-affinityclause" (dict "root" .root "which" .name) }}
       containers:
       - name: {{ .name | quote }}
         image: {{ include "partials.backend-image" (dict "root" .root "which" .name) }}

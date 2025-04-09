@@ -9,13 +9,18 @@ metadata:
   name: {{ $name }}
   namespace: {{ .Release.Namespace }}
   labels:
-    service: {{ $name }}
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: edge
+    faces.buoyant.io/component: {{ $name | quote }}
 spec:
   type: ClusterIP
   selector:
-    service: {{ $name }}
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: edge
+    faces.buoyant.io/component: {{ $name | quote }}
   ports:
   - port: 80
+    name: http
     targetPort: http
 ---
 apiVersion: apps/v1
@@ -24,17 +29,24 @@ metadata:
   name: {{ $name }}
   namespace: {{ .Release.Namespace }}
   labels:
-    service: {{ $name }}
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: edge
+    faces.buoyant.io/component: {{ $name | quote }}
 spec:
-  replicas: 1
+  replicas: {{ include "partials.face-replicas" . }}
   selector:
     matchLabels:
-      service: {{ $name }}
+      buoyant.io/application: faces
+      faces.buoyant.io/component-type: edge
+      faces.buoyant.io/component: {{ $name | quote }}
   template:
     metadata:
       labels:
-        service: {{ $name }}
+        buoyant.io/application: faces
+        faces.buoyant.io/component-type: edge
+        faces.buoyant.io/component: {{ $name | quote }}
     spec:
+      {{ include "partials.face-affinityclause" . }}
       containers:
       - name: {{ $name }}
         image: {{ include "partials.face-image" . }}

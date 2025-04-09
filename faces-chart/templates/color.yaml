@@ -1,12 +1,15 @@
 {{- include "partials.backend"
     (dict "name" "color"
           "workload" "color"
+          "portname" "http2"
           "root" .) }}
 {{- include "partials.backend"
     (dict "name" "color2"
           "workload" "color"
+          "portname" "http2"
           "root" .) }}
 {{- include "partials.backend"
     (dict "name" "color3"
           "workload" "color"
+          "portname" "http2"
           "root" .) }}

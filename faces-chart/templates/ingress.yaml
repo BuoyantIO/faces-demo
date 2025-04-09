@@ -6,13 +6,18 @@ metadata:
   name: face
   namespace: {{ .Release.Namespace }}
   labels:
-    service: face
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: edge
+    faces.buoyant.io/component: faces-gui
 spec:
   type: ClusterIP
   selector:
-    service: face
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: edge
+    faces.buoyant.io/component: faces-gui
   ports:
   - port: 80
+    name: http
     targetPort: http
 ---
 apiVersion: apps/v1
@@ -21,16 +26,22 @@ metadata:
   name: face
   namespace: {{ .Release.Namespace }}
   labels:
-    service: face
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: edge
+    faces.buoyant.io/component: faces-gui
 spec:
   replicas: 1
   selector:
     matchLabels:
-      service: face
+      buoyant.io/application: faces
+      faces.buoyant.io/component-type: edge
+      faces.buoyant.io/component: faces-gui
   template:
     metadata:
       labels:
-        service: face
+        buoyant.io/application: faces
+        faces.buoyant.io/component-type: edge
+        faces.buoyant.io/component: faces-gui
     spec:
       containers:
       - name: face
