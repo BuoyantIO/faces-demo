@@ -54,8 +54,8 @@
 {{- define "partials.frontend-affinityclause" -}}
   {{- $source := index .root.Values .which -}}
   {{- include "partials.affinityclause"
-      (dict ".antiaffinity" $source.antiaffinity
-            ".affinity" $source.affinity
+      (dict "antiaffinity" $source.antiaffinity
+            "affinity" $source.affinity
             "which" .which) -}}
 {{- end -}}
 
