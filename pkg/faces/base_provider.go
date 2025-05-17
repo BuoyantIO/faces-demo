@@ -495,6 +495,8 @@ func (bprv *BaseProvider) HandleRequest(start time.Time, prvReq *ProviderRequest
 	end := time.Now()
 	delta := end.Sub(start)
 
+	bprv.lastRequestTime = end
+
 	bprv.requestsTotal.WithLabelValues(bprv.Name, bprv.hostName, bprv.Key, fmt.Sprintf("%03d", resp.StatusCode)).Inc()
 	bprv.requestDuration.WithLabelValues(bprv.Name, bprv.hostName, bprv.Key).Observe(delta.Seconds())
 
