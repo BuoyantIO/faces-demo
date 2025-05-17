@@ -53,6 +53,7 @@ func main() {
 	flag.Parse()
 
 	cprv := faces.NewColorProviderFromEnvironment()
+	cprv.SetUpdater(hw.Updater)
 	cprv.SetPreHook(hw.PreHook)
 	cprv.SetPostHook(hw.PostHook)
 

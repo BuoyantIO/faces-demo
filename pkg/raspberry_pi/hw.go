@@ -185,7 +185,7 @@ func (hw *HardwareStuff) Watch(startingErrorFraction int, startingLatched bool) 
 	}()
 }
 
-func (hw *HardwareStuff) PreHook(bprv *faces.BaseProvider, prvReq *faces.ProviderRequest, rstat *faces.BaseRequestStatus) bool {
+func (hw *HardwareStuff) Updater(bprv *faces.BaseProvider) {
 	bprv.Lock()
 	defer bprv.Unlock()
 
@@ -198,7 +198,9 @@ func (hw *HardwareStuff) PreHook(bprv *faces.BaseProvider, prvReq *faces.Provide
 		bprv.SetLatched(hw.serverLatched)
 		bprv.Infof("latched %v", bprv.IsLatched())
 	}
+}
 
+func (hw *HardwareStuff) PreHook(bprv *faces.BaseProvider, prvReq *faces.ProviderRequest, rstat *faces.BaseRequestStatus) bool {
 	if rstat.IsErrored() || rstat.IsRateLimited() {
 		hw.ledOn("red")
 	} else {
