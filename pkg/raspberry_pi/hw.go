@@ -170,7 +170,7 @@ func (hw *HardwareStuff) Watch(startingErrorFraction int, startingLatched bool) 
 
 			hw.serverErrorFraction = efrac
 
-			fmt.Printf("hardware: error fraction now %d\n", hw.serverErrorFraction)
+			hw.Infof("error fraction now %d\n", hw.serverErrorFraction)
 		}
 	}()
 
@@ -180,7 +180,7 @@ func (hw *HardwareStuff) Watch(startingErrorFraction int, startingLatched bool) 
 
 			hw.serverLatched = !hw.serverLatched
 
-			fmt.Printf("hardware: latched now %v\n", hw.serverLatched)
+			hw.Infof("hardware: latched now %v\n", hw.serverLatched)
 		}
 	}()
 }
@@ -191,12 +191,12 @@ func (hw *HardwareStuff) Updater(bprv *faces.BaseProvider) {
 
 	if bprv.ErrorFraction() != hw.serverErrorFraction {
 		bprv.SetErrorFraction(hw.serverErrorFraction)
-		bprv.Infof("errorFraction %d", bprv.ErrorFraction())
+		bprv.Infof("Updater: set errorFraction to %d", bprv.ErrorFraction())
 	}
 
 	if bprv.IsLatched() != hw.serverLatched {
 		bprv.SetLatched(hw.serverLatched)
-		bprv.Infof("latched %v", bprv.IsLatched())
+		bprv.Infof("Updater: set latched to %v", bprv.IsLatched())
 	}
 }
 
