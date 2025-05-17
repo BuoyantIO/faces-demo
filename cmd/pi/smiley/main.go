@@ -50,6 +50,7 @@ func main() {
 	flag.Parse()
 
 	sprv := faces.NewSmileyProviderFromEnvironment()
+	sprv.SetUpdater(hw.Updater)
 	sprv.SetPreHook(hw.PreHook)
 	sprv.SetPostHook(hw.PostHook)
 

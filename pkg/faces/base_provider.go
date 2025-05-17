@@ -147,11 +147,17 @@ type ProviderInterface interface {
 type HTTPGetHandler func(w http.ResponseWriter, r *http.Request)
 type ProviderGetHandler func(prvReq *ProviderRequest) ProviderResponse
 
-// A Hook is a function that takes a ProviderRequest and a BaseRequestStatus and
-// returns a boolean indicating whether the request should proceed. If desired,
-// the Hook may modify the BaseRequestStatus in place to set the status code and
-// a message to hand back to the client.
-type Hook func(*BaseProvider, *ProviderRequest, *BaseRequestStatus) bool
+// A ProviderUpdater is a function that updates the provider's state based on external
+// things. It does _not_ get to short-circuit the request; it only gets to update
+// state.
+type ProviderUpdater func(*BaseProvider)
+
+// A ProviderHook is a function that takes a ProviderRequest and a
+// BaseRequestStatus and returns a boolean indicating whether the request
+// should proceed. If desired, the ProviderHook may modify the
+// BaseRequestStatus in place to set the status code and a message to hand
+// back to the client.
+type ProviderHook func(*BaseProvider, *ProviderRequest, *BaseRequestStatus) bool
 
 type BaseProvider struct {
 	Name               string // Name of this kind of provider
@@ -169,8 +175,9 @@ type BaseProvider struct {
 	providerGetHandler ProviderGetHandler
 	httpGetHandler     HTTPGetHandler
 
-	preHook  Hook
-	postHook Hook
+	updater  ProviderUpdater
+	preHook  ProviderHook
+	postHook ProviderHook
 
 	requestsTotal   *prometheus.CounterVec
 	requestDuration *prometheus.HistogramVec
@@ -267,11 +274,15 @@ func (bprv *BaseProvider) SetHTTPGetHandler(handler HTTPGetHandler) {
 	bprv.httpGetHandler = handler
 }
 
-func (bprv *BaseProvider) SetPreHook(hook Hook) {
+func (bprv *BaseProvider) SetUpdater(updater ProviderUpdater) {
+	bprv.updater = updater
+}
+
+func (bprv *BaseProvider) SetPreHook(hook ProviderHook) {
 	bprv.preHook = hook
 }
 
-func (bprv *BaseProvider) SetPostHook(hook Hook) {
+func (bprv *BaseProvider) SetPostHook(hook ProviderHook) {
 	bprv.postHook = hook
 }
 
@@ -423,6 +434,11 @@ func (bprv *BaseProvider) HandleRequest(start time.Time, prvReq *ProviderRequest
 	resp := ProviderResponseEmpty()
 
 	bprv.CheckUnlatch(start)
+
+	if bprv.updater != nil {
+		bprv.updater(bprv)
+	}
+
 	rstat := bprv.CheckRequestStatus()
 
 	if bprv.preHook != nil {
@@ -478,6 +494,8 @@ func (bprv *BaseProvider) HandleRequest(start time.Time, prvReq *ProviderRequest
 
 	end := time.Now()
 	delta := end.Sub(start)
+
+	bprv.lastRequestTime = end
 
 	bprv.requestsTotal.WithLabelValues(bprv.Name, bprv.hostName, bprv.Key, fmt.Sprintf("%03d", resp.StatusCode)).Inc()
 	bprv.requestDuration.WithLabelValues(bprv.Name, bprv.hostName, bprv.Key).Observe(delta.Seconds())

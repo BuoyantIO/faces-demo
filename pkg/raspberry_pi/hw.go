@@ -24,7 +24,7 @@ import (
 
 	"github.com/BuoyantIO/faces-demo/v2/pkg/faces"
 	"github.com/BuoyantIO/faces-demo/v2/pkg/utils"
-	"github.com/warthog618/gpiod"
+	"github.com/warthog618/go-gpiocdev"
 )
 
 type HardwareStuff struct {
@@ -38,7 +38,7 @@ type HardwareStuff struct {
 	button *Button
 	rotary *RotaryEncoder
 
-	leds map[string]*gpiod.Line
+	leds map[string]*gpiocdev.Line
 
 	btnChan    chan ButtonEvent
 	rotaryChan chan RotaryEvent
@@ -73,7 +73,7 @@ func NewHardwareStuff(rotaryAPin, rotaryBPin, buttonPin, ledGreenPin, ledRedPin 
 		return nil, fmt.Errorf("could not create rotary encoder on lines %d and %d: %s", rotaryAPin, rotaryBPin, err)
 	}
 
-	redLED, err := gpiod.RequestLine("gpiochip0", ledRedPin, gpiod.AsOutput(1), gpiod.LineDrivePushPull)
+	redLED, err := gpiocdev.RequestLine("gpiochip0", ledRedPin, gpiocdev.AsOutput(1), gpiocdev.LineDrivePushPull)
 
 	if err != nil {
 		btn.Close()
@@ -82,7 +82,7 @@ func NewHardwareStuff(rotaryAPin, rotaryBPin, buttonPin, ledGreenPin, ledRedPin 
 		return nil, fmt.Errorf("could not create red LED on line %d: %s", ledRedPin, err)
 	}
 
-	greenLED, err := gpiod.RequestLine("gpiochip0", ledGreenPin, gpiod.AsOutput(1), gpiod.LineDrivePushPull)
+	greenLED, err := gpiocdev.RequestLine("gpiochip0", ledGreenPin, gpiocdev.AsOutput(1), gpiocdev.LineDrivePushPull)
 
 	if err != nil {
 		btn.Close()
@@ -103,7 +103,7 @@ func NewHardwareStuff(rotaryAPin, rotaryBPin, buttonPin, ledGreenPin, ledRedPin 
 
 		button: btn,
 		rotary: rotary,
-		leds: map[string]*gpiod.Line{
+		leds: map[string]*gpiocdev.Line{
 			"red":   redLED,
 			"green": greenLED,
 		},
@@ -170,7 +170,7 @@ func (hw *HardwareStuff) Watch(startingErrorFraction int, startingLatched bool) 
 
 			hw.serverErrorFraction = efrac
 
-			fmt.Printf("hardware: error fraction now %d\n", hw.serverErrorFraction)
+			hw.Infof("error fraction now %d\n", hw.serverErrorFraction)
 		}
 	}()
 
@@ -180,25 +180,27 @@ func (hw *HardwareStuff) Watch(startingErrorFraction int, startingLatched bool) 
 
 			hw.serverLatched = !hw.serverLatched
 
-			fmt.Printf("hardware: latched now %v\n", hw.serverLatched)
+			hw.Infof("hardware: latched now %v\n", hw.serverLatched)
 		}
 	}()
 }
 
-func (hw *HardwareStuff) PreHook(bprv *faces.BaseProvider, prvReq *faces.ProviderRequest, rstat *faces.BaseRequestStatus) bool {
+func (hw *HardwareStuff) Updater(bprv *faces.BaseProvider) {
 	bprv.Lock()
 	defer bprv.Unlock()
 
 	if bprv.ErrorFraction() != hw.serverErrorFraction {
 		bprv.SetErrorFraction(hw.serverErrorFraction)
-		bprv.Infof("errorFraction %d", bprv.ErrorFraction())
+		bprv.Infof("Updater: set errorFraction to %d", bprv.ErrorFraction())
 	}
 
 	if bprv.IsLatched() != hw.serverLatched {
 		bprv.SetLatched(hw.serverLatched)
-		bprv.Infof("latched %v", bprv.IsLatched())
+		bprv.Infof("Updater: set latched to %v", bprv.IsLatched())
 	}
+}
 
+func (hw *HardwareStuff) PreHook(bprv *faces.BaseProvider, prvReq *faces.ProviderRequest, rstat *faces.BaseRequestStatus) bool {
 	if rstat.IsErrored() || rstat.IsRateLimited() {
 		hw.ledOn("red")
 	} else {
