@@ -29,8 +29,5 @@ COPY gui-workload /workload
 # Also copy HTML files to be served.
 COPY assets/html /app/data
 
-# Default to the GUI service
-ENV FACES_SERVICE=gui
-
 # Set the entrypoint to the compiled binary
 ENTRYPOINT ["/workload"]
