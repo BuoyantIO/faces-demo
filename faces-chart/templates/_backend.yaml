@@ -39,6 +39,19 @@
 {{- end -}}
 
 # params: .root for the root, .which for the name of the workload
+{{- define "partials.backend-resources" -}}
+  {{- $source := index .root.Values .which -}}
+  {{- $requests := get $source "requests"
+                   | default (.root.Values.backend).requests
+                   | default (.root.Values).defaultRequests -}}
+  {{- $limits := get $source "limits"
+                 | default (.root.Values.backend).limits
+                 | default (.root.Values).defaultLimits -}}
+  {{- include "partials.resources" (dict "requests" $requests
+                                        "limits" $limits) }}
+{{- end -}}
+
+# params: .root for the root, .which for the name of the workload
 {{- define "partials.backend-errorFraction" -}}
   {{- $source := index .root.Values .which -}}
   {{- include "partials.select-env"
@@ -132,13 +145,7 @@ spec:
         {{- end -}}
         {{- include "partials.backend-delayBuckets" (dict "root" .root "which" .name) }}
         {{- include "partials.backend-errorFraction" (dict "root" .root "which" .name) }}
-        resources:
-          requests:
-            cpu: 100m
-            memory: 64Mi
-          # limits:
-          #   cpu: 250m
-          #   memory: 128Mi
+        {{ include "partials.backend-resources" (dict "root" .root "which" .name) }}
 {{- end -}}
 {{- end -}}
 {{- end -}}

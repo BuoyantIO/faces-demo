@@ -57,11 +57,5 @@ spec:
           value: {{ .Values.authHeader | quote }}
         - name: CELL_SERVICE
           value: {{ .Values.ingress.cellService | quote }}
-        resources:
-          requests:
-            cpu: 100m
-            memory: 64Mi
-          # limits:
-          #   cpu: 250m
-          #   memory: 128Mi
+        {{- include "partials.ingress-resources" . }}
 {{- end -}}

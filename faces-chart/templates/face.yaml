@@ -61,10 +61,4 @@ spec:
           value: {{ .Values.authHeader | quote }}
         {{- include "partials.face-errorFraction" . }}
         {{- include "partials.face-delayBuckets" . }}
-        resources:
-          requests:
-            cpu: 300m     # The face service doesn't need much memory, but it does need more
-            memory: 64Mi  # CPU than the other backend services since it has to call the
-          # limits:         # face and smiley services, then composite the results.
-          #   cpu: 500m
-          #   memory: 128Mi
+        {{- include "partials.face-resources" . }}
