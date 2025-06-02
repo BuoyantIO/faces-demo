@@ -65,11 +65,11 @@ The Faces architecture is fairly simple:
   code (e.g. `#ff0000` for bright red).
 
   The named colors in the `Colors` map are meant to work for normal color
-  vision and for various kinds of colorblindness, and are taken from the
-  "Bright" color scheme shown in the "Qualitative // Color Schemes" section of
-  https://personal.sron.nl/~pault/. For (much) more information, read the
-  comments in `pkg/faces/constants.go`. Feedback here is welcome, since the
-  Faces authors have normal color vision...
+  vision as well as for various kinds of colorblindness, and are taken from
+  the "Bright" color scheme shown in the "Qualitative // Color Schemes"
+  section of https://personal.sron.nl/~pault/. For (much) more information,
+  read the comments in `pkg/faces/constants.go`. Feedback here is welcome,
+  since the Faces authors have normal color vision...
 
 [Linkerd]: https://linkerd.io
 [Buoyant Enterprise for Linkerd]: https://buoyant.io/linkerd-enterprise
