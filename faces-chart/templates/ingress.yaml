@@ -30,7 +30,8 @@ metadata:
     faces.buoyant.io/component-type: edge
     faces.buoyant.io/component: faces-gui
 spec:
-  replicas: 1
+  replicas: {{ get .Values.ingress "replicas"
+               | default .Values.defaultReplicas }}
   selector:
     matchLabels:
       buoyant.io/application: faces
@@ -46,7 +47,8 @@ spec:
       containers:
       - name: face
         image: {{ include "partials.ingress-image" . }}
-        imagePullPolicy: {{ include "partials.ingress-imagePullPolicy" . }}
+        imagePullPolicy: {{ get .Values.ingress "imagePullPolicy"
+                            | default .Values.defaultImagePullPolicy }}
         ports:
         - name: http
           containerPort: 8000

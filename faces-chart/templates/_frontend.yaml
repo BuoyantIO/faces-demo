@@ -13,24 +13,6 @@
 {{- end -}}
 
 # params: .root for the root, .which for the name of the workload
-{{- define "partials.frontend-imagePullPolicy" -}}
-  {{- $source := index .root.Values .which -}}
-  {{- include "partials.select-key"
-      (dict "root" .root
-            "source" $source
-            "key" "imagePullPolicy") -}}
-{{- end -}}
-
-# params: .root for the root, .which for the name of the workload
-{{- define "partials.frontend-replicas" -}}
-  {{- $source := index .root.Values .which -}}
-  {{- include "partials.select-key"
-      (dict "root" .root
-            "source" $source
-            "key" "replicas") -}}
-{{- end -}}
-
-# params: .root for the root, .which for the name of the workload
 {{- define "partials.frontend-delayBuckets" -}}
   {{- $source := index .root.Values .which -}}
   {{- include "partials.select-env"
@@ -81,18 +63,6 @@
             "which" "gui") -}}
 {{- end -}}
 
-{{- define "partials.gui-imagePullPolicy" -}}
-  {{- include "partials.frontend-imagePullPolicy"
-      (dict "root" .
-            "which" "gui") -}}
-{{- end -}}
-
-{{- define "partials.gui-replicas" -}}
-  {{- include "partials.frontend-replicas"
-      (dict "root" .
-            "which" "gui") -}}
-{{- end -}}
-
 {{- define "partials.gui-affinityclause" -}}
   {{- include "partials.frontend-affinityclause"
       (dict "root" .
@@ -107,18 +77,6 @@
 
 {{- define "partials.face-image" -}}
   {{- include "partials.frontend-image"
-      (dict "root" .
-            "which" "face") -}}
-{{- end -}}
-
-{{- define "partials.face-imagePullPolicy" -}}
-  {{- include "partials.frontend-imagePullPolicy"
-      (dict "root" .
-            "which" "face") -}}
-{{- end -}}
-
-{{- define "partials.face-replicas" -}}
-  {{- include "partials.frontend-replicas"
       (dict "root" .
             "which" "face") -}}
 {{- end -}}
@@ -149,12 +107,6 @@
 
 {{- define "partials.ingress-image" -}}
   {{- include "partials.frontend-image"
-      (dict "root" .
-            "which" "ingress") -}}
-{{- end -}}
-
-{{- define "partials.ingress-imagePullPolicy" -}}
-  {{- include "partials.frontend-imagePullPolicy"
       (dict "root" .
             "which" "ingress") -}}
 {{- end -}}

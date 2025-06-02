@@ -33,7 +33,8 @@ metadata:
     faces.buoyant.io/component-type: edge
     faces.buoyant.io/component: {{ $name | quote }}
 spec:
-  replicas: {{ include "partials.face-replicas" . }}
+  replicas: {{ get .Values.face "replicas"
+               | default .Values.defaultReplicas }}
   selector:
     matchLabels:
       buoyant.io/application: faces
@@ -50,7 +51,8 @@ spec:
       containers:
       - name: {{ $name }}
         image: {{ include "partials.face-image" . }}
-        imagePullPolicy: {{ include "partials.face-imagePullPolicy" . }}
+        imagePullPolicy: {{ get .Values.face "imagePullPolicy"
+                            | default .Values.defaultImagePullPolicy }}
         ports:
         - name: http
           containerPort: 8000
