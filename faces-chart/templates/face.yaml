@@ -61,6 +61,14 @@ spec:
           value: "face"
         - name: USER_HEADER_NAME
           value: {{ .Values.authHeader | quote }}
+        - name: SMILEY_SERVICE
+          value: {{ get .Values.face "smileyService"
+                    | default "smiley"
+                    | quote }}
+        - name: COLOR_SERVICE
+          value: {{ get .Values.face "colorService"
+                    | default "color"
+                    | quote }}
         {{- include "partials.face-errorFraction" . }}
         {{- include "partials.face-delayBuckets" . }}
         {{- include "partials.face-resources" . }}

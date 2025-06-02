@@ -29,6 +29,8 @@ face:
   imagePullPolicy: ""           # If not set, uses the default imagePullPolicy
   errorFraction: "20"
   delayBuckets: ""
+  # smileyService: smiley         # Override if desired
+  # colorService: color           # Override if desired
 
 ingress:
   enabled: False                # If set to True, enables the ingress workload
