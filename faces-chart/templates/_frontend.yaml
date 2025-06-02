@@ -111,6 +111,12 @@
             "which" "ingress") -}}
 {{- end -}}
 
+{{- define "partials.ingress-affinityclause" -}}
+  {{- include "partials.frontend-affinityclause"
+      (dict "root" .
+            "which" "ingress") -}}
+{{- end -}}
+
 {{- define "partials.ingress-resources" -}}
   {{- include "partials.frontend-resources"
       (dict "root" .

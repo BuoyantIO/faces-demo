@@ -44,6 +44,7 @@ spec:
         faces.buoyant.io/component-type: edge
         faces.buoyant.io/component: faces-gui
     spec:
+      {{ include "partials.ingress-affinityclause" . }}
       containers:
       - name: face
         image: {{ include "partials.ingress-image" . }}
