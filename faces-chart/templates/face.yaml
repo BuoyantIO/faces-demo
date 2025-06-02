@@ -57,8 +57,6 @@ spec:
         - name: http
           containerPort: 8000
         env:
-        - name: FACES_SERVICE
-          value: "face"
         - name: USER_HEADER_NAME
           value: {{ .Values.authHeader | quote }}
         - name: SMILEY_SERVICE

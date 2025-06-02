@@ -54,8 +54,6 @@ spec:
         - name: http
           containerPort: 8000
         env:
-        - name: FACES_SERVICE
-          value: "ingress"
         - name: USER_HEADER_NAME
           value: {{ .Values.authHeader | quote }}
         - name: CELL_SERVICE

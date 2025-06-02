@@ -125,8 +125,6 @@ spec:
         - name: http
           containerPort: 8000
         env:
-        - name: FACES_SERVICE
-          value: {{ .workload | quote }}
         - name: USER_HEADER_NAME
           value: {{ .root.Values.authHeader | quote }}
         {{- if index $info .workload }}
