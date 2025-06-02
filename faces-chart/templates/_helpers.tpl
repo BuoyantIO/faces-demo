@@ -112,3 +112,28 @@
         {{- end -}}
   {{- end -}}
 {{- end -}}
+
+# params: .requests and .limits
+{{- define "partials.resources" -}}
+  {{- if or .requests .limits }}
+        resources:
+          {{- if .requests }}
+          requests:
+            {{- if hasKey .requests "cpu" }}
+            cpu: {{ .requests.cpu | quote }}
+            {{- end }}
+            {{- if hasKey .requests "memory" }}
+            memory: {{ .requests.memory | quote }}
+            {{- end }}
+          {{- end }}
+          {{- if .limits }}
+          limits:
+            {{- if hasKey .limits "cpu" }}
+            cpu: {{ .limits.cpu | quote }}
+            {{- end }}
+            {{- if hasKey .limits "memory" }}
+            memory: {{ .limits.memory | quote }}
+            {{- end }}
+          {{- end }}
+  {{- end }}
+{{- end -}}

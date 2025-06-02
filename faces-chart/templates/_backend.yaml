@@ -14,20 +14,6 @@
 {{- end -}}
 
 # params: .root for the root, .which for the name of the workload
-{{- define "partials.backend-imagePullPolicy" -}}
-  {{- $source := index .root.Values .which -}}
-  {{- include "partials.select-key"
-      (dict "root" .root "source" $source "key" "imagePullPolicy" "default" .root.Values.backend) -}}
-{{- end -}}
-
-# params: .root for the root, .which for the name of the workload
-{{- define "partials.backend-replicas" -}}
-  {{- $source := index .root.Values .which -}}
-  {{- include "partials.select-key"
-      (dict "root" .root "source" $source "key" "replicas" "default" .root.Values.backend) -}}
-{{- end -}}
-
-# params: .root for the root, .which for the name of the workload
 {{- define "partials.backend-delayBuckets" -}}
   {{- $source := index .root.Values .which -}}
   {{- include "partials.select-env"
@@ -36,6 +22,19 @@
             "key" "delayBuckets"
             "name" "DELAY_BUCKETS"
             "default" .root.Values.backend) -}}
+{{- end -}}
+
+# params: .root for the root, .which for the name of the workload
+{{- define "partials.backend-resources" -}}
+  {{- $source := index .root.Values .which -}}
+  {{- $requests := get $source "requests"
+                   | default (.root.Values.backend).requests
+                   | default (.root.Values).defaultRequests -}}
+  {{- $limits := get $source "limits"
+                 | default (.root.Values.backend).limits
+                 | default (.root.Values).defaultLimits -}}
+  {{- include "partials.resources" (dict "requests" $requests
+                                        "limits" $limits) }}
 {{- end -}}
 
 # params: .root for the root, .which for the name of the workload
@@ -100,7 +99,9 @@ metadata:
     faces.buoyant.io/component-type: backend
     faces.buoyant.io/component: {{ .name | quote }}
 spec:
-  replicas: {{ include "partials.backend-replicas" (dict "root" .root "which" .name) }}
+  replicas: {{ get $info "replicas"
+                | default (.root.Values.backend).replicas
+                | default (.root.Values).defaultReplicas }}
   selector:
     matchLabels:
       buoyant.io/application: faces
@@ -117,7 +118,9 @@ spec:
       containers:
       - name: {{ .name | quote }}
         image: {{ include "partials.backend-image" (dict "root" .root "which" .name) }}
-        imagePullPolicy: {{ include "partials.backend-imagePullPolicy" (dict "root" .root "which" .name) }}
+        imagePullPolicy: {{ get $info "imagePullPolicy"
+                            | default (.root.Values.backend).imagePullPolicy
+                            | default (.root.Values).defaultImagePullPolicy }}
         ports:
         - name: http
           containerPort: 8000
@@ -132,13 +135,7 @@ spec:
         {{- end -}}
         {{- include "partials.backend-delayBuckets" (dict "root" .root "which" .name) }}
         {{- include "partials.backend-errorFraction" (dict "root" .root "which" .name) }}
-        resources:
-          requests:
-            cpu: 100m
-            memory: 64Mi
-          # limits:
-          #   cpu: 250m
-          #   memory: 128Mi
+        {{ include "partials.backend-resources" (dict "root" .root "which" .name) }}
 {{- end -}}
 {{- end -}}
 {{- end -}}

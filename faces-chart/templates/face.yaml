@@ -33,7 +33,8 @@ metadata:
     faces.buoyant.io/component-type: edge
     faces.buoyant.io/component: {{ $name | quote }}
 spec:
-  replicas: {{ include "partials.face-replicas" . }}
+  replicas: {{ get .Values.face "replicas"
+               | default .Values.defaultReplicas }}
   selector:
     matchLabels:
       buoyant.io/application: faces
@@ -50,7 +51,8 @@ spec:
       containers:
       - name: {{ $name }}
         image: {{ include "partials.face-image" . }}
-        imagePullPolicy: {{ include "partials.face-imagePullPolicy" . }}
+        imagePullPolicy: {{ get .Values.face "imagePullPolicy"
+                            | default .Values.defaultImagePullPolicy }}
         ports:
         - name: http
           containerPort: 8000
@@ -59,12 +61,14 @@ spec:
           value: "face"
         - name: USER_HEADER_NAME
           value: {{ .Values.authHeader | quote }}
+        - name: SMILEY_SERVICE
+          value: {{ get .Values.face "smileyService"
+                    | default "smiley"
+                    | quote }}
+        - name: COLOR_SERVICE
+          value: {{ get .Values.face "colorService"
+                    | default "color"
+                    | quote }}
         {{- include "partials.face-errorFraction" . }}
         {{- include "partials.face-delayBuckets" . }}
-        resources:
-          requests:
-            cpu: 300m     # The face service doesn't need much memory, but it does need more
-            memory: 64Mi  # CPU than the other backend services since it has to call the
-          # limits:         # face and smiley services, then composite the results.
-          #   cpu: 500m
-          #   memory: 128Mi
+        {{- include "partials.face-resources" . }}

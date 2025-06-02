@@ -30,7 +30,8 @@ metadata:
     faces.buoyant.io/component-type: edge
     faces.buoyant.io/component: faces-gui
 spec:
-  replicas: 1
+  replicas: {{ get .Values.ingress "replicas"
+               | default .Values.defaultReplicas }}
   selector:
     matchLabels:
       buoyant.io/application: faces
@@ -43,10 +44,12 @@ spec:
         faces.buoyant.io/component-type: edge
         faces.buoyant.io/component: faces-gui
     spec:
+      {{ include "partials.ingress-affinityclause" . }}
       containers:
       - name: face
         image: {{ include "partials.ingress-image" . }}
-        imagePullPolicy: {{ include "partials.ingress-imagePullPolicy" . }}
+        imagePullPolicy: {{ get .Values.ingress "imagePullPolicy"
+                            | default .Values.defaultImagePullPolicy }}
         ports:
         - name: http
           containerPort: 8000
@@ -57,11 +60,5 @@ spec:
           value: {{ .Values.authHeader | quote }}
         - name: CELL_SERVICE
           value: {{ .Values.ingress.cellService | quote }}
-        resources:
-          requests:
-            cpu: 100m
-            memory: 64Mi
-          # limits:
-          #   cpu: 250m
-          #   memory: 128Mi
+        {{- include "partials.ingress-resources" . }}
 {{- end -}}

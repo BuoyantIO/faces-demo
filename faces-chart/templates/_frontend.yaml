@@ -13,24 +13,6 @@
 {{- end -}}
 
 # params: .root for the root, .which for the name of the workload
-{{- define "partials.frontend-imagePullPolicy" -}}
-  {{- $source := index .root.Values .which -}}
-  {{- include "partials.select-key"
-      (dict "root" .root
-            "source" $source
-            "key" "imagePullPolicy") -}}
-{{- end -}}
-
-# params: .root for the root, .which for the name of the workload
-{{- define "partials.frontend-replicas" -}}
-  {{- $source := index .root.Values .which -}}
-  {{- include "partials.select-key"
-      (dict "root" .root
-            "source" $source
-            "key" "replicas") -}}
-{{- end -}}
-
-# params: .root for the root, .which for the name of the workload
 {{- define "partials.frontend-delayBuckets" -}}
   {{- $source := index .root.Values .which -}}
   {{- include "partials.select-env"
@@ -59,6 +41,17 @@
             "which" .which) -}}
 {{- end -}}
 
+# params: .root for the root, .which for the name of the workload
+{{- define "partials.frontend-resources" -}}
+  {{- $source := index .root.Values .which -}}
+  {{- $requests := get $source "requests"
+                   | default (.root.Values).defaultRequests -}}
+  {{- $limits := get $source "limits"
+                 | default (.root.Values).defaultLimits -}}
+  {{- include "partials.resources" (dict "requests" $requests
+                                        "limits" $limits) }}
+{{- end -}}
+
 # We use all the above to provide nicer helpers for each of the workloads.
 # Given that the frontend workloads are all different enough that it's not
 # worth having the equivalent of partials-backend, we need to include a lot
@@ -70,20 +63,14 @@
             "which" "gui") -}}
 {{- end -}}
 
-{{- define "partials.gui-imagePullPolicy" -}}
-  {{- include "partials.frontend-imagePullPolicy"
-      (dict "root" .
-            "which" "gui") -}}
-{{- end -}}
-
-{{- define "partials.gui-replicas" -}}
-  {{- include "partials.frontend-replicas"
-      (dict "root" .
-            "which" "gui") -}}
-{{- end -}}
-
 {{- define "partials.gui-affinityclause" -}}
   {{- include "partials.frontend-affinityclause"
+      (dict "root" .
+            "which" "gui") -}}
+{{- end -}}
+
+{{- define "partials.gui-resources" -}}
+  {{- include "partials.frontend-resources"
       (dict "root" .
             "which" "gui") -}}
 {{- end -}}
@@ -94,20 +81,14 @@
             "which" "face") -}}
 {{- end -}}
 
-{{- define "partials.face-imagePullPolicy" -}}
-  {{- include "partials.frontend-imagePullPolicy"
-      (dict "root" .
-            "which" "face") -}}
-{{- end -}}
-
-{{- define "partials.face-replicas" -}}
-  {{- include "partials.frontend-replicas"
-      (dict "root" .
-            "which" "face") -}}
-{{- end -}}
-
 {{- define "partials.face-affinityclause" -}}
   {{- include "partials.frontend-affinityclause"
+      (dict "root" .
+            "which" "face") -}}
+{{- end -}}
+
+{{- define "partials.face-resources" -}}
+  {{- include "partials.frontend-resources"
       (dict "root" .
             "which" "face") -}}
 {{- end -}}
@@ -130,8 +111,14 @@
             "which" "ingress") -}}
 {{- end -}}
 
-{{- define "partials.ingress-imagePullPolicy" -}}
-  {{- include "partials.frontend-imagePullPolicy"
+{{- define "partials.ingress-affinityclause" -}}
+  {{- include "partials.frontend-affinityclause"
+      (dict "root" .
+            "which" "ingress") -}}
+{{- end -}}
+
+{{- define "partials.ingress-resources" -}}
+  {{- include "partials.frontend-resources"
       (dict "root" .
             "which" "ingress") -}}
 {{- end -}}
