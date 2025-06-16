@@ -28,6 +28,15 @@ type SmileyProvider struct {
 	smiley string
 }
 
+func (sprv *SmileyProvider) SetSmiley(smileyName string) {
+	sprv.Key = smileyName
+	sprv.smiley = utils.Smileys.Lookup(smileyName)
+
+	smileyNameUsed := utils.Smileys.LookupValue(sprv.smiley)
+
+	sprv.Infof("Using smiley %s", smileyNameUsed)
+}
+
 func NewSmileyProviderFromEnvironment() *SmileyProvider {
 	sprv := &SmileyProvider{
 		BaseProvider: BaseProvider{
@@ -43,13 +52,8 @@ func NewSmileyProviderFromEnvironment() *SmileyProvider {
 
 	sprv.BaseProvider.SetupFromEnvironment()
 
-	smileyName := utils.StringFromEnv("SMILEY", "Grinning")
-	sprv.Key = smileyName
-	sprv.smiley = utils.Smileys.Lookup(smileyName)
+	sprv.SetSmiley(utils.StringFromEnv("SMILEY", "Grinning"))
 
-	smileyNameUsed := utils.Smileys.LookupValue(sprv.smiley)
-
-	sprv.Infof("Using smiley %s", smileyNameUsed)
 	return sprv
 }
 

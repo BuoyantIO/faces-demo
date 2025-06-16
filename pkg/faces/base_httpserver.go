@@ -31,13 +31,20 @@ type BaseHTTPServer struct {
 	mux      *http.ServeMux
 }
 
-func NewBaseHTTPServer(provider *BaseProvider) *BaseHTTPServer {
-	bsrv := &BaseHTTPServer{provider: provider}
+func NewBaseHTTPServerNoMux(provider *BaseProvider) *BaseHTTPServer {
+	// This is a constructor for the BaseHTTPServer that does not create a new ServeMux.
+	// This is useful if you want to use a custom ServeMux or if you want to add
+	// additional handlers to the BaseHTTPServer after it has been created.
+	return &BaseHTTPServer{provider: provider}
+}
 
-	bsrv.mux = http.NewServeMux()
-	bsrv.mux.HandleFunc("/", bsrv.handleRequest)
+func NewBaseHTTPServer(provider *BaseProvider) *BaseHTTPServer {
+	bsrv := NewBaseHTTPServerNoMux(provider)
 
 	provider.SetHTTPGetHandler(bsrv.defaultGetHandler)
+
+	bsrv.mux = http.NewServeMux()
+	bsrv.mux.HandleFunc("/", bsrv.HandleRequest)
 
 	return bsrv
 }
@@ -53,7 +60,7 @@ func (bsrv *BaseHTTPServer) Start(addr string) error {
 	return httpServer.ListenAndServe()
 }
 
-func (bsrv *BaseHTTPServer) handleRequest(w http.ResponseWriter, r *http.Request) {
+func (bsrv *BaseHTTPServer) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodHead {
 		bsrv.StandardResponse(w, r, ProviderResponseEmpty())
 	} else if r.Method == http.MethodGet {

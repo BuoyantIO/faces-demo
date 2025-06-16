@@ -226,29 +226,13 @@ func (bprv *BaseProvider) SetupBasicsFromEnvironment() {
 	bprv.Infof("debug_enabled %v", bprv.debugEnabled)
 }
 
-func (bprv *BaseProvider) SetupFromEnvironment() {
-	bprv.SetupBasicsFromEnvironment()
-
-	delayBucketsStr := utils.StringFromEnv("DELAY_BUCKETS", "")
-
-	if delayBucketsStr != "" {
-		delayBuckets := strings.Split(delayBucketsStr, ",")
-		for _, bucketStr := range delayBuckets {
-			bucket, err := strconv.Atoi(bucketStr)
-			if err == nil {
-				if bucket < 0 {
-					bucket = 0
-				}
-
-				bprv.delayBuckets = append(bprv.delayBuckets, bucket)
-			}
-		}
-	}
-
-	bprv.errorFraction = utils.PercentageFromEnv("ERROR_FRACTION", 0)
-	bprv.latchFraction = utils.PercentageFromEnv("LATCH_FRACTION", 0)
-
-	bprv.maxRate = utils.FloatFromEnv("MAX_RATE", 0.0)
+// SetupFromConstants sets up the BaseProvider using provided constants instead of environment variables.
+// delayBuckets is a slice of delay values in milliseconds.
+func (bprv *BaseProvider) SetupFromConstants(errorFraction int, latchFraction int, maxRate float64, delayBuckets []int) {
+	bprv.errorFraction = errorFraction
+	bprv.latchFraction = latchFraction
+	bprv.maxRate = maxRate
+	bprv.delayBuckets = delayBuckets
 
 	if bprv.maxRate >= 0.1 {
 		bprv.rateCounter = utils.NewRateCounter(10)
@@ -258,6 +242,33 @@ func (bprv *BaseProvider) SetupFromEnvironment() {
 	bprv.Infof("error_fraction %d", bprv.errorFraction)
 	bprv.Infof("latch_fraction %d", bprv.latchFraction)
 	bprv.Infof("max_rate %f", bprv.maxRate)
+}
+
+func (bprv *BaseProvider) SetupFromEnvironment() {
+	bprv.SetupBasicsFromEnvironment()
+
+	delayBucketsStr := utils.StringFromEnv("DELAY_BUCKETS", "")
+
+	var delayBuckets []int
+
+	if delayBucketsStr != "" {
+		for bucketStr := range strings.SplitSeq(delayBucketsStr, ",") {
+			bucket, err := strconv.Atoi(bucketStr)
+			if err == nil {
+				if bucket < 0 {
+					bucket = 0
+				}
+
+				delayBuckets = append(delayBuckets, bucket)
+			}
+		}
+	}
+
+	errorFraction := utils.PercentageFromEnv("ERROR_FRACTION", 0)
+	latchFraction := utils.PercentageFromEnv("LATCH_FRACTION", 0)
+	maxRate := utils.FloatFromEnv("MAX_RATE", 0.0)
+
+	bprv.SetupFromConstants(errorFraction, latchFraction, maxRate, delayBuckets)
 }
 
 // SetGetHandler sets the function that will be called to get the data for a
