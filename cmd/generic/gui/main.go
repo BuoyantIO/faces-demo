@@ -41,11 +41,9 @@ func main() {
 	port := flag.Int("port", 8000, "the port number to listen on")
 	flag.Parse()
 
-	// Order matters here: you MUST call SetHTTPGetHandler _after_
-	// creating the BaseHTTPServer. Yuck.
 	gprv := faces.NewGUIProviderFromEnvironment()
 	server := faces.NewBaseHTTPServer(&gprv.BaseProvider)
-	gprv.SetHTTPGetHandler(gprv.HTTPGetHandler)
+	server.SetHTTPGetHandler(gprv.HTTPGetHandler)
 
 	faces.StartPrometheusServer()
 

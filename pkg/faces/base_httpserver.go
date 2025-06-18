@@ -26,8 +26,11 @@ import (
 	"time"
 )
 
+type HTTPGetHandler func(w http.ResponseWriter, r *http.Request)
+
 type BaseHTTPServer struct {
 	provider *BaseProvider
+	getHandler HTTPGetHandler
 	mux      *http.ServeMux
 }
 
@@ -41,10 +44,9 @@ func NewBaseHTTPServerNoMux(provider *BaseProvider) *BaseHTTPServer {
 func NewBaseHTTPServer(provider *BaseProvider) *BaseHTTPServer {
 	bsrv := NewBaseHTTPServerNoMux(provider)
 
-	provider.SetHTTPGetHandler(bsrv.defaultGetHandler)
-
 	bsrv.mux = http.NewServeMux()
 	bsrv.mux.HandleFunc("/", bsrv.HandleRequest)
+	bsrv.getHandler = bsrv.defaultGetHandler
 
 	return bsrv
 }
@@ -60,11 +62,17 @@ func (bsrv *BaseHTTPServer) Start(addr string) error {
 	return httpServer.ListenAndServe()
 }
 
+func (bsrv *BaseHTTPServer) SetHTTPGetHandler(handler HTTPGetHandler) {
+	// SetHTTPGetHandler allows you to set a custom HTTP GET handler for the BaseHTTP
+	// Server. This is useful if you want to handle GET requests in a specific way.
+	bsrv.getHandler = handler
+}
+
 func (bsrv *BaseHTTPServer) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodHead {
 		bsrv.StandardResponse(w, r, ProviderResponseEmpty())
 	} else if r.Method == http.MethodGet {
-		bsrv.provider.httpGetHandler(w, r)
+		bsrv.getHandler(w, r)
 	} else {
 		bsrv.StandardResponse(w, r, ProviderResponseMethodNotAllowed(r.Method))
 	}

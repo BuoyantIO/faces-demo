@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -31,6 +30,29 @@ import (
 
 	"github.com/BuoyantIO/faces-demo/v2/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
+
+type HTTPStatus int
+
+const (
+	HTTPStatusOK HTTPStatus = iota + 200
+
+	// 4xx Client Error
+	HTTPStatusBadRequest           HTTPStatus = 400
+	HTTPStatusUnauthorized         HTTPStatus = 401
+	HTTPStatusForbidden            HTTPStatus = 403
+	HTTPStatusNotFound             HTTPStatus = 404
+	HTTPStatusMethodNotAllowed     HTTPStatus = 405
+	HTTPStatusTooManyRequests      HTTPStatus = 429
+
+	// 5xx Server Error
+	HTTPStatusInternalServerError  HTTPStatus = 500
+	HTTPStatusNotImplemented       HTTPStatus = 501
+	HTTPStatusServiceUnavailable   HTTPStatus = 503
+	HTTPStatusGatewayTimeout       HTTPStatus = 504
+
+	// 599 is a custom status code used to indicate that the provider is latched
+	// into an error state and is not processing requests.
+	HTTPStatusLatched              HTTPStatus = 599
 )
 
 type BaseRequestStatus struct {
@@ -80,7 +102,7 @@ type ProviderResponse struct {
 
 func ProviderResponseNotImplemented() ProviderResponse {
 	return ProviderResponse{
-		StatusCode: http.StatusNotImplemented,
+		StatusCode: int(HTTPStatusNotImplemented),
 		Data: map[string]interface{}{
 			"errors": []string{"not implemented"},
 		},
@@ -89,7 +111,7 @@ func ProviderResponseNotImplemented() ProviderResponse {
 
 func ProviderResponseMethodNotAllowed(method string) ProviderResponse {
 	return ProviderResponse{
-		StatusCode: http.StatusMethodNotAllowed,
+		StatusCode: int(HTTPStatusMethodNotAllowed),
 		Data: map[string]interface{}{
 			"errors": []string{fmt.Sprintf("method %s not allowed", method)},
 		},
@@ -98,7 +120,7 @@ func ProviderResponseMethodNotAllowed(method string) ProviderResponse {
 
 func ProviderResponseEmpty() ProviderResponse {
 	return ProviderResponse{
-		StatusCode: http.StatusOK,
+		StatusCode: int(HTTPStatusOK),
 		Data:       map[string]interface{}{},
 	}
 }
@@ -144,7 +166,6 @@ type ProviderInterface interface {
 	Edge(prvReq *ProviderRequest) ProviderResponse
 }
 
-type HTTPGetHandler func(w http.ResponseWriter, r *http.Request)
 type ProviderGetHandler func(prvReq *ProviderRequest) ProviderResponse
 
 // A ProviderUpdater is a function that updates the provider's state based on external
@@ -173,7 +194,6 @@ type BaseProvider struct {
 	hostName           string
 	debugEnabled       bool
 	providerGetHandler ProviderGetHandler
-	httpGetHandler     HTTPGetHandler
 
 	updater  ProviderUpdater
 	preHook  ProviderHook
@@ -277,14 +297,6 @@ func (bprv *BaseProvider) SetGetHandler(handler ProviderGetHandler) {
 	bprv.providerGetHandler = handler
 }
 
-// SetHTTPGetHandler sets the function that will be called to handle HTTP GET
-// requests. This is lower-level than SetGetHandler; the default HTTP GET handler
-// calls the provider-level Get handler (set with SetGetHandler) for requests
-// that don't trip the error fraction or get rate limited.
-func (bprv *BaseProvider) SetHTTPGetHandler(handler HTTPGetHandler) {
-	bprv.httpGetHandler = handler
-}
-
 func (bprv *BaseProvider) SetUpdater(updater ProviderUpdater) {
 	bprv.updater = updater
 }
@@ -386,7 +398,7 @@ func (bprv *BaseProvider) CheckRequestStatus() *BaseRequestStatus {
 	rstat := &BaseRequestStatus{
 		// It's true that not every provider uses HTTP, but we're going
 		// to use the HTTP status codes as a common way to signal errors.
-		statusCode: http.StatusOK,
+		statusCode: int(HTTPStatusOK),
 	}
 
 	start := time.Now()
@@ -467,7 +479,7 @@ func (bprv *BaseProvider) HandleRequest(start time.Time, prvReq *ProviderRequest
 	if rstat.IsRateLimited() {
 		bprv.Debugf("RATELIMIT(%s) => %s", prvReq.InfoStr(), rstat.Message())
 
-		resp.StatusCode = http.StatusTooManyRequests
+		resp.StatusCode = int(HTTPStatusTooManyRequests)
 		resp.AddError(rstat.Message())
 	} else if rstat.IsErrored() {
 		msg := rstat.Message()
@@ -490,7 +502,7 @@ func (bprv *BaseProvider) HandleRequest(start time.Time, prvReq *ProviderRequest
 			dataJSON = []byte("{????}")
 		}
 
-		if resp.StatusCode == http.StatusOK {
+		if resp.StatusCode == int(HTTPStatusOK) {
 			bprv.Debugf("OK(%s) => %d, %s", prvReq.InfoStr(), resp.StatusCode, string(dataJSON))
 		} else {
 			bprv.Debugf("FAIL(%s) => %d, %s", prvReq.InfoStr(), resp.StatusCode, string(dataJSON))
