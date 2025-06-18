@@ -1,3 +1,4 @@
+use phf;
 use rand::Rng;
 use serde;
 use serde_json;
@@ -7,6 +8,25 @@ use std::time::Duration;
 use wasmcloud_component::http;
 use wasmcloud_component::http::StatusCode;
 use wasmcloud_component::wasi;
+
+/// A static map of smiley names to their corresponding HTML-encoded
+/// Unicode values.
+static SMILEYS: phf::Map<&'static str, &'static str> = phf::phf_map! {
+    "Grinning"    => "&#x1F603;",
+    "Sleeping"    => "&#x1F634;",
+    "Cursing"     => "&#x1F92C;",
+    "Kaboom"      => "&#x1F92F;",
+    "HeartEyes"   => "&#x1F60D;",
+    "Neutral"     => "&#x1F610;",
+    "RollingEyes" => "&#x1F644;",
+    "Screaming"   => "&#x1F631;",
+    "Vomiting"    => "&#x1F92E;",
+};
+
+/// Returns the HTML-encoded Unicode value for a given smiley name, or None if not found.
+fn get_smiley(name: &str) -> &'static str {
+    SMILEYS.get(name).copied().unwrap_or("&#x1F92E;")
+}
 
 struct Component {
     error_fraction: u32,
@@ -171,7 +191,7 @@ impl http::Server for Component {
             method: _request.method().to_string(),
             path: _request.uri().path().to_string(),
             status: status.as_u16(),
-            smiley: "grinning".to_string(),
+            smiley: get_smiley("Grinning").to_string(),
         };
 
         let body_str = serde_json::to_string(&body).unwrap();
