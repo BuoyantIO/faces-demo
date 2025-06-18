@@ -21,6 +21,7 @@ static SMILEYS: phf::Map<&'static str, &'static str> = phf::phf_map! {
     "RollingEyes" => "&#x1F644;",
     "Screaming"   => "&#x1F631;",
     "Vomiting"    => "&#x1F92E;",
+    "Rusty"       => "&#x1F980;",
 };
 
 /// Returns the HTML-encoded Unicode value for a given smiley name, or None if not found.
@@ -29,6 +30,7 @@ fn get_smiley(name: &str) -> &'static str {
 }
 
 struct Component {
+    smiley: &'static str,
     error_fraction: u32,
     delay_buckets: Vec<u32>,
 }
@@ -79,10 +81,20 @@ impl Default for Component {
             })
             .unwrap_or_else(Vec::new);
 
+        // Read SMILEY from wasi:config (default to "Rusty")
+        let smiley_name = wasi::config::store::get("SMILEY")
+            .ok()
+            .and_then(|opt| opt)
+            .unwrap_or("Rusty".to_string());
+
+        let smiley = get_smiley(&smiley_name);
+
         println!("Configured with ERROR_FRACTION: {}", error_fraction);
         println!("Configured with DELAY_BUCKETS: {:?}", delay_buckets);
+        println!("Configured with SMILEY {}: {}", smiley_name, smiley);
 
         Component {
+            smiley,
             error_fraction,
             delay_buckets,
         }
@@ -191,7 +203,7 @@ impl http::Server for Component {
             method: _request.method().to_string(),
             path: _request.uri().path().to_string(),
             status: status.as_u16(),
-            smiley: get_smiley("Grinning").to_string(),
+            smiley: component.smiley.to_string(),
         };
 
         let body_str = serde_json::to_string(&body).unwrap();

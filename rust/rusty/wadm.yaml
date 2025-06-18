@@ -15,18 +15,18 @@ spec:
     - name: http-component
       type: component
       properties:
-        image: ghcr.io/ricochet/components/rusty:0.1.0
+        image: ghcr.io/BuoyantIO/faces-components/rusty:0.1.1
+        # image: ghcr.io/ricochet/components/rusty:0.1.0
         # image: file://./build/http_hello_world_s.wasm
-        # To use the a precompiled version of this component, use the line below instead:
-        # image: ghcr.io/wasmcloud/components/rusty-rust:0.1.0
       traits:
         # Govern the spread/scheduling of the component
         - type: daemonscaler
           properties:
             replicas: 100
-      config: 
+      config:
         - name: custom-config
-          properties: 
+          properties:
+            SMILEY: HeartEyes
             ERROR_FRACTION: 1
             DELAY_BUCKETS: 5,10,20
 
@@ -46,12 +46,12 @@ spec:
               config:
               - name: wasi-http-config
                 properties:
-                  address: 127.0.0.1:8000
+                  address: 0.0.0.0:8000
             target:
               name: http-component
-        # When running the application on Kubernetes with the wasmCloud operator, 
-        # the operator automatically creates a Kubernetes service for applications that use 
+        # When running the application on Kubernetes with the wasmCloud operator,
+        # the operator automatically creates a Kubernetes service for applications that use
         # the httpserver provider with a daemonscaler.
-        - type: daemonscaler
+        - type: spreadscaler
           properties:
             replicas: 1
