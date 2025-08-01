@@ -158,7 +158,7 @@ helm upgrade -i faces -n faces \
 
 Split smiley 50/50 between the two services:
 
-```
+```sh
 cat <<EOF | kubectl -n faces apply -f -
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -186,7 +186,7 @@ EOF
 
 Split the colors between two services:
 
-```
+```sh
 cat <<EOF | kubectl -n faces apply -f -
 ---
 apiVersion: gateway.networking.k8s.io/v1
@@ -216,10 +216,10 @@ spec:
 EOF
 ```
 
-Now put one color service on the egde, and one in the center:
+Now put one color service on the edge, and one in the center:
 
 
-```
+```sh
 cat <<EOF | kubectl -n faces apply -f -
 ---
 apiVersion: gateway.networking.k8s.io/v1
@@ -258,9 +258,9 @@ spec:
 EOF
 ```
 
-Now put one smiley service on the egde, and one in the center:
+Now put one smiley service on the edge, and one in the center:
 
-```
+```sh
 cat <<EOF | kubectl -n faces apply -f -
 ---
 apiVersion: gateway.networking.k8s.io/v1
