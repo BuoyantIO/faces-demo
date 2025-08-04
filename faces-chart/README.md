@@ -44,21 +44,37 @@ You can customize the demo using Helm `--set` flags or by creating a `values.yam
 
 ### GUI
 
-| Parameter         | Description                                            | Default                       |
-| ----------------- | ------------------------------------------------------ | ----------------------------- |
-| `gui.imageName`   | GUI image name                                         | `ghcr.io/buoyantio/faces-gui` |
-| `gui.imageTag`    | GUI image tag                                          | Uses `defaultImageTag`        |
-| `gui.serviceType` | Service type (`ClusterIP`, `NodePort`, `LoadBalancer`) | `ClusterIP`                   |
+| Parameter                | Description                                            | Default                       |
+| ------------------------ | ------------------------------------------------------ | ----------------------------- |
+| `gui.image`              | GUI image                                              | ` `                           |
+| `gui.imageName`          | GUI image name                                         | `ghcr.io/buoyantio/faces-gui` |
+| `gui.imageTag`           | GUI image tag                                          | Uses `defaultImageTag`        |
+| `gui.imagePullPolicy`    | GUI pull policy                                        | `IfNotPresent`       |
+| `gui.replicas`           | Replica count                                          | `defaultReplicas`             |
+| `gui.serviceType`        | Service type (`ClusterIP`, `NodePort`, `LoadBalancer`) | `ClusterIP`                   |
 
 ### Face
 
 | Parameter            | Description                        | Default                        |
 | -------------------- | ---------------------------------- | ------------------------------ |
-| `face.imageName`     | Face backend image                 | `ghcr.io/buoyantio/faces-face` |
+| `face.image`         | Face backend image                     | ` `                            |
+| `face.imageName`     | Face backend image name                | `ghcr.io/buoyantio/faces-face` |
+| `face.imagePullPolicy`     | Face pull policy                | `IfNotPresent` |
 | `face.errorFraction` | % of requests that fail (0–100)    | `20`                           |
 | `face.delayBuckets`  | Comma-separated delay values in ms | *not set*                      |
 | `face.smileyService` | Name of smiley service to call     | `smiley`                       |
 | `face.colorService`  | Name of color service to call      | `color`                        |
+
+### Ingress
+
+| Parameter                  | Description                        | Default                        |
+| -------------------------- | ---------------------------------- | ------------------------------ |
+| `ingress.enabled`          | Enabled Ingress workload           | `False`                        |
+| `ingress.image`            | Ingress image                      | ` `                            |
+| `ingress.imageName`        | Ingress image name                 | `ghcr.io/buoyantio/faces-ingress` |
+| `ingress.imageTag`         | Ingress tag name                   | ` `                            |
+| `ingress.imagePullPolicy`  | Ingress pull policy                | `IfNotPresent`                 |
+| `ingress.cellService`      | Name of cell service to call       | `cell`                         |
 
 ### Backend
 
@@ -70,6 +86,28 @@ You can customize the demo using Helm `--set` flags or by creating a `values.yam
 **`delayBuckets`** lets you simulate random latency by specifying a list of delays (in milliseconds). On each request, the app randomly picks one of the values and pauses for that duration before responding. This helps test how your system handles slow or delayed services.
 
 ### Smiley / Color Variants
+
+#### Smiley
+
+| Key                                | Description                                          | Default                 |
+| ---------------------------------- | ---------------------------------------------------- | ----------------------- |
+| `smiley.enabled`                   | Whether to deploy this workload                      | `true`                  |
+| `smiley.smiley`                    | Emoji name to return                                 | `Grinning`              |
+| `smiley.imageName`                 | Image (defaults to `ghcr.io/buoyantio/faces-smiley`) |                         |
+| `smiley.imageTag`                  | Tag for image                                        | *optional*              |
+| `smiley.errorFraction`             | Failure percentage                                   | `backend.errorFraction` |
+| `smiley.delayBuckets`              | Delay buckets                                        | `backend.delayBuckets`  |
+
+#### Color
+
+| Key                               | Description                                         | Default                 |
+| --------------------------------- | --------------------------------------------------- | ----------------------- |
+| `color.enabled`                   | Whether to deploy this workload                     | `true`                  |
+| `color.color`                     | Name of the color to return (e.g. `blue`)           | `lightblue`             |
+| `color.imageName`                 | Image (defaults to `ghcr.io/buoyantio/faces-color`) |                         |
+| `color.imageTag`                  | Tag for image                                       | *optional*              |
+| `color.errorFraction`             | Failure percentage                                  | `backend.errorFraction` |
+| `color.delayBuckets`              | Delay buckets                                       | `backend.delayBuckets`  |
 
 You can enable up to three smiley and color services:
 
@@ -140,7 +178,7 @@ Install Faces with a red background, heart-eyes smiley, and 50% error rate:
 ```sh
 helm install faces -n faces \
   oci://ghcr.io/buoyantio/faces-chart --version 2.0.0 \
-  --set color.color="#ff0000" \
+  --set color.color="#073359" \
   --set smiley.smiley="HeartEyes" \
   --set face.errorFraction=50
 ```
@@ -150,6 +188,9 @@ Enable second smiley and color services:
 ```sh
 helm upgrade -i faces -n faces \
   oci://ghcr.io/buoyantio/faces-chart --version 2.0.0 \
+  --set color.color="#073359" \
+  --set smiley.smiley="HeartEyes" \
+  --set face.errorFraction=50
   --set smiley2.enabled=true \
   --set smiley2.smiley="RollingEyes" \
   --set color2.enabled=true \
