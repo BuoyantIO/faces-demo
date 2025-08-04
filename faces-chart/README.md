@@ -27,6 +27,13 @@ kubectl port-forward -n faces svc/faces-gui 8080:80
 open http://localhost:8080
 ```
 
+If you have LoadBalancing capabilities, set `gui.serviceType` to `LoadBalancer` to access the GUI via the load balancer it creates:
+
+```sh
+helm install faces -n faces \
+  oci://ghcr.io/buoyantio/faces-chart --version 2.0.0 --set gui.serviceType=LoadBalancer
+```
+
 ---
 
 ## Configuration
@@ -49,34 +56,32 @@ You can customize the demo using Helm `--set` flags or by creating a `values.yam
 | `gui.image`              | GUI image                                              | ` `                           |
 | `gui.imageName`          | GUI image name                                         | `ghcr.io/buoyantio/faces-gui` |
 | `gui.imageTag`           | GUI image tag                                          | Uses `defaultImageTag`        |
-| `gui.imagePullPolicy`    | GUI pull policy                                        | `IfNotPresent`       |
-| `gui.replicas`           | Replica count                                          | `defaultReplicas`             |
+| `gui.imagePullPolicy`    | GUI pull policy                                        | `IfNotPresent`                |
+| `gui.replicas`           | Replica count                                          | `1`                           |
 | `gui.serviceType`        | Service type (`ClusterIP`, `NodePort`, `LoadBalancer`) | `ClusterIP`                   |
+
+> **Note:** 
+> If you set gui.image, the chart uses that exact image (including tag).
+> If you leave gui.image empty, the chart will build the image reference by combining gui.imageName and gui.imageTag.
+> If you don’t set gui.imageTag, it falls back to defaultImageTag (which defaults to the chart version).
 
 ### Face
 
-| Parameter            | Description                        | Default                        |
-| -------------------- | ---------------------------------- | ------------------------------ |
-| `face.image`         | Face backend image                     | ` `                            |
-| `face.imageName`     | Face backend image name                | `ghcr.io/buoyantio/faces-face` |
-| `face.imagePullPolicy`     | Face pull policy                | `IfNotPresent` |
-| `face.errorFraction` | % of requests that fail (0–100)    | `20`                           |
-| `face.delayBuckets`  | Comma-separated delay values in ms | *not set*                      |
-| `face.smileyService` | Name of smiley service to call     | `smiley`                       |
-| `face.colorService`  | Name of color service to call      | `color`                        |
+| Parameter              | Description                        | Default                        |
+| ---------------------- | ---------------------------------- | ------------------------------ |
+| `face.image`           | Face backend image                 | ` `                            |
+| `face.imageName`       | Face backend image name            | `ghcr.io/buoyantio/faces-face` |
+| `face.imagePullPolicy` | Face pull policy                   | `IfNotPresent`                 |
+| `face.errorFraction`   | % of requests that fail (0–100)    | `20`                           |
+| `face.delayBuckets`    | Comma-separated delay values in ms | *not set*                      |
+| `face.smileyService`   | Name of smiley service to call     | `smiley`                       |
+| `face.colorService`    | Name of color service to call      | `color`                        |
 
-### Ingress
+### Smiley / Color Variants
 
-| Parameter                  | Description                        | Default                        |
-| -------------------------- | ---------------------------------- | ------------------------------ |
-| `ingress.enabled`          | Enabled Ingress workload           | `False`                        |
-| `ingress.image`            | Ingress image                      | ` `                            |
-| `ingress.imageName`        | Ingress image name                 | `ghcr.io/buoyantio/faces-ingress` |
-| `ingress.imageTag`         | Ingress tag name                   | ` `                            |
-| `ingress.imagePullPolicy`  | Ingress pull policy                | `IfNotPresent`                 |
-| `ingress.cellService`      | Name of cell service to call       | `cell`                         |
+#### Backend
 
-### Backend
+The `backend` section sets the defaults for all the `smily` and `color variants. Each one can be overwritten.
 
 | Parameter               | Description                             | Default                        |
 | ----------------------- | --------------------------------------- | ------------------------------ |
@@ -85,29 +90,27 @@ You can customize the demo using Helm `--set` flags or by creating a `values.yam
 
 **`delayBuckets`** lets you simulate random latency by specifying a list of delays (in milliseconds). On each request, the app randomly picks one of the values and pauses for that duration before responding. This helps test how your system handles slow or delayed services.
 
-### Smiley / Color Variants
-
 #### Smiley
 
-| Key                                | Description                                          | Default                 |
-| ---------------------------------- | ---------------------------------------------------- | ----------------------- |
-| `smiley.enabled`                   | Whether to deploy this workload                      | `true`                  |
-| `smiley.smiley`                    | Emoji name to return                                 | `Grinning`              |
-| `smiley.imageName`                 | Image (defaults to `ghcr.io/buoyantio/faces-smiley`) |                         |
-| `smiley.imageTag`                  | Tag for image                                        | *optional*              |
-| `smiley.errorFraction`             | Failure percentage                                   | `backend.errorFraction` |
-| `smiley.delayBuckets`              | Delay buckets                                        | `backend.delayBuckets`  |
+| Key                                | Description                         | Default                          |
+| ---------------------------------- | ----------------------------------- | -------------------------------- |
+| `smiley.enabled`                   | Whether to deploy this workload     | `true`                           |
+| `smiley.smiley`                    | Emoji name to return                | `Grinning`                       |
+| `smiley.imageName`                 | Smiley image name                   | `ghcr.io/buoyantio/faces-smiley` |
+| `smiley.imageTag`                  | Tag for image                       | *optional*                       |
+| `smiley.errorFraction`             | Failure percentage                  | `backend.errorFraction`          |
+| `smiley.delayBuckets`              | Delay buckets                       | `backend.delayBuckets`           |
 
 #### Color
 
-| Key                               | Description                                         | Default                 |
-| --------------------------------- | --------------------------------------------------- | ----------------------- |
-| `color.enabled`                   | Whether to deploy this workload                     | `true`                  |
-| `color.color`                     | Name of the color to return (e.g. `blue`)           | `lightblue`             |
-| `color.imageName`                 | Image (defaults to `ghcr.io/buoyantio/faces-color`) |                         |
-| `color.imageTag`                  | Tag for image                                       | *optional*              |
-| `color.errorFraction`             | Failure percentage                                  | `backend.errorFraction` |
-| `color.delayBuckets`              | Delay buckets                                       | `backend.delayBuckets`  |
+| Key                               | Description                                         | Default                         |
+| --------------------------------- | --------------------------------------------------- | ------------------------------- |
+| `color.enabled`                   | Whether to deploy this workload                     | `true`                          |
+| `color.color`                     | Name of the color to return (e.g. `blue`)           | `lightblue`                     |
+| `color.imageName`                 | Color image name                                    | `ghcr.io/buoyantio/faces-color` |
+| `color.imageTag`                  | Tag for image                                       | *optional*                      |
+| `color.errorFraction`             | Failure percentage                                  | `backend.errorFraction`         |
+| `color.delayBuckets`              | Delay buckets                                       | `backend.delayBuckets`          |
 
 You can enable up to three smiley and color services:
 
@@ -122,25 +125,23 @@ You can enable up to three smiley and color services:
 | `color2.enabled`  | Enable second color backend        | `false`         |
 | `color3.enabled`  | Enable third color backend         | `false`         |
 
-### Available Colors and Smileys
-
-You can customize the smiley face and background color used by each cell via Helm values or environment variables. Below are the predefined options supported by the Faces app.
+> **Note** You can customize the smiley face and background color used by each cell via Helm values or environment variables. Below are the predefined options supported by the Faces app.
 
 #### Color Options
 
 Use the `COLOR` environment variable or `color.color` Helm value to override the default. These named colors are designed to be distinguishable for users with various types of color vision.
 
-| Name     |
-| -------- |
-| grey     |
-| black    |
-| white    |
-| darkblue |
-| blue     |
-| green    |
-| yellow   |
-| red      |
-| purple   |
+| Name     | Hexadecimal Code |
+| -------- | ---------------- |
+| black    | `#000000`        |
+| blue     | `#66CCEE`        |
+| darkblue | `#4477AA`        |
+| green    | `#228833`        |
+| grey     | `#BBBBBB`        |
+| purple   | `#AA3377`        |
+| white    | `#FFFFFF`        |
+| red      | `#EE6677`        |
+| yellow   | `#AA3377`        |
 
 You may also use any valid hex color code (e.g. `#073359` for a Buoyant Blue).
 
@@ -150,37 +151,35 @@ Use the `SMILEY` environment variable or `smiley.smiley` Helm value to change th
 
 | Name        | Emoji          |
 | ----------- | -------------- |
-| Grinning    | 😃 (`U+1F603`) |
-| Sleeping    | 😴 (`U+1F634`) |
 | Cursing     | 🤬 (`U+1F92C`) |
-| Kaboom      | 🤯 (`U+1F92F`) |
+| Grinning    | 😃 (`U+1F603`) |
 | HeartEyes   | 😍 (`U+1F60D`) |
+| Kaboom      | 🤯 (`U+1F92F`) |
 | Neutral     | 😐 (`U+1F610`) |
 | RollingEyes | 🙄 (`U+1F644`) |
 | Screaming   | 😱 (`U+1F631`) |
+| Sleeping    | 😴 (`U+1F634`) |
 | Vomiting    | 🤮 (`U+1F92E`) |
 
 These values are case-sensitive and must match exactly.
-
-### Ingress
-
-| Parameter             | Description                   | Default |
-| --------------------- | ----------------------------- | ------- |
-| `ingress.enabled`     | Deploy ingress proxy          | `false` |
-| `ingress.cellService` | Target service for /face path | `cell`  |
 
 ---
 
 ## Example Custom Installation
 
-Install Faces with a red background, heart-eyes smiley, and 50% error rate:
+Install Faces with a blue background with no errors or delays:
 
 ```sh
+kubectl create namespace faces
+kubectl annotate namespace faces linkerd.io/inject=enabled
+
 helm install faces -n faces \
   oci://ghcr.io/buoyantio/faces-chart --version 2.0.0 \
   --set color.color="#073359" \
   --set smiley.smiley="HeartEyes" \
-  --set face.errorFraction=50
+  --set backend.errorFraction="" \
+  --set backend.delayBuckets="" \
+  --set face.errorFraction="0"
 ```
 
 Enable second smiley and color services:
@@ -189,15 +188,18 @@ Enable second smiley and color services:
 helm upgrade -i faces -n faces \
   oci://ghcr.io/buoyantio/faces-chart --version 2.0.0 \
   --set color.color="#073359" \
-  --set smiley.smiley="HeartEyes" \
-  --set face.errorFraction=50
+  --set backend.errorFraction="0" \
+  --set backend.delayBuckets="" \
+  --set face.errorFraction="0" \
   --set smiley2.enabled=true \
   --set smiley2.smiley="RollingEyes" \
   --set color2.enabled=true \
   --set color2.color="green"
 ```
 
-Split smiley 50/50 between the two services:
+### Example Routing with Gateway API
+
+Split requests 50/50 between `smiley` and `smiley2`:
 
 ```sh
 cat <<EOF | kubectl -n faces apply -f -
