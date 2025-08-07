@@ -129,7 +129,7 @@ spec:
           value: {{ .root.Values.authHeader | quote }}
         {{- if index $info .workload }}
         - name: {{ .workload | upper | quote }}
-          value: {{ index $info .workload }}
+          value: {{ index $info .workload | quote }}
         {{- end -}}
         {{- include "partials.backend-delayBuckets" (dict "root" .root "which" .name) }}
         {{- include "partials.backend-errorFraction" (dict "root" .root "which" .name) }}
