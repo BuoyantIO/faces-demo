@@ -1,0 +1,6 @@
+package faces:rusty;
+
+world rusty {
+   import wasi:config/runtime@0.2.0-draft;
+   export wasi:http/incoming-handler@0.2.0;
+}
