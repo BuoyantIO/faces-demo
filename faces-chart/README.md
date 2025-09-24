@@ -342,3 +342,71 @@ spec:
 EOF
 ```
 
+---
+
+## Faces with Argo Rollouts
+
+This chart can optionally render [Argo Rollouts](https://argo-rollouts.readthedocs.io) instead of plain Deployments. Rollouts let you do progressive delivery with **blue/green** or **canary** strategies. Find more information on using Argo Rollouts with Linkerd [here](https://linkerd.io/2-edge/tasks/flagger/#argo-rollouts).
+
+### Common Options
+
+| Key                                | Description                                                     | Default  |
+| ---------------------------------- | --------------------------------------------------------------- | -------- |
+| `rollouts.enabled`                 | When `true`, render `Rollout` resources instead of `Deployment` | `false`  |
+| `rollouts.strategy`                | Rollout strategy to use (`canary` \| `blueGreen`)               | `canary` |
+| `rollouts.maxSurge`                | Max extra pods during update                                    | `1`      |
+| `rollouts.maxUnavailable`          | Max unavailable pods during update                              | `0`      |
+| `rollouts.revisionHistoryLimit`    | Number of old ReplicaSets to keep                               | `5`      |
+| `rollouts.progressDeadlineSeconds` | Timeout in seconds before rollout is considered failed          | `600`    |
+| `rollouts.minReadySeconds`         | Minimum ready time before pod is considered available           | `0`      |
+
+### Canary Strategy
+
+When `rollouts.strategy=canary`, you can choose between simple rolling updates or traffic-shifted canaries.
+
+| Key                                                      | Description                                                                                                  | Default      |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------ |
+| `rollouts.canary.trafficRouting.provider`                | Built-in provider for traffic shifting (e.g. `smi`, `nginx`, `alb`, `gateway`). Leave empty if using plugin. | `null`       |
+| `rollouts.canary.trafficRouting.plugin.name`             | Name of a plugin to use for traffic shifting (e.g. `argoproj-labs/gatewayAPI`)                               | `argoproj-labs/gatewayAPI`        |
+| `rollouts.canary.trafficRouting.plugin.autocreateRoutes` | When `true`, chart creates Gateway API routes and fills plugin config automatically                          | `false`      |
+| `rollouts.canary.trafficRouting.plugin.config`           | Extra key/values passed to plugin                                                                            | `{}`         |
+| `rollouts.canary.steps`                                  | List of canary steps (setWeight, pause, etc.) to control rollout progression                                 | *see values* |
+| `rollouts.canary.serviceSuffix.canary`                   | Suffix used for the canary Service name                                                                      | `-canary`    |
+
+> **Example values:**
+>
+> ```yaml
+> rollouts:
+>   enabled: true
+>   strategy: canary
+>   canary:
+>     trafficRouting:
+>       provider: smi
+>     steps:
+>       - setWeight: 30
+>       - pause: { duration: 10 }
+>       - setWeight: 60
+>       - pause: { duration: 30 }
+>.      - setWeight: 100
+> ```
+
+### Blue/Green Strategy
+
+When `rollouts.strategy=blueGreen`, Rollouts maintain both an **active** and a **preview** Service.
+
+| Key                                        | Description                                            | Default    |
+| ------------------------------------------ | ------------------------------------------------------ | ---------- |
+| `rollouts.blueGreen.autoPromotionEnabled`  | If `true`, automatically promote new version to active | `false`    |
+| `rollouts.blueGreen.autoPromotionSeconds`  | Delay before auto-promotion (if enabled)               | `null`     |
+| `rollouts.blueGreen.serviceSuffix.preview` | Suffix used for the preview Service name               | `-preview` |
+
+> **Example values:**
+>
+> ```yaml
+> rollouts:
+>   enabled: true
+>   strategy: blueGreen
+>   blueGreen:
+>     autoPromotionEnabled: false
+> ```
+
