@@ -22,6 +22,126 @@ spec:
   - port: 80
     name: http
     targetPort: http
+{{- if .Values.rollouts.enabled }}
+  {{- $strategy := .Values.rollouts.strategy | default "canary" -}}
+  {{- if eq $strategy "canary" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: faces-gui{{ .Values.rollouts.canary.serviceSuffix.canary | default "-canary" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: frontend
+    faces.buoyant.io/component: faces-gui
+spec:
+  type: ClusterIP
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: frontend
+    faces.buoyant.io/component: faces-gui
+  ports:
+  - port: 80
+    name: http
+    targetPort: http
+  {{- else if eq $strategy "blueGreen" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: faces-gui{{ .Values.rollouts.blueGreen.serviceSuffix.preview | default "-preview" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: frontend
+    faces.buoyant.io/component: faces-gui
+spec:
+  type: ClusterIP
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: frontend
+    faces.buoyant.io/component: faces-gui
+  ports:
+  - port: 80
+    name: http
+    targetPort: http
+  {{- end }}
+{{- end }}
+
+{{- if .Values.rollouts.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: faces-gui
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: frontend
+    faces.buoyant.io/component: faces-gui
+spec:
+  replicas: {{ get .Values.gui "replicas" | default .Values.defaultReplicas }}
+  revisionHistoryLimit: {{ .Values.rollouts.revisionHistoryLimit | default 5 }}
+  progressDeadlineSeconds: {{ .Values.rollouts.progressDeadlineSeconds | default 600 }}
+  selector:
+    matchLabels:
+      buoyant.io/application: faces
+      faces.buoyant.io/component-type: frontend
+      faces.buoyant.io/component: faces-gui
+  strategy:
+    {{- if eq (.Values.rollouts.strategy | default "canary") "canary" }}
+    canary:
+      maxSurge: {{ .Values.rollouts.maxSurge | default 1 }}
+      maxUnavailable: {{ .Values.rollouts.maxUnavailable | default 0 }}
+      {{- $tr := .Values.rollouts.canary.trafficRouting | default dict -}}
+      {{- $provider := (hasKey $tr "provider") | ternary $tr.provider "" -}}
+      {{- $plugin := (hasKey $tr "plugin") | ternary $tr.plugin dict -}}
+      {{- $pluginName := (hasKey $plugin "name") | ternary $plugin.name "" -}}
+      {{- if and $provider $pluginName }}
+        {{- fail "rollouts.canary.trafficRouting: choose EITHER 'provider' OR 'plugin.name', not both" -}}
+      {{- end }}
+
+      {{- if eq $provider "smi" }}
+      stableService: faces-gui
+      canaryService: {{ printf "faces-gui%s" (.Values.rollouts.canary.serviceSuffix.canary | default "-canary") | quote }}
+      trafficRouting: { smi: {} }
+      {{- end }}
+
+      {{- if .Values.rollouts.canary.steps }}
+      steps:
+{{ toYaml .Values.rollouts.canary.steps | nindent 8 }}
+      {{- end }}
+
+    {{- else }}
+    blueGreen:
+      activeService: faces-gui
+      previewService: {{ printf "faces-gui%s" (.Values.rollouts.blueGreen.serviceSuffix.preview | default "-preview") | quote }}
+      autoPromotionEnabled: {{ .Values.rollouts.blueGreen.autoPromotionEnabled | default false }}
+      {{- if hasKey .Values.rollouts.blueGreen "autoPromotionSeconds" }}
+      autoPromotionSeconds: {{ .Values.rollouts.blueGreen.autoPromotionSeconds }}
+      {{- end }}
+    {{- end }}
+  template:
+    metadata:
+      labels:
+        buoyant.io/application: faces
+        faces.buoyant.io/component-type: frontend
+        faces.buoyant.io/component: faces-gui
+    spec:
+      {{ include "partials.gui-affinityclause" . }}
+      containers:
+      - name: faces-gui
+        image: {{ include "partials.gui-image" . }}
+        imagePullPolicy: {{ get .Values.gui "imagePullPolicy" | default .Values.defaultImagePullPolicy }}
+        env:
+        - name: USER_HEADER_NAME
+          value: {{ .Values.authHeader | quote }}
+        ports:
+        - name: http
+          containerPort: 8000
+        {{- include "partials.gui-resources" . }}
+{{- else }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -60,3 +180,5 @@ spec:
         - name: http
           containerPort: 8000
         {{- include "partials.gui-resources" . }}
+
+{{- end }}

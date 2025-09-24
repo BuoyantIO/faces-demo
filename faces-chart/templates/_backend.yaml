@@ -86,8 +86,230 @@ spec:
     faces.buoyant.io/component: {{ .name | quote }}
   ports:
   - port: 80
-    name: {{ $portname }}
+    name: {{ $portname | quote }}
     targetPort: http
+
+{{- if .root.Values.rollouts.enabled }}
+  {{- /* 2) Extra Service for canary or preview, depending on strategy */ -}}
+  {{- $strategy := .root.Values.rollouts.strategy | default "canary" -}}
+  {{- if eq $strategy "canary" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ printf "%s%s" .name (.root.Values.rollouts.canary.serviceSuffix.canary | default "-canary") | quote }}
+  namespace: {{ .root.Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: backend
+    faces.buoyant.io/component: {{ .name | quote }}
+spec:
+  type: ClusterIP
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: backend
+    faces.buoyant.io/component: {{ .name | quote }}
+  ports:
+  - port: 80
+    name: {{ $portname | quote }}
+    targetPort: http
+  {{- else if eq $strategy "blueGreen" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ printf "%s%s" .name (.root.Values.rollouts.blueGreen.serviceSuffix.preview | default "-preview") | quote }}
+  namespace: {{ .root.Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: backend
+    faces.buoyant.io/component: {{ .name | quote }}
+spec:
+  type: ClusterIP
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: backend
+    faces.buoyant.io/component: {{ .name | quote }}
+  ports:
+  - port: 80
+    name: {{ $portname | quote  }}
+    targetPort: http
+  {{- end }}
+{{- end }}
+
+{{- $tr := .root.Values.rollouts.canary.trafficRouting | default dict -}}
+{{- $plugin := (hasKey $tr "plugin") | ternary $tr.plugin dict -}}
+{{- $pluginName := (hasKey $plugin "name") | ternary $plugin.name "" -}}
+{{- $autocreate := (hasKey $plugin "autocreateRoutes") | ternary $plugin.autocreateRoutes false -}}
+{{- $routeConf := (index .root.Values .name).route | default dict -}}
+{{- $routeKind := (hasKey $routeConf "kind") | ternary $routeConf.kind "" -}}
+{{- $routeName := (hasKey $routeConf "name") | ternary $routeConf.name (printf "%s-route" .name) -}}
+
+{{- if and .root.Values.rollouts.enabled (eq .root.Values.rollouts.strategy "canary") $pluginName $autocreate (eq $pluginName "argoproj-labs/gatewayAPI") -}}
+  {{- if eq $routeKind "HTTPRoute" }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $routeName }}
+  namespace: {{ .root.Release.Namespace }}
+spec:
+  parentRefs:
+    - kind: Service
+      group: ""
+      name: {{ .name }}
+      port: 80
+  rules:
+    - backendRefs:
+        - name: {{ printf "%s%s" .name (.root.Values.rollouts.canary.serviceSuffix.canary | default "-canary") }}
+          group: ""
+          port: 80
+          weight: 50
+        - name: {{ .name }}
+          group: ""
+          port: 80
+          weight: 50
+  {{- else if eq $routeKind "GRPCRoute" }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: {{ $routeName }}
+  namespace: {{ .root.Release.Namespace }}
+spec:
+  parentRefs:
+    - kind: Service
+      group: ""
+      name: {{ .name }}
+      namespace: {{ .root.Release.Namespace }}
+      port: 80
+  rules:
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: {{ printf "%s%s" .name (.root.Values.rollouts.canary.serviceSuffix.canary | default "-canary") }}
+          namespace: {{ .root.Release.Namespace }}
+          port: 80
+          weight: 50
+        - group: ""
+          kind: Service
+          name: {{ .name }}
+          namespace: {{ .root.Release.Namespace }}
+          port: 80
+          weight: 50
+  {{- end }}
+{{- end }}
+
+{{- if .root.Values.rollouts.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ .name | quote }}
+  namespace: {{ .root.Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: backend
+    faces.buoyant.io/component: {{ .name | quote }}
+spec:
+  replicas: {{ get $info "replicas"
+                | default (.root.Values.backend).replicas
+                | default (.root.Values).defaultReplicas }}
+  revisionHistoryLimit: {{ .root.Values.rollouts.revisionHistoryLimit | default 5 }}
+  progressDeadlineSeconds: {{ .root.Values.rollouts.progressDeadlineSeconds | default 600 }}
+  selector:
+    matchLabels:
+      buoyant.io/application: faces
+      faces.buoyant.io/component-type: backend
+      faces.buoyant.io/component: {{ .name | quote }}
+  strategy:
+    {{- $strategy := .root.Values.rollouts.strategy | default "canary" -}}
+    {{- if eq $strategy "canary" }}
+    canary:
+      maxSurge: {{ .root.Values.rollouts.maxSurge | default 1 }}
+      maxUnavailable: {{ .root.Values.rollouts.maxUnavailable | default 0 }}
+      {{- $tr := .root.Values.rollouts.canary.trafficRouting | default dict -}}
+      {{- $provider := (hasKey $tr "provider") | ternary $tr.provider "" -}}
+      {{- $plugin := (hasKey $tr "plugin") | ternary $tr.plugin dict -}}
+      {{- $pluginName := (hasKey $plugin "name") | ternary $plugin.name "" -}}
+      {{- $pluginCfg := (hasKey $plugin "config") | ternary $plugin.config dict -}}
+      {{- $autocreate := (hasKey $plugin "autocreateRoutes") | ternary $plugin.autocreateRoutes false -}}
+      {{- $routeConf := (index .root.Values .name).route | default dict -}}
+      {{- $routeKind := (hasKey $routeConf "kind") | ternary $routeConf.kind "" -}}
+      {{- $routeName := (hasKey $routeConf "name") | ternary $routeConf.name (printf "%s-route" .name) -}}
+
+      {{- if and $provider $pluginName }}
+        {{- fail "rollouts.canary.trafficRouting: choose EITHER 'provider' OR 'plugin.name', not both" -}}
+      {{- end }}
+
+      {{- if or (eq $provider "smi") $pluginName }}
+      stableService: {{ .name | quote }}
+      canaryService: {{ printf "%s%s" .name (.root.Values.rollouts.canary.serviceSuffix.canary | default "-canary") | quote }}
+      {{- end }}
+
+      {{- if eq $provider "smi" }}
+      trafficRouting:
+        smi: {}
+      {{- else if $pluginName }}
+      trafficRouting:
+        plugins:
+          {{ $pluginName }}:
+            {{- /* If user provided config, honor it; otherwise auto-fill for gatewayAPI */ -}}
+            {{- if $pluginCfg }}
+{{ toYaml $pluginCfg | nindent 12 }}
+            {{- else if and (eq $pluginName "argoproj-labs/gatewayAPI") $autocreate (eq $routeKind "HTTPRoute") }}
+              httpRoute: {{ $routeName }}
+              namespace: {{ .root.Release.Namespace }}
+            {{- else if and (eq $pluginName "argoproj-labs/gatewayAPI") $autocreate (eq $routeKind "GRPCRoute") }}
+              grpcRoute: {{ $routeName }}
+              namespace: {{ .root.Release.Namespace }}
+            {{- else }}
+              {}
+            {{- end }}
+      {{- end }}
+      {{- if .root.Values.rollouts.canary.steps }}
+      steps:
+{{ toYaml .root.Values.rollouts.canary.steps | nindent 8 }}
+      {{- end }}
+    {{- else if eq $strategy "blueGreen" }}
+    blueGreen:
+      activeService: {{ .name | quote }}
+      previewService: {{ printf "%s%s" .name (.root.Values.rollouts.blueGreen.serviceSuffix.preview | default "-preview") | quote }}
+      autoPromotionEnabled: {{ .root.Values.rollouts.blueGreen.autoPromotionEnabled | default false }}
+      {{- if hasKey .root.Values.rollouts.blueGreen "autoPromotionSeconds" }}
+      autoPromotionSeconds: {{ .root.Values.rollouts.blueGreen.autoPromotionSeconds }}
+      {{- end }}
+    {{- end }}
+  template:
+    metadata:
+      labels:
+        buoyant.io/application: faces
+        faces.buoyant.io/component-type: backend
+        faces.buoyant.io/component: {{ .name | quote }}
+    spec:
+      {{ include "partials.backend-affinityclause" (dict "root" .root "which" .name) }}
+      containers:
+      - name: {{ .name | quote }}
+        image: {{ include "partials.backend-image" (dict "root" .root "which" .name) | quote }}
+        imagePullPolicy: {{ get $info "imagePullPolicy"
+                            | default (.root.Values.backend).imagePullPolicy
+                            | default (.root.Values).defaultImagePullPolicy }}
+        ports:
+        - name: http
+          containerPort: 8000
+        env:
+        - name: USER_HEADER_NAME
+          value: {{ .root.Values.authHeader | quote }}
+        {{- if index $info .workload }}
+        - name: {{ .workload | upper | quote }}
+          value: {{ index $info .workload | quote }}
+        {{- end -}}
+        {{- include "partials.backend-delayBuckets" (dict "root" .root "which" .name) }}
+        {{- include "partials.backend-errorFraction" (dict "root" .root "which" .name) }}
+        {{ include "partials.backend-resources" (dict "root" .root "which" .name) }}
+
+{{- else }}
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -117,7 +339,7 @@ spec:
       {{ include "partials.backend-affinityclause" (dict "root" .root "which" .name) }}
       containers:
       - name: {{ .name | quote }}
-        image: {{ include "partials.backend-image" (dict "root" .root "which" .name) }}
+        image: {{ include "partials.backend-image" (dict "root" .root "which" .name) | quote }}
         imagePullPolicy: {{ get $info "imagePullPolicy"
                             | default (.root.Values.backend).imagePullPolicy
                             | default (.root.Values).defaultImagePullPolicy }}
@@ -134,6 +356,7 @@ spec:
         {{- include "partials.backend-delayBuckets" (dict "root" .root "which" .name) }}
         {{- include "partials.backend-errorFraction" (dict "root" .root "which" .name) }}
         {{ include "partials.backend-resources" (dict "root" .root "which" .name) }}
-{{- end -}}
-{{- end -}}
-{{- end -}}
+{{- end }}  
+{{- end }}  
+{{- end }}  
+{{- end -}} 
