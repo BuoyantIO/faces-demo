@@ -24,6 +24,7 @@ import (
 
 	"github.com/BuoyantIO/faces-demo/v2/pkg/faces"
 	"github.com/BuoyantIO/faces-demo/v2/pkg/utils"
+
 	"github.com/warthog618/go-gpiocdev"
 )
 
@@ -201,10 +202,12 @@ func (hw *HardwareStuff) Updater(bprv *faces.BaseProvider) {
 }
 
 func (hw *HardwareStuff) PreHook(bprv *faces.BaseProvider, prvReq *faces.ProviderRequest, rstat *faces.BaseRequestStatus) bool {
-	if rstat.IsErrored() || rstat.IsRateLimited() {
-		hw.ledOn("red")
-	} else {
+	succeeded := !(rstat.IsErrored() || rstat.IsRateLimited())
+
+	if succeeded {
 		hw.ledOn("green")
+	} else {
+		hw.ledOn("red")
 	}
 
 	return true

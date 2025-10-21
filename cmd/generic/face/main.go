@@ -41,9 +41,21 @@ func main() {
 	port := flag.Int("port", 8000, "the port number to listen on")
 	flag.Parse()
 
+	whisperAddr := utils.StringFromEnv("WHISPER_ADDRESS", "")
+	enablePrometheus := utils.BoolFromEnv("ENABLE_PROMETHEUS", true)
+
 	fprv := faces.NewFaceProviderFromEnvironment()
 
-	faces.StartPrometheusServer()
+	if whisperAddr != "" {
+		nodeNumber := utils.IntFromEnv("WHISPER_NODE_NUMBER", 0)
+		processNumber := utils.IntFromEnv("WHISPER_PROCESS_NUMBER", 1)
+
+		fprv.EnableWhisper(whisperAddr, "face", nodeNumber, processNumber)
+	}
+
+	if enablePrometheus {
+		faces.StartPrometheusServer()
+	}
 
 	server := faces.NewBaseHTTPServer(&fprv.BaseProvider)
 

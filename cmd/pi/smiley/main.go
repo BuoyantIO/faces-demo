@@ -49,17 +49,30 @@ func main() {
 	port := flag.Int("port", 8000, "the port number to listen on")
 	flag.Parse()
 
+	whisperAddr := utils.StringFromEnv("WHISPER_ADDRESS", "")
+	enablePrometheus := utils.BoolFromEnv("ENABLE_PROMETHEUS", true)
+
 	sprv := faces.NewSmileyProviderFromEnvironment()
-	sprv.SetUpdater(hw.Updater)
-	sprv.SetPreHook(hw.PreHook)
-	sprv.SetPostHook(hw.PostHook)
+
+	if whisperAddr != "" {
+		nodeNumber := utils.IntFromEnv("WHISPER_NODE_NUMBER", 0)
+		processNumber := utils.IntFromEnv("WHISPER_PROCESS_NUMBER", 1)
+
+		sprv.EnableWhisper(whisperAddr, "smiley", nodeNumber, processNumber)
+	}
+
+	sprv.AddUpdater(hw.Updater)
+	sprv.AddPreHook(hw.PreHook)
+	sprv.AddPostHook(hw.PostHook)
 
 	hw.Watch(sprv.ErrorFraction(), sprv.IsLatched())
 
 	server := faces.NewBaseHTTPServer(&sprv.BaseProvider)
 	server.Start(fmt.Sprintf(":%d", *port))
 
-	faces.StartPrometheusServer()
+	if enablePrometheus {
+		faces.StartPrometheusServer()
+	}
 
 	// Wait for servers to finish
 	select {}

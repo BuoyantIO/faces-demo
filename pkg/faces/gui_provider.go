@@ -50,10 +50,11 @@ import (
 
 type GUIProvider struct {
 	BaseProvider
-	dataPath string
-	bgColor  string
-	hideKey  bool
-	showPods bool
+	dataPath    string
+	faceService string
+	bgColor     string
+	hideKey     bool
+	showPods    bool
 }
 
 func NewGUIProviderFromEnvironment() *GUIProvider {
@@ -73,6 +74,7 @@ func NewGUIProviderFromEnvironment() *GUIProvider {
 	gprv.BaseProvider.SetupBasicsFromEnvironment()
 
 	gprv.dataPath = utils.StringFromEnv("DATA_PATH", "/app/data")
+	gprv.faceService = utils.StringFromEnv("FACE_SERVICE", "face")
 	gprv.bgColor = utils.StringFromEnv("COLOR", "white")
 	gprv.hideKey = utils.BoolFromEnv("HIDE_KEY", false)
 	gprv.showPods = utils.BoolFromEnv("SHOW_PODS", false)
@@ -152,7 +154,7 @@ func (gprv *GUIProvider) HTTPGetHandler(w http.ResponseWriter, r *http.Request) 
 		key = "face"
 		reqStart := time.Now()
 
-		url := fmt.Sprintf("http://face/%s", r.URL.Path[6:])
+		url := fmt.Sprintf("http://%s/%s", gprv.faceService, r.URL.Path[6:])
 
 		rq := r.URL.RawQuery
 
