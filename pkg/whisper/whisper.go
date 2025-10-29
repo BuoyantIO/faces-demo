@@ -42,6 +42,11 @@ type Susurrus struct {
 // Received susurri are pushed to the channel
 // Usage: w := NewWhisper(); w.Listen(); w.Send(...); <-w.RecvChan
 
+const (
+	DefaultGroupAddr = "224.0.6.14"
+	DefaultPort      = 0x614
+)
+
 type Whisper struct {
 	groupAddr string
 	port      int
@@ -59,7 +64,7 @@ type Whisper struct {
 
 // NewWhisper creates a Whisper with default group and port
 func NewWhisper() (*Whisper, error) {
-	w, err := NewWhisperWithOptions("224.0.6.14", 0x614)
+	w, err := NewWhisperWithOptions(DefaultGroupAddr, DefaultPort)
 	if err != nil {
 		return nil, err
 	}
@@ -266,10 +271,19 @@ func (w *Whisper) recvLoop() {
 
 			// Unidirectional susurri: deliver to RecvChan
 			// fmt.Printf("Sending to RecvChan\n")
-			w.RecvChan <- srs
+			select {
+			case w.RecvChan <- srs:
+				// Delivered successfully.
+			default:
+				fmt.Printf("RecvChan buffer full, dropping message: dest=0x%08X source=0x%08X Cmd=0x%04X Nonce=%d Len=%d\n", srs.Dest, srs.Source, srs.Cmd, srs.Nonce, len(srs.Data))
+			}
 		}
 	}
 }
+
+// Close releases all resources associated with the Whisper instance. It
+// is safe to call Close multiple times; subsequent calls have no effect
+// due to the use of sync.Once.
 func (w *Whisper) Close() {
 	w.closeOnce.Do(func() {
 		close(w.closed)

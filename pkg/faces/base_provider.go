@@ -285,8 +285,8 @@ func (bprv *BaseProvider) SetupFromEnvironment() {
 	bprv.Infof("max_rate %f", bprv.maxRate)
 }
 
-func (bprv *BaseProvider) EnableWhisper(whisperAddr string, name string, nodeNumber int, processNumber int) {
-	w, err := whisper.NewWhisperWithOptions(whisperAddr, 0x614)
+func (bprv *BaseProvider) EnableWhisper(whisperAddr string, nodeNumber int, processNumber int) {
+	w, err := whisper.NewWhisperWithOptions(whisperAddr, whisper.DefaultPort)
 
 	if err != nil {
 		bprv.Warnf("Could not enable whisper: %s", err)
