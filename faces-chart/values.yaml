@@ -15,6 +15,11 @@ defaultReplicas: 1
 # User auth header.
 authHeader: "X-Faces-User"
 
+# Whisper address. If set, enables Whisper integration in all services.
+whisperAddress: ""
+# Whisper node number. Only needed if multiple nodes of a service are run.
+whisperNode: 1
+
 gui:
   image: ""                     # If set, overrides the imageName/imageTag pair
   imageName: ghcr.io/buoyantio/faces-gui
@@ -58,7 +63,7 @@ smiley:
   # errorFraction: ""             # If not set, uses backend.errorFraction
   # delayBuckets: ""              # If not set, uses backend.delayBuckets
 
-  # If argo rollouts is enabled with canary and to create route automatically 
+  # If argo rollouts is enabled with canary and to create route automatically
   route:
     kind: HTTPRoute
     name: smiley-route
@@ -93,7 +98,7 @@ color:
   # errorFraction: ""             # If not set, uses backend.errorFraction
   # delayBuckets: ""              # If not set, uses backend.delayBuckets
 
-  # If argo rollouts is enabled with canary and to create route automatically 
+  # If argo rollouts is enabled with canary and to create route automatically
   route:
     kind: GRPCRoute
     name: color-route
@@ -121,7 +126,7 @@ color3:
 # --- Argo Rollouts switch & common options ---
 rollouts:
   # when true, render Rollout instead of Deployment
-  enabled: false           
+  enabled: false
 
   # Choose one: "canary" or "blueGreen"
   strategy: canary

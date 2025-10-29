@@ -31,29 +31,13 @@ import (
 	"github.com/BuoyantIO/faces-demo/v2/pkg/utils"
 )
 
-// SPDX-FileCopyrightText: 2025 Buoyant Inc.
-// SPDX-License-Identifier: Apache-2.0
-//
-// Copyright 2022-2025 Buoyant Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License"); you may
-// not use this file except in compliance with the License.  You may obtain
-// a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 type GUIProvider struct {
 	BaseProvider
-	dataPath string
-	bgColor  string
-	hideKey  bool
-	showPods bool
+	dataPath    string
+	faceService string
+	bgColor     string
+	hideKey     bool
+	showPods    bool
 }
 
 func NewGUIProviderFromEnvironment() *GUIProvider {
@@ -73,6 +57,7 @@ func NewGUIProviderFromEnvironment() *GUIProvider {
 	gprv.BaseProvider.SetupBasicsFromEnvironment()
 
 	gprv.dataPath = utils.StringFromEnv("DATA_PATH", "/app/data")
+	gprv.faceService = utils.StringFromEnv("FACE_SERVICE", "face")
 	gprv.bgColor = utils.StringFromEnv("COLOR", "white")
 	gprv.hideKey = utils.BoolFromEnv("HIDE_KEY", false)
 	gprv.showPods = utils.BoolFromEnv("SHOW_PODS", false)
@@ -152,7 +137,7 @@ func (gprv *GUIProvider) HTTPGetHandler(w http.ResponseWriter, r *http.Request) 
 		key = "face"
 		reqStart := time.Now()
 
-		url := fmt.Sprintf("http://face/%s", r.URL.Path[6:])
+		url := fmt.Sprintf("http://%s/%s", gprv.faceService, r.URL.Path[6:])
 
 		rq := r.URL.RawQuery
 

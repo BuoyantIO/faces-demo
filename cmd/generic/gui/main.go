@@ -41,13 +41,26 @@ func main() {
 	port := flag.Int("port", 8000, "the port number to listen on")
 	flag.Parse()
 
+	whisperAddr := utils.StringFromEnv("WHISPER_ADDRESS", "")
+	enablePrometheus := utils.BoolFromEnv("ENABLE_PROMETHEUS", true)
+
 	// Order matters here: you MUST call SetHTTPGetHandler _after_
 	// creating the BaseHTTPServer. Yuck.
 	gprv := faces.NewGUIProviderFromEnvironment()
 	server := faces.NewBaseHTTPServer(&gprv.BaseProvider)
+
+	if whisperAddr != "" {
+		nodeNumber := utils.IntFromEnv("WHISPER_NODE_NUMBER", 0)
+		processNumber := utils.IntFromEnv("WHISPER_PROCESS_NUMBER", 0)
+
+		gprv.EnableWhisper(whisperAddr, "gui", nodeNumber, processNumber)
+	}
+
 	gprv.SetHTTPGetHandler(gprv.HTTPGetHandler)
 
-	faces.StartPrometheusServer()
+	if enablePrometheus {
+		faces.StartPrometheusServer()
+	}
 
 	err := server.Start(fmt.Sprintf(":%d", *port))
 

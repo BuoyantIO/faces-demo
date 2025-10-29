@@ -20,6 +20,7 @@ package faces
 import (
 	"encoding/json"
 	"fmt"
+	"hash/crc32"
 	"log/slog"
 	"math/rand"
 	"net/http"
@@ -30,7 +31,20 @@ import (
 	"time"
 
 	"github.com/BuoyantIO/faces-demo/v2/pkg/utils"
+	"github.com/BuoyantIO/faces-demo/v2/pkg/whisper"
 	"github.com/prometheus/client_golang/prometheus"
+)
+
+// Glowing stuff
+type GlowMsg struct {
+	Node    int
+	Process int
+	OK      bool
+	Value   int
+}
+
+const (
+	CmdActivity = 1
 )
 
 type BaseRequestStatus struct {
@@ -39,6 +53,7 @@ type BaseRequestStatus struct {
 	latched     bool
 	message     string
 	statusCode  int
+	delayMs     int
 }
 
 func (rstat *BaseRequestStatus) IsErrored() bool {
@@ -59,6 +74,10 @@ func (rstat *BaseRequestStatus) Message() string {
 
 func (rstat *BaseRequestStatus) StatusCode() int {
 	return rstat.statusCode
+}
+
+func (rstat *BaseRequestStatus) DelayMs() int {
+	return rstat.delayMs
 }
 
 type ProviderRequest struct {
@@ -175,9 +194,9 @@ type BaseProvider struct {
 	providerGetHandler ProviderGetHandler
 	httpGetHandler     HTTPGetHandler
 
-	updater  ProviderUpdater
-	preHook  ProviderHook
-	postHook ProviderHook
+	updaters  []ProviderUpdater
+	preHooks  []ProviderHook
+	postHooks []ProviderHook
 
 	requestsTotal   *prometheus.CounterVec
 	requestDuration *prometheus.HistogramVec
@@ -185,6 +204,12 @@ type BaseProvider struct {
 	latched         bool
 	rateCounter     *utils.RateCounter
 	lastRequestTime time.Time
+
+	whisper              *whisper.Whisper
+	whisperNodeNumber    int
+	whisperProcessNumber int
+	whisperSelfID        uint32
+	whisperServerID      uint32
 }
 
 func (bprv *BaseProvider) SetupBasicsFromEnvironment() {
@@ -260,6 +285,57 @@ func (bprv *BaseProvider) SetupFromEnvironment() {
 	bprv.Infof("max_rate %f", bprv.maxRate)
 }
 
+func (bprv *BaseProvider) EnableWhisper(whisperAddr string, nodeNumber int, processNumber int) {
+	w, err := whisper.NewWhisperWithOptions(whisperAddr, whisper.DefaultPort)
+
+	if err != nil {
+		bprv.Warnf("Could not enable whisper: %s", err)
+		return
+	}
+
+	bprv.whisper = w
+	bprv.whisperNodeNumber = nodeNumber
+	bprv.whisperProcessNumber = processNumber
+
+	// Server we'll send to, which is a constant
+	bprv.whisperServerID = bprv.whisper.GetHashID([]byte("glowsrv"))
+
+	// Local ID based on hostname
+	hostname, err := os.Hostname()
+	if err != nil {
+		bprv.Warnf("Could not get hostname: %s", err)
+		hostname = "unknown"
+	}
+
+	bprv.whisperSelfID = crc32.ChecksumIEEE([]byte(hostname))
+	bprv.Infof("using ID 0x%08X (from hostname %s)", bprv.whisperSelfID, hostname)
+
+	bprv.whisper.SetID(bprv.whisperSelfID)
+}
+
+func (bprv *BaseProvider) Announce(ok bool, value int) error {
+	// No-op if whisper is not enabled
+	if bprv.whisper == nil {
+		return nil
+	}
+
+	msg := GlowMsg{
+		Node:    bprv.whisperNodeNumber,
+		Process: bprv.whisperProcessNumber,
+		OK:      ok,
+		Value:   value,
+	}
+
+	jsonData, err := json.Marshal(msg)
+	if err != nil {
+		bprv.Warnf("failed to marshal message: %v", err)
+		return err
+	}
+	// fmt.Printf("ANNOUNCE: JSON payload: %s\n", string(jsonData))
+
+	return bprv.whisper.Send(bprv.whisperServerID, CmdActivity, jsonData)
+}
+
 // SetGetHandler sets the function that will be called to get the data for a
 // given provider request.
 func (bprv *BaseProvider) SetGetHandler(handler ProviderGetHandler) {
@@ -274,16 +350,16 @@ func (bprv *BaseProvider) SetHTTPGetHandler(handler HTTPGetHandler) {
 	bprv.httpGetHandler = handler
 }
 
-func (bprv *BaseProvider) SetUpdater(updater ProviderUpdater) {
-	bprv.updater = updater
+func (bprv *BaseProvider) AddUpdater(updater ProviderUpdater) {
+	bprv.updaters = append(bprv.updaters, updater)
 }
 
-func (bprv *BaseProvider) SetPreHook(hook ProviderHook) {
-	bprv.preHook = hook
+func (bprv *BaseProvider) AddPreHook(hook ProviderHook) {
+	bprv.preHooks = append(bprv.preHooks, hook)
 }
 
-func (bprv *BaseProvider) SetPostHook(hook ProviderHook) {
-	bprv.postHook = hook
+func (bprv *BaseProvider) AddPostHook(hook ProviderHook) {
+	bprv.postHooks = append(bprv.postHooks, hook)
 }
 
 func (bprv *BaseProvider) Infof(format string, args ...interface{}) {
@@ -352,10 +428,9 @@ func (bprv *BaseProvider) CheckUnlatch(now time.Time) {
 }
 
 // DelayIfNeeded delays if there are delay buckets set.
-func (bprv *BaseProvider) DelayIfNeeded() {
-	if len(bprv.delayBuckets) > 0 {
-		delayMs := bprv.delayBuckets[rand.Intn(len(bprv.delayBuckets))]
-		time.Sleep(time.Duration(delayMs) * time.Millisecond)
+func (bprv *BaseProvider) DelayIfNeeded(rstat *BaseRequestStatus) {
+	if rstat.delayMs > 0 {
+		time.Sleep(time.Duration(rstat.delayMs) * time.Millisecond)
 	}
 }
 
@@ -427,6 +502,11 @@ func (bprv *BaseProvider) CheckRequestStatus() *BaseRequestStatus {
 		}
 	}
 
+	if len(bprv.delayBuckets) > 0 {
+		delayMs := bprv.delayBuckets[rand.Intn(len(bprv.delayBuckets))]
+		rstat.delayMs = delayMs
+	}
+
 	return rstat
 }
 
@@ -435,23 +515,36 @@ func (bprv *BaseProvider) HandleRequest(start time.Time, prvReq *ProviderRequest
 
 	bprv.CheckUnlatch(start)
 
-	if bprv.updater != nil {
-		bprv.updater(bprv)
+	if bprv.updaters != nil {
+		for _, updater := range bprv.updaters {
+			updater(bprv)
+		}
 	}
 
 	rstat := bprv.CheckRequestStatus()
 
-	if bprv.preHook != nil {
-		proceed := bprv.preHook(bprv, prvReq, rstat)
+	if bprv.whisper != nil {
+		succeeded := !(rstat.IsErrored() || rstat.IsRateLimited())
+		err := bprv.Announce(succeeded, int(rstat.DelayMs()))
 
-		if !proceed {
-			bprv.Debugf("pre-hook short-circuited with status %03d, message %s", rstat.StatusCode(), rstat.Message())
-
-			rstat.errored = true
+		if err != nil {
+			bprv.Warnf("Could not send whisper announce: %s", err)
 		}
 	}
 
-	bprv.DelayIfNeeded()
+	if bprv.preHooks != nil {
+		for _, hook := range bprv.preHooks {
+			proceed := hook(bprv, prvReq, rstat)
+
+			if !proceed {
+				bprv.Debugf("pre-hook short-circuited with status %03d, message %s", rstat.StatusCode(), rstat.Message())
+
+				rstat.errored = true
+			}
+		}
+	}
+
+	bprv.DelayIfNeeded(rstat)
 
 	if rstat.IsRateLimited() {
 		bprv.Debugf("RATELIMIT(%s) => %s", prvReq.InfoStr(), rstat.Message())
@@ -486,9 +579,11 @@ func (bprv *BaseProvider) HandleRequest(start time.Time, prvReq *ProviderRequest
 		}
 	}
 
-	if bprv.postHook != nil {
-		if !bprv.postHook(bprv, prvReq, rstat) {
-			bprv.Debugf("post-hook errored with status %03d, message %s", rstat.StatusCode(), rstat.Message())
+	if bprv.postHooks != nil {
+		for _, hook := range bprv.postHooks {
+			if !hook(bprv, prvReq, rstat) {
+				bprv.Debugf("post-hook errored with status %03d, message %s", rstat.StatusCode(), rstat.Message())
+			}
 		}
 	}
 
