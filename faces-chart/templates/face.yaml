@@ -22,6 +22,133 @@ spec:
   - port: 80
     name: http
     targetPort: http
+{{- if .Values.rollouts.enabled }}
+  {{- $strategy := .Values.rollouts.strategy | default "canary" -}}
+  {{- if eq $strategy "canary" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}{{ .Values.rollouts.canary.serviceSuffix.canary | default "-canary" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: edge
+    faces.buoyant.io/component: {{ $name | quote }}
+spec:
+  type: ClusterIP
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: edge
+    faces.buoyant.io/component: {{ $name | quote }}
+  ports:
+  - port: 80
+    name: http
+    targetPort: http
+  {{- else if eq $strategy "blueGreen" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}{{ .Values.rollouts.blueGreen.serviceSuffix.preview | default "-preview" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: edge
+    faces.buoyant.io/component: {{ $name | quote }}
+spec:
+  type: ClusterIP
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: edge
+    faces.buoyant.io/component: {{ $name | quote }}
+  ports:
+  - port: 80
+    name: http
+    targetPort: http
+  {{- end }}
+{{- end }}
+
+{{- if .Values.rollouts.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: edge
+    faces.buoyant.io/component: {{ $name | quote }}
+spec:
+  replicas: {{ get .Values.face "replicas" | default .Values.defaultReplicas }}
+  revisionHistoryLimit: {{ .Values.rollouts.revisionHistoryLimit | default 5 }}
+  progressDeadlineSeconds: {{ .Values.rollouts.progressDeadlineSeconds | default 600 }}
+  selector:
+    matchLabels:
+      buoyant.io/application: faces
+      faces.buoyant.io/component-type: edge
+      faces.buoyant.io/component: {{ $name | quote }}
+  strategy:
+    {{- if eq (.Values.rollouts.strategy | default "canary") "canary" }}
+    canary:
+      maxSurge: {{ .Values.rollouts.maxSurge | default 1 }}
+      maxUnavailable: {{ .Values.rollouts.maxUnavailable | default 0 }}
+      {{- $tr := .Values.rollouts.canary.trafficRouting | default dict -}}
+      {{- $provider := (hasKey $tr "provider") | ternary $tr.provider "" -}}
+      {{- $plugin := (hasKey $tr "plugin") | ternary $tr.plugin dict -}}
+      {{- $pluginName := (hasKey $plugin "name") | ternary $plugin.name "" -}}
+      {{- if and $provider $pluginName }}
+        {{- fail "rollouts.canary.trafficRouting: choose EITHER 'provider' OR 'plugin.name', not both" -}}
+      {{- end }}
+
+      {{- if eq $provider "smi" }}
+      stableService: {{ $name | quote }}
+      canaryService: {{ printf "%s%s" $name (.Values.rollouts.canary.serviceSuffix.canary | default "-canary") | quote }}
+      trafficRouting: { smi: {} }
+      {{- end }}
+
+      {{- if .Values.rollouts.canary.steps }}
+      steps:
+{{ toYaml .Values.rollouts.canary.steps | nindent 8 }}
+      {{- end }}
+
+    {{- else }}
+    blueGreen:
+      activeService: {{ $name | quote }}
+      previewService: {{ printf "%s%s" $name (.Values.rollouts.blueGreen.serviceSuffix.preview | default "-preview") | quote }}
+      autoPromotionEnabled: {{ .Values.rollouts.blueGreen.autoPromotionEnabled | default false }}
+      {{- if hasKey .Values.rollouts.blueGreen "autoPromotionSeconds" }}
+      autoPromotionSeconds: {{ .Values.rollouts.blueGreen.autoPromotionSeconds }}
+      {{- end }}
+    {{- end }}
+  template:
+    metadata:
+      labels:
+        buoyant.io/application: faces
+        faces.buoyant.io/component-type: edge
+        faces.buoyant.io/component: {{ $name | quote }}
+    spec:
+      {{ include "partials.face-affinityclause" . }}
+      containers:
+      - name: {{ $name }}
+        image: {{ include "partials.face-image" . }}
+        imagePullPolicy: {{ get .Values.face "imagePullPolicy" | default .Values.defaultImagePullPolicy }}
+        ports:
+        - name: http
+          containerPort: 8000
+        env:
+        - name: USER_HEADER_NAME
+          value: {{ .Values.authHeader | quote }}
+        - name: SMILEY_SERVICE
+          value: {{ get .Values.face "smileyService" | default "smiley" | quote }}
+        - name: COLOR_SERVICE
+          value: {{ get .Values.face "colorService" | default "color" | quote }}
+        {{- include "partials.face-errorFraction" . }}
+        {{- include "partials.face-delayBuckets" . }}
+        {{- include "partials.face-resources" . }}
+{{- else }}
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -70,3 +197,5 @@ spec:
         {{- include "partials.face-errorFraction" . }}
         {{- include "partials.face-delayBuckets" . }}
         {{- include "partials.face-resources" . }}
+
+{{- end }}

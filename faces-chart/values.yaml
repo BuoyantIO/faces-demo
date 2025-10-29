@@ -58,6 +58,11 @@ smiley:
   # errorFraction: ""             # If not set, uses backend.errorFraction
   # delayBuckets: ""              # If not set, uses backend.delayBuckets
 
+  # If argo rollouts is enabled with canary and to create route automatically 
+  route:
+    kind: HTTPRoute
+    name: smiley-route
+
 smiley2:
   enabled: False                  # If set to True, enables the second smiley workload
   smiley: "HeartEyes"            # Override if desired
@@ -88,6 +93,11 @@ color:
   # errorFraction: ""             # If not set, uses backend.errorFraction
   # delayBuckets: ""              # If not set, uses backend.delayBuckets
 
+  # If argo rollouts is enabled with canary and to create route automatically 
+  route:
+    kind: GRPCRoute
+    name: color-route
+
 color2:
   enabled: False                  # If set to True, enables the second color workload
   color: "green"                  # Override if desired, defaults to colorblind-friendly green from the Tol palette
@@ -107,3 +117,54 @@ color3:
   # imagePullPolicy: ""           # If not set, uses backend.imagePullPolicy
   # errorFraction: ""             # If not set, uses backend.errorFraction
   # delayBuckets: ""              # If not set, uses backend.delayBuckets
+
+# --- Argo Rollouts switch & common options ---
+rollouts:
+  # when true, render Rollout instead of Deployment
+  enabled: false           
+
+  # Choose one: "canary" or "blueGreen"
+  strategy: canary
+
+  # Common pod rollout knobs (work for both strategies)
+  maxSurge: 1
+  maxUnavailable: 0
+  revisionHistoryLimit: 5
+  progressDeadlineSeconds: 600
+  minReadySeconds: 0
+
+  # Canary options
+  canary:
+    # If you do traffic shifting with Linkerd, Argo will manage a TrafficSplit.
+    # If you don't want traffic shifting, leave trafficRouting null and it behaves like controlled rolling update.
+    trafficRouting:
+      # Option A: built-in provider (example: smi | nginx | alb | gateway | null). Leave null/empty if using plugin.
+      provider: null
+
+      # Option B: plugin-based traffic routing
+      plugin:
+        name: "argoproj-labs/gatewayAPI"             # e.g., "argoproj-labs/gatewayAPI"
+        autocreateRoutes: true                       # if true, chart creates routes & fills plugin config automatically
+        config: {}                                   # arbitrary key/values, e.g. { httpRoute: argo-rollouts-http-route, namespace: test }
+    steps:
+      - setWeight: 10
+      - pause: { duration: 30 }
+      - setWeight: 20
+      - pause: { duration: 30 }
+      - setWeight: 50
+      - pause: { duration: 30 }
+      - setWeight: 70
+      - pause: { duration: 60 }
+      - setWeight: 100
+    # Service names (stable stays the original; canary gets a -canary suffix)
+    serviceSuffix:
+      canary: "-canary"
+
+  # Blue/Green options
+  blueGreen:
+    autoPromotionEnabled: false
+    autoPromotionSeconds: null
+    # Service names (active stays the original; preview gets a -preview suffix)
+    serviceSuffix:
+      preview: "-preview"
+
