@@ -69,8 +69,15 @@ func NewWhisper() (*Whisper, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	w.ID = 0
-	w.Listen()
+
+	err = w.Listen()
+
+	if err != nil {
+		return nil, err
+	}
+
 	return w, nil
 }
 
@@ -218,14 +225,15 @@ func (w *Whisper) Send(source uint32, dest uint32, cmd uint16, data []byte) erro
 
 func (w *Whisper) recvLoop() {
 	buf := make([]byte, 65535)
+	w.recvConn.SetReadBuffer(len(buf))
+
 	for {
 		select {
 		case <-w.closed:
 			return
 		default:
-			w.recvConn.SetReadBuffer(len(buf))
 			n, _, err := w.recvConn.ReadFromUDP(buf)
-			if err != nil || n < 12 {
+			if err != nil || n < 16 {
 				if err != nil {
 					fmt.Printf("Receive error: %v\n", err)
 				}
@@ -265,10 +273,15 @@ func (w *Whisper) recvLoop() {
 func (w *Whisper) Close() {
 	w.closeOnce.Do(func() {
 		close(w.closed)
-		w.recvConn.Close()
+
+		if w.recvConn != nil {
+			w.recvConn.Close()
+		}
+
 		if w.sendConn != nil {
 			w.sendConn.Close()
 		}
+
 		close(w.RecvChan)
 	})
 }

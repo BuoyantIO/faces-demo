@@ -287,13 +287,13 @@ func (bprv *BaseProvider) SetupFromEnvironment() {
 
 func (bprv *BaseProvider) EnableWhisper(whisperAddr string, name string, nodeNumber int, processNumber int) {
 	w, err := whisper.NewWhisperWithOptions(whisperAddr, 0x614)
-	bprv.whisper = w
 
 	if err != nil {
 		bprv.Warnf("Could not enable whisper: %s", err)
 		return
 	}
 
+	bprv.whisper = w
 	bprv.whisperNodeNumber = nodeNumber
 	bprv.whisperProcessNumber = processNumber
 
@@ -314,6 +314,11 @@ func (bprv *BaseProvider) EnableWhisper(whisperAddr string, name string, nodeNum
 }
 
 func (bprv *BaseProvider) Announce(ok bool, value int) error {
+	// No-op if whisper is not enabled
+	if bprv.whisper == nil {
+		return nil
+	}
+
 	msg := GlowMsg{
 		Node:    bprv.whisperNodeNumber,
 		Process: bprv.whisperProcessNumber,
@@ -323,7 +328,7 @@ func (bprv *BaseProvider) Announce(ok bool, value int) error {
 
 	jsonData, err := json.Marshal(msg)
 	if err != nil {
-		bprv.Warnf("failed to marshal message: %w", err)
+		bprv.Warnf("failed to marshal message: %v", err)
 	}
 	// fmt.Printf("ANNOUNCE: JSON payload: %s\n", string(jsonData))
 
