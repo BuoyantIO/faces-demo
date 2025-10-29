@@ -63,7 +63,7 @@ smiley:
   # errorFraction: ""             # If not set, uses backend.errorFraction
   # delayBuckets: ""              # If not set, uses backend.delayBuckets
 
-  # If argo rollouts is enabled with canary and to create route automatically 
+  # If argo rollouts is enabled with canary and to create route automatically
   route:
     kind: HTTPRoute
     name: smiley-route
@@ -98,7 +98,7 @@ color:
   # errorFraction: ""             # If not set, uses backend.errorFraction
   # delayBuckets: ""              # If not set, uses backend.delayBuckets
 
-  # If argo rollouts is enabled with canary and to create route automatically 
+  # If argo rollouts is enabled with canary and to create route automatically
   route:
     kind: GRPCRoute
     name: color-route
@@ -126,7 +126,7 @@ color3:
 # --- Argo Rollouts switch & common options ---
 rollouts:
   # when true, render Rollout instead of Deployment
-  enabled: false           
+  enabled: false
 
   # Choose one: "canary" or "blueGreen"
   strategy: canary

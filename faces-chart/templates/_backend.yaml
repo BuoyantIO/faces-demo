@@ -372,7 +372,7 @@ spec:
         {{- include "partials.backend-delayBuckets" (dict "root" .root "which" .name) }}
         {{- include "partials.backend-errorFraction" (dict "root" .root "which" .name) }}
         {{ include "partials.backend-resources" (dict "root" .root "which" .name) }}
-{{- end }}  
-{{- end }}  
-{{- end }}  
-{{- end -}} 
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end -}}
