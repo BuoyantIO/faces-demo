@@ -137,6 +137,14 @@ spec:
         env:
         - name: USER_HEADER_NAME
           value: {{ .Values.authHeader | quote }}
+        {{- if .root.Values.whisperAddress }}
+        - name: WHISPER_ADDRESS
+          value: {{ .root.Values.whisperAddress | quote }}
+        {{- if .root.Values.whisperNode }}
+        - name: WHISPER_NODE_NUMBER
+          value: {{ .root.Values.whisperNode | quote }}
+        {{- end }}
+        {{- end }}
         ports:
         - name: http
           containerPort: 8000

@@ -56,6 +56,14 @@ spec:
         env:
         - name: USER_HEADER_NAME
           value: {{ .Values.authHeader | quote }}
+        {{- if .root.Values.whisperAddress }}
+        - name: WHISPER_ADDRESS
+          value: {{ .root.Values.whisperAddress | quote }}
+        {{- if .root.Values.whisperNode }}
+        - name: WHISPER_NODE_NUMBER
+          value: {{ .root.Values.whisperNode | quote }}
+        {{- end }}
+        {{- end }}
         - name: CELL_SERVICE
           value: {{ .Values.ingress.cellService | quote }}
         {{- include "partials.ingress-resources" . }}

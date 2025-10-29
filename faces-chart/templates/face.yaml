@@ -140,6 +140,14 @@ spec:
         env:
         - name: USER_HEADER_NAME
           value: {{ .Values.authHeader | quote }}
+        {{- if .root.Values.whisperAddress }}
+        - name: WHISPER_ADDRESS
+          value: {{ .root.Values.whisperAddress | quote }}
+        {{- if .root.Values.whisperNode }}
+        - name: WHISPER_NODE_NUMBER
+          value: {{ .root.Values.whisperNode | quote }}
+        {{- end }}
+        {{- end }}
         - name: SMILEY_SERVICE
           value: {{ get .Values.face "smileyService" | default "smiley" | quote }}
         - name: COLOR_SERVICE

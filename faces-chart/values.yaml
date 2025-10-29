@@ -15,6 +15,11 @@ defaultReplicas: 1
 # User auth header.
 authHeader: "X-Faces-User"
 
+# Whisper address. If set, enables Whisper integration in all services.
+whisperAddress: ""
+# Whisper node number. Only needed if multiple nodes of a service are run.
+whisperNode: 1
+
 gui:
   image: ""                     # If set, overrides the imageName/imageTag pair
   imageName: ghcr.io/buoyantio/faces-gui
