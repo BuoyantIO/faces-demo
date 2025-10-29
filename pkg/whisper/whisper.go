@@ -27,12 +27,6 @@ import (
 	"sync"
 )
 
-// Susurrus command constants
-const (
-	// Actual commands
-	CmdIDRequest uint16 = 1
-)
-
 // Susurrus represents a message with ID, length, and data
 type Susurrus struct {
 	Dest   uint32 // destination ID
@@ -186,7 +180,7 @@ func (w *Whisper) SetHashID(data []byte) {
 // RequestID removed: susurri are unidirectional; examples should set IDs locally.
 
 // Send sends a susurrus unidirectionally (no reply tracking)
-func (w *Whisper) Send(source uint32, dest uint32, cmd uint16, data []byte) error {
+func (w *Whisper) Send(dest uint32, cmd uint16, data []byte) error {
 	// generate a random nonce
 	var nonceBytes [4]byte
 	if _, err := rand.Read(nonceBytes[:]); err != nil {

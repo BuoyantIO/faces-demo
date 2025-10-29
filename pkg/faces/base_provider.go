@@ -329,10 +329,11 @@ func (bprv *BaseProvider) Announce(ok bool, value int) error {
 	jsonData, err := json.Marshal(msg)
 	if err != nil {
 		bprv.Warnf("failed to marshal message: %v", err)
+		return err
 	}
 	// fmt.Printf("ANNOUNCE: JSON payload: %s\n", string(jsonData))
 
-	return bprv.whisper.Send(bprv.whisperSelfID, bprv.whisperServerID, CmdActivity, jsonData)
+	return bprv.whisper.Send(bprv.whisperServerID, CmdActivity, jsonData)
 }
 
 // SetGetHandler sets the function that will be called to get the data for a
