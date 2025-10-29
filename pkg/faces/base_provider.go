@@ -285,7 +285,7 @@ func (bprv *BaseProvider) SetupFromEnvironment() {
 	bprv.Infof("max_rate %f", bprv.maxRate)
 }
 
-func (bprv *BaseProvider) EnableWhisper(whisperAddr string, nodeNumber int, processNumber int) {
+func (bprv *BaseProvider) EnableWhisper(whisperAddr string, name string, nodeNumber int, processNumber int) {
 	w, err := whisper.NewWhisperWithOptions(whisperAddr, whisper.DefaultPort)
 
 	if err != nil {
@@ -301,14 +301,10 @@ func (bprv *BaseProvider) EnableWhisper(whisperAddr string, nodeNumber int, proc
 	bprv.whisperServerID = bprv.whisper.GetHashID([]byte("glowsrv"))
 
 	// Local ID based on hostname
-	hostname, err := os.Hostname()
-	if err != nil {
-		bprv.Warnf("Could not get hostname: %s", err)
-		hostname = "unknown"
-	}
+	localName := fmt.Sprintf("%s-%d-%d", name, nodeNumber, processNumber)
 
-	bprv.whisperSelfID = crc32.ChecksumIEEE([]byte(hostname))
-	bprv.Infof("using ID 0x%08X (from hostname %s)", bprv.whisperSelfID, hostname)
+	bprv.whisperSelfID = crc32.ChecksumIEEE([]byte(localName))
+	bprv.Infof("using ID 0x%08X (from %s)", bprv.whisperSelfID, localName)
 
 	bprv.whisper.SetID(bprv.whisperSelfID)
 }
