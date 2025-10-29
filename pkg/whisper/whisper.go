@@ -163,6 +163,11 @@ func (w *Whisper) Listen() error {
 	return nil
 }
 
+// GetHashID returns a Whisper ID based on a hash of the provided data.
+func (w *Whisper) GetHashID(data []byte) uint32 {
+	return crc32.ChecksumIEEE(data)
+}
+
 // SetID sets the Whisper's ID
 func (w *Whisper) SetID(id uint32) {
 	w.ID = id
@@ -170,8 +175,7 @@ func (w *Whisper) SetID(id uint32) {
 
 // SetHashID sets the Whisper's ID to a hash of the provided data.
 func (w *Whisper) SetHashID(data []byte) {
-	// Calculate hash of data to use as requested ID
-	w.SetID(crc32.ChecksumIEEE(data))
+	w.SetID(w.GetHashID(data))
 }
 
 // Send sends a susurrus unidirectionally (no reply tracking)
@@ -194,12 +198,14 @@ func (w *Whisper) Send(dest uint32, cmd uint16, data []byte) error {
 
 	// Wire format: dest(4) source(4) cmd(2) nonce(4) length(2) data
 	buf := make([]byte, 16+len(srs.Data))
+
 	binary.BigEndian.PutUint32(buf[0:4], srs.Dest)
 	binary.BigEndian.PutUint32(buf[4:8], srs.Source)
 	binary.BigEndian.PutUint16(buf[8:10], srs.Cmd)
 	binary.BigEndian.PutUint32(buf[10:14], srs.Nonce)
-	binary.BigEndian.PutUint16(buf[14:16], uint16(len(srs.Data)))
+	binary.BigEndian.PutUint16(buf[14:16], srs.Length)
 	copy(buf[16:], srs.Data)
+
 	// Debug log
 	// fmt.Printf("Sending susurrus: dest=0x%08X source=0x%08X Cmd=0x%04X Nonce=%d Len=%d\n", srs.Dest, srs.Source, srs.Cmd, srs.Nonce, len(srs.Data))
 
@@ -250,6 +256,11 @@ func (w *Whisper) recvLoop() {
 			// Filter out our own messages (by source)
 			if srs.Source == w.ID {
 				// fmt.Printf("Ignoring our own message (source=0x%08X)\n", w.ID)
+				continue
+			}
+
+			if srs.Dest != 0 && srs.Dest != w.ID {
+				fmt.Printf("Ignoring message not addressed to us (dest=0x%08X, our ID=0x%08X)\n", srs.Dest, w.ID)
 				continue
 			}
 

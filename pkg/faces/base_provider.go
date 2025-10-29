@@ -297,10 +297,10 @@ func (bprv *BaseProvider) EnableWhisper(whisperAddr string, name string, nodeNum
 	bprv.whisperNodeNumber = nodeNumber
 	bprv.whisperProcessNumber = processNumber
 
-	// Server we'll send to
-	bprv.whisperServerID = crc32.ChecksumIEEE([]byte(fmt.Sprintf("%s-%d", name, nodeNumber)))
+	// Server we'll send to, which is a constant
+	bprv.whisperServerID = bprv.whisper.GetHashID([]byte("glowsrv"))
 
-	// Local ID based on node number
+	// Local ID based on hostname
 	hostname, err := os.Hostname()
 	if err != nil {
 		bprv.Warnf("Could not get hostname: %s", err)
