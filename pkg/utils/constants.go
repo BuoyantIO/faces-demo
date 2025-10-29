@@ -17,6 +17,8 @@
 
 package utils
 
+import "strings"
+
 type SmileyMap struct {
 	smileys map[string]string
 }
@@ -42,6 +44,17 @@ func (sm *SmileyMap) Lookup(name string) string {
 		return smiley
 	}
 
+	// If the smiley starts with 'U+', assume it's a unicode and
+	// return it as-is.
+
+    // If the smiley starts with 'U', assume it's a unicode and return it as-is
+	if strings.HasPrefix(name, "U+") {
+		// Replace "U+" with "&#x" and append a trailing ";"
+		return strings.Replace(name, "U+", "&#x", 1) + ";"
+	}
+
+	// It doesn't look like a unicode and it's not in list,
+	// so return Vomiting as a fallback.
 	return sm.smileys["Vomiting"]
 }
 
@@ -51,8 +64,8 @@ func (sm *SmileyMap) LookupValue(value string) string {
 			return k
 		}
 	}
-
-	return "UNKNOWN"
+	// Pass through unknown values so we can see Unicodes
+	return value
 }
 
 type Palette struct {
