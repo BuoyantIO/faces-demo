@@ -168,16 +168,11 @@ func (w *Whisper) SetID(id uint32) {
 	w.ID = id
 }
 
-// RequestID requests an ID based on a hash of the provided data
-// Waits up to 10 seconds for a response via the pending message system
+// SetHashID sets the Whisper's ID to a hash of the provided data.
 func (w *Whisper) SetHashID(data []byte) {
 	// Calculate hash of data to use as requested ID
 	w.SetID(crc32.ChecksumIEEE(data))
 }
-
-// RequestID sends an ID request (unidirectional) and optimistically sets our ID to the requested hash.
-// It returns the requested ID (hash) or an error if sending the request failed.
-// RequestID removed: susurri are unidirectional; examples should set IDs locally.
 
 // Send sends a susurrus unidirectionally (no reply tracking)
 func (w *Whisper) Send(dest uint32, cmd uint16, data []byte) error {
