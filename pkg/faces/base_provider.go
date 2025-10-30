@@ -299,14 +299,14 @@ func (bprv *BaseProvider) EnableWhisper(whisperAddr string, name string, nodeNum
 
 	// Server we'll send to, which is a constant
 	bprv.whisperServerID = bprv.whisper.GetHashID([]byte("glowsrv"))
+	bprv.Infof("Whisper: server ID 0x%08X", bprv.whisperServerID)
 
 	// Local ID based on hostname
 	localName := fmt.Sprintf("%s-%d-%d", name, nodeNumber, processNumber)
 
 	bprv.whisperSelfID = crc32.ChecksumIEEE([]byte(localName))
-	bprv.Infof("using ID 0x%08X (from %s)", bprv.whisperSelfID, localName)
-
 	bprv.whisper.SetID(bprv.whisperSelfID)
+	bprv.Infof("Whisper enabled: %s", bprv.whisper.String())
 }
 
 func (bprv *BaseProvider) Announce(ok bool, value int) error {
