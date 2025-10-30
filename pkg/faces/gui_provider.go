@@ -38,6 +38,8 @@ type GUIProvider struct {
 	bgColor     string
 	hideKey     bool
 	showPods    bool
+	gridSize    int
+	edgeSize    int
 }
 
 func NewGUIProviderFromEnvironment() *GUIProvider {
@@ -61,11 +63,15 @@ func NewGUIProviderFromEnvironment() *GUIProvider {
 	gprv.bgColor = utils.StringFromEnv("COLOR", "white")
 	gprv.hideKey = utils.BoolFromEnv("HIDE_KEY", false)
 	gprv.showPods = utils.BoolFromEnv("SHOW_PODS", false)
+	gprv.gridSize = utils.IntFromEnv("GRID_SIZE", 4)
+	gprv.edgeSize = utils.IntFromEnv("EDGE_SIZE", 1)
 
 	gprv.Infof("dataPath %s", gprv.dataPath)
 	gprv.Infof("bgColor %s", gprv.bgColor)
 	gprv.Infof("hideKey %v", gprv.hideKey)
 	gprv.Infof("showPods %v", gprv.showPods)
+	gprv.Infof("gridSize %d", gprv.gridSize)
+	gprv.Infof("edgeSize %d", gprv.edgeSize)
 
 	return gprv
 }
@@ -126,6 +132,8 @@ func (gprv *GUIProvider) HTTPGetHandler(w http.ResponseWriter, r *http.Request) 
 			rtext = strings.ReplaceAll(rtext, "%%{color}", gprv.bgColor)
 			rtext = strings.ReplaceAll(rtext, "%%{hide_key}", fmt.Sprintf("%v", gprv.hideKey))
 			rtext = strings.ReplaceAll(rtext, "%%{show_pods}", fmt.Sprintf("%v", gprv.showPods))
+			rtext = strings.ReplaceAll(rtext, "%%{grid_size}", fmt.Sprintf("%d", gprv.gridSize))
+			rtext = strings.ReplaceAll(rtext, "%%{edge_size}", fmt.Sprintf("%d", gprv.edgeSize))
 			rtext = strings.ReplaceAll(rtext, "%%{user}", user)
 			rtext = strings.ReplaceAll(rtext, "%%{user_header}", fmt.Sprintf("%v", gprv.userHeaderName))
 			rtext = strings.ReplaceAll(rtext, "%%{user_agent}", userAgent)

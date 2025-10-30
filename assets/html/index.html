@@ -227,6 +227,19 @@
 	<!-- <div id="log" class="log"><div> -->
 
 	<script>
+		const GRID_SIZE = %%{grid_size};
+		const CENTER_MIN = %%{edge_size};
+		const CENTER_MAX = (GRID_SIZE - 1) - %%{edge_size};
+
+		// How often do we want to repaint the whole screen?
+		const PAINT_INTERVAL_MS = 2000;
+
+		// How long should it take to paint a whole row?
+		let ROW_INTERVAL = Math.floor(PAINT_INTERVAL_MS / GRID_SIZE)
+
+		// How long should it take to paint a single cell?
+		let CELL_INTERVAL = Math.floor(PAINT_INTERVAL_MS / (GRID_SIZE * GRID_SIZE))
+
 		//////// Utilities
 		//
 		// Sucking in all of jQuery is massive overkill, but the $() shorthand
@@ -609,12 +622,9 @@
 				this.lastStatus = 0		// will be an HTTP status code
 				this.sentAt = {}
 
-				this.interval = 2000	// ms
+				this.interval = PAINT_INTERVAL_MS;
 
-				let rowInterval = Math.floor(this.interval / 4)
-				let colInterval = Math.floor(this.interval / 16)
-
-				setTimeout(() => { this.run() }, (row * rowInterval) + (col * colInterval))
+				setTimeout(() => { this.run() }, (row * ROW_INTERVAL) + (col * CELL_INTERVAL))
 			}
 
 			// Helpers to save on keystrokes
@@ -1265,9 +1275,12 @@
 
 			let cells = []
 
-			for (row = 0; row < 4; row++) {
-				for (col = 0; col < 4; col++) {
-					let isCenter = ((row === 1 || row === 2) && (col === 1 || col === 2))
+			for (row = 0; row < GRID_SIZE; row++) {
+				for (col = 0; col < GRID_SIZE; col++) {
+					let isCenterRow = (row >= CENTER_MIN && row <= CENTER_MAX);
+					let isCenterCol = (col >= CENTER_MIN && col <= CENTER_MAX);
+					let isCenter = (isCenterRow && isCenterCol);
+
 					let cellURL = isCenter ? `../face/center/` : `../face/edge/`
 
 					let cell = new Cell(logger, sw, podSet, cellURL, $("cells"), row, col)
