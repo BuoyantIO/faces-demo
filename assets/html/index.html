@@ -23,13 +23,18 @@
 	<Title>Faces</Title>
 
 	<style>
+		:root {
+			--legend-scale: 1;
+			--wrapper-max: 1500px;
+		}
+
 		h1 {
 			font-family: sans-serif;
 		}
 
 		.key {
 			font-family: sans-serif;
-			font-size: 32px;
+			font-size: calc(32px * var(--legend-scale));
 			font-weight: bold;
 			display: inline-block;
 		}
@@ -38,10 +43,10 @@
 			display: inline-block;
 			border: 2px solid grey;
 			border-radius: 8px;
-			height: 60px;
-			width: 60px;
+			height: calc(60px * var(--legend-scale));
+			width: calc(60px * var(--legend-scale));
 			margin: 2px;
-			font-size: 48px;
+			font-size: calc(48px * var(--legend-scale));
 			text-align: center;
 			vertical-align: middle;
 		}
@@ -193,39 +198,91 @@
 			border-top: 1px solid gray;
 			padding-top: .3em;
 		}
+
+        .wrapper {
+          width: min(95vw, var(--wrapper-max));
+          max-width: var(--wrapper-max);
+          margin: 2em auto;
+          padding: 2em;
+          border: 3px solid #888;
+          border-radius: 10px;
+          background-color: #fdfdfd;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+          overflow: auto;
+        }
+
+		body { 
+          display: flex; 
+          flex-direction: column; 
+          min-height: 100vh; 
+        }
+
+        .site-footer {
+          margin-top: auto;
+          text-align: center;
+          padding: 0.75rem 1rem;
+          font-family: sans-serif;
+          font-size: 14px;
+          color: #ffffff;
+          background: rgba(0,0,0,0.25);
+          backdrop-filter: saturate(180%) blur(6px);
+        }
+
+        #main {
+          display: flex;
+          justify-content: center;
+          align-items: flex-start;
+          gap: 16px;
+          flex-wrap: wrap;
+        }
+
+        #column1, #column2, #column3 { float: none; }
+    
+        #column3:empty { display: none; }
+
+       .toolbar {
+         display: flex;
+         flex-wrap: wrap;
+         gap: 8px;
+         margin: 0 0 12px 0;
+         align-items: center;
+       }
+
 	</style>
 </HEAD>
 
-<BODY style="background-color: %%{color}">
+<BODY style=" margin: 0; height: 100vh; background: linear-gradient( 135deg, #003359 0%, /* Navy blue */ #004380 16.6%, /* Sea blue */ #0067c4 33.3%, /* Blue */ #0085fd 50%, /* Electric blue */ #00c1b4 66.6%, /* Teal */ #64f9bf 100% /* Electric teal */ ); background-repeat: no-repeat; background-attachment: fixed; background-size: cover; ">
+  <div class="wrapper">
+	<H1 style="text-align: center;">Faces</H1>
 
-	<H1>Faces</H1>
-
-	<input id="btnToggle" type="button" value="Init..." class="roundedButton margins" />
-	<input id="btnCounters" type="button" value="Init..." class="roundedButton margins" />
-	<input id="btnShowPods" type="button" value="Init..." class="roundedButton margins" />
-	<div id="userDiv" class="inline margins">
-		User: <input id="userName" contenteditable="true" placeholder="unknown"></span>
-	</div>
-
-	<div id="timer" class="inline margins"></div>
-
-	<div id="main">
-		<div id="column1" class="inline-block float-left">
-			<div id="cells" class="vert-margins"></div>
-		</div>
-		<div id="column2" class="inline-block float-left pod-stats">
-			<div id="pods" class="vert-margins"></div>
-		</div>
-		<div id="column3" class="inline-block margins">
-			<div id="key" class="vert-margins margin-left">
-			</div>
-		</div>
-	</div>
+    <div id="main">
+      <div id="column1" class="inline-block float-left">
+        <div id="toolbar" class="toolbar">
+          <input id="btnToggle" type="button" value="Init..." class="roundedButton" />
+          <input id="btnCounters" type="button" value="Init..." class="roundedButton" />
+          <input id="btnShowPods" type="button" value="Init..." class="roundedButton" />
+          <div id="userDiv" class="inline">
+            User: <input id="userName" contenteditable="true" placeholder="unknown">
+          </div>
+          <div id="timer" class="inline"></div>
+        </div>
+    
+        <div id="cells" class="vert-margins"></div>
+      </div>
+    
+      <div id="column2" class="inline-block float-left pod-stats">
+        <div id="pods" class="vert-margins"></div>
+      </div>
+    
+      <div id="column3" class="inline-block margins">
+        <div id="key" class="vert-margins margin-left"></div>
+      </div>
+    </div>
 
 	<div id="xhr"></div>
 
 	<!-- <div id="log" class="log"><div> -->
-
+   </div>
 	<script>
 		const GRID_SIZE = %%{grid_size};
 		const CENTER_MIN = %%{edge_size};
@@ -269,6 +326,35 @@
 			// Return null if not found
 			return null;
 		}
+
+        // ===== Wrapper sizing: keep white wrapper aligned to visible content =====
+        function updateWrapperMax() {
+          // Column widths
+          const CELL_OUTER = 128;
+          const GAP_BETWEEN_COLS = 16; // matches #main
+          const PADDING_X = 64;        // wrapper padding + small safety
+          const col2Fixed = 258;       // .pod-stats width cap
+
+          const col2El = $("column2");
+          const col3El = $("column3");
+
+          const hasPods   = col2El && getComputedStyle(col2El).display !== "none";
+          const hasLegend = col3El && getComputedStyle(col3El).display !== "none" && col3El.childElementCount > 0;
+
+          const col1Width = GRID_SIZE * CELL_OUTER;
+          const col2Width = hasPods ? col2Fixed : 0;
+          const col3Width = hasLegend ? (col3El.offsetWidth || 260) : 0;
+
+          const visibleCols = 1 + (hasPods ? 1 : 0) + (hasLegend ? 1 : 0);
+          const gaps = Math.max(0, visibleCols - 1) * GAP_BETWEEN_COLS;
+
+          const total = col1Width + col2Width + col3Width + gaps + PADDING_X;
+
+          const minCap = Math.min(800, total);
+          const maxCap = Math.max(minCap, Math.ceil(total));
+
+          document.documentElement.style.setProperty("--wrapper-max", `${maxCap}px`);
+        }
 
 		//////// Logger
 		//
@@ -1264,10 +1350,12 @@
 			let showPods = new CounterSwitch(
 				$("btnShowPods"), "Show Pods", "Hide Pods",
 				() => {
-					$("column2").style.display = "none"
+					$("column2").style.display = "none";
+					updateWrapperMax(); // keep wrapper aligned when pods are hidden
 				},
 				() => {
-					$("column2").style.display = "block"
+					$("column2").style.display = "block";
+					updateWrapperMax(); // keep wrapper aligned when pods are shown
 				},
 			)
 
@@ -1289,9 +1377,13 @@
 				$("cells").innerHTML += "<br/>"
 			}
 
-			if (!%%{hide_key}) {
-				key = new Key($("key"))
-			}
+            if (!%%{hide_key}) {
+              key = new Key($("key"));
+			  updateWrapperMax();
+            } else {
+              $("column3").style.display = "none";
+			  updateWrapperMax();
+            }
 
 			if (%%{show_pods}) {
 				showPods.toggle()
@@ -1307,7 +1399,24 @@
 			// let timer = new Timer($("timer"), $("btnToggle"), 2, () => {
 			// 	q.run()
 			// })
+		    document.getElementById('copyright-year').textContent = new Date().getFullYear();
+
+			// Scale the legend based on GRID_SIZE
+			function updateLegendScale() {
+				const scale = Math.max(0.55, Math.min(1, 4 / GRID_SIZE));
+				document.documentElement.style.setProperty("--legend-scale", String(scale));
+			}
+			updateLegendScale();
+
+			// Initial wrapper sizing + keep it responsive on resize
+			updateWrapperMax();
+			window.addEventListener("resize", updateWrapperMax);
 		}
 	</script>
 
+    <footer class="site-footer">
+      &copy; <span id="copyright-year"></span> Buoyant Inc.
+    </footer>
+
 </BODY>
+</HTML>
