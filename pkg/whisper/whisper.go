@@ -103,7 +103,7 @@ func NewWhisperWithOptions(groupAddr string, port int) (*Whisper, error) {
 		return nil, fmt.Errorf("failed to create send connection: %v", err)
 	}
 
-	fmt.Printf("Setup complete - sending to %s:%d\n", groupAddr, port)
+	// fmt.Printf("Setup complete - sending to %s:%d\n", groupAddr, port)
 
 	w := &Whisper{
 		groupAddr: groupAddr,
@@ -139,7 +139,7 @@ func (w *Whisper) Listen() error {
 			Port: w.port,
 		}
 
-		fmt.Printf("Setting up unicast on %s\n", addr.String())
+		// fmt.Printf("Setting up unicast on %s\n", addr.String())
 
 		conn, err = net.ListenUDP("udp", addr)
 		if err != nil {
@@ -152,7 +152,7 @@ func (w *Whisper) Listen() error {
 			return fmt.Errorf("failed to resolve multicast address: %v", err)
 		}
 
-		fmt.Printf("Setting up multicast on %s\n", mcastAddr.String())
+		// fmt.Printf("Setting up multicast on %s\n", mcastAddr.String())
 
 		conn, err = net.ListenMulticastUDP("udp", nil, mcastAddr)
 
@@ -166,6 +166,17 @@ func (w *Whisper) Listen() error {
 	go w.recvLoop()
 
 	return nil
+}
+
+// String returns a formatted string representation of the Whisper instance
+func (w *Whisper) String() string {
+	mode := "multicast"
+
+	if w.isUnicast {
+		mode = "unicast"
+	}
+
+	return fmt.Sprintf("whisper@%s:%d (%s, id=0x%08X)", w.groupAddr, w.port, mode, w.ID)
 }
 
 // GetHashID returns a Whisper ID based on a hash of the provided data.
@@ -215,9 +226,11 @@ func (w *Whisper) Send(dest uint32, cmd uint16, data []byte) error {
 	// fmt.Printf("Sending susurrus: dest=0x%08X source=0x%08X Cmd=0x%04X Nonce=%d Len=%d\n", srs.Dest, srs.Source, srs.Cmd, srs.Nonce, len(srs.Data))
 
 	_, err := w.sendConn.Write(buf)
-	if err != nil {
-		fmt.Printf("Send error: %v\n", err)
-	}
+
+	// if err != nil {
+	// 	fmt.Printf("Send error: %v\n", err)
+	// }
+
 	return err
 }
 
@@ -265,7 +278,7 @@ func (w *Whisper) recvLoop() {
 			}
 
 			if srs.Dest != 0 && srs.Dest != w.ID {
-				fmt.Printf("Ignoring message not addressed to us (dest=0x%08X, our ID=0x%08X)\n", srs.Dest, w.ID)
+				// fmt.Printf("Ignoring message not addressed to us (dest=0x%08X, our ID=0x%08X)\n", srs.Dest, w.ID)
 				continue
 			}
 
