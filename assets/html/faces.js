@@ -39,28 +39,6 @@ function $(id) {
     return document.getElementById(id)
 }
 
-// getCookie (from MDN) clearly demonstrates why we can't have nice things.
-
-function getCookie(name) {
-    // Split cookie string and get all individual name=value pairs in an array
-    var cookieArr = document.cookie.split(";");
-
-    // Loop through the array elements
-    for (var i = 0; i < cookieArr.length; i++) {
-        var cookiePair = cookieArr[i].split("=");
-
-        /* Removing whitespace at the beginning of the cookie name
-        and compare it with the given string */
-        if (name == cookiePair[0].trim()) {
-            // Decode the cookie value and return
-            return decodeURIComponent(cookiePair[1]);
-        }
-    }
-
-    // Return null if not found
-    return null;
-}
-
 // ===== Wrapper sizing: keep white wrapper aligned to visible content =====
 function updateWrapperMax() {
     // Column widths
@@ -169,10 +147,9 @@ class StartStop {
 // UserController is a class to (totally insecurely) manage the username.
 
 class UserController {
-    constructor(logger, userDiv, userInput, initialUser) {
+    constructor(logger, userInput, initialUser) {
         this.logger = logger;
         this.logger.info("Starting UserController")
-        this.userDiv = userDiv;		// not an ID, the div itself
         this.userInput = userInput;	// not an ID, the element itself
         this.userInput.addEventListener("keydown",
             (event) => {
@@ -440,7 +417,6 @@ class Cell {
 
         this.lastUpdated = new Date().getTime()
         this.lastStatus = 0		// will be an HTTP status code
-        this.sentAt = {}
 
         this.interval = PAINT_INTERVAL_MS;
 
@@ -616,7 +592,7 @@ class Cell {
         // this, so we use a custom header to force preflighting.
         xhr.setRequestHeader("X-Custom-Header", "custom")
 
-        // OK -- save the time we sent the request, and off we go.
+        // OK -- off we go.
         // this.info(`[${xhrName}] sending XHR`)
         xhr.send();
     }
@@ -866,188 +842,6 @@ class CellWatcher {
     }
 }
 
-//////// Markers
-//
-// Markers is a class that updates a div with colored squares to provide
-// hints about what happened over time.
-
-class Markers {
-    constructor(markerdiv, rowlength) {
-        this.markerdiv = markerdiv	// not an ID, the div itself
-        this.rowlength = rowlength	// how many markers per row?
-        this.currentrow = 0 		// how many markers are on the current row?
-    }
-
-    mark(shape, fgColor, bgColor) {
-        this.markerdiv.innerHTML += `
-	<div class="marker" style="background-color:${bgColor}">
-		<svg width="50" height="50" xmlns="http://www.w3.org/2000/svg">
-		    <g transform="rotate(0 25 25)">
-			    <polygon points="${shape}" fill="${fgColor}" stroke="black"></polygon>
-		    </g>
-		</svg>
-	</div>`
-
-        this.currentrow++
-
-        if (this.currentrow >= this.rowlength) {
-            $("markers").innerHTML += "<br />"
-            this.currentrow = 0
-        }
-    }
-}
-
-//////// XHR
-//
-// Fetcher is our real test class: fetch from the face service and render the response
-// in the UI.
-
-class Fetcher {
-    constructor(logger, markers, xhrdiv, fetchURL) {
-        this.logger = logger		// Logger object
-        this.markers = markers		// Markers object
-        this.xhrdiv = xhrdiv		// Div (not the ID, the div!) to update with XHR results
-        this.fetchURL = fetchURL	// URL to fetch
-
-        this.count = 0				// How many requests have we done?
-        this.lastXSRF = undefined	// Last XSRF value we saw
-        this.sentAt = undefined		// When we last sent a request
-    }
-
-    // Helpers to save on keystrokes
-    info(msg) { this.logger.info(msg) }
-    success(msg) { this.logger.success(msg) }
-    fail(msg) { this.logger.fail(msg) }
-
-    // Run can be called manually, but it's most useful when used as the
-    // callable of a Timer.
-    run() {
-        // this.info("Setting up XHR...")
-
-        let xhr = new XMLHttpRequest();
-
-        xhr.addEventListener("load", () => {
-            // This is the success case: our XHR succeeded, and we should
-            // have a JSON quote dictionary as a response. It has several
-            // attributes, but the only one we're interested in is the quote
-            // of the moment itself.
-            //
-            // Start by figuring out how long it took to get the response...
-            let now = new Date()
-            let latency = now - this.sentAt
-
-            // ...then figure out what we got.
-            let text = undefined
-            let shape = undefined
-            let fgColor = undefined	// color of the shape, as opposed to color of the background
-
-            // ...then check the status code.
-            if (xhr.status == 504) {
-                text = `Timeout after ${latency}ms`
-                shape = "19.000,49.000 31.000,49.000 31.000,1.000 19.000,1.000"
-                fgColor = Cell.colors.cyan
-            }
-            else if (xhr.status != 200) {
-                text = `Unknown status ${xhr.status} after ${latency}ms`
-                shape = "19.000,49.000 31.000,49.000 31.000,1.000 19.000,1.000"
-                fgColor = Cell.colors.purple
-            }
-            else {
-                // Parse JSON!
-                try {
-                    let obj = JSON.parse(xhr.responseText)
-                    text = obj.quote
-                    shape = obj.shape
-                    fgColor = obj.color
-                }
-                catch (e) {
-                    // Whoops, something went wrong. If it's a SyntaxError, that
-                    // probably means we got bad JSON. Otherwise, it's... who knows?
-                    if (e instanceof SyntaxError) {
-                        text = `Could not parse QotM: ${e.message}\n${xhr.responseText}`
-                        shape = "19.000,49.000 31.000,49.000 31.000,1.000 19.000,1.000"
-                        fgColor = Cell.colors.purple
-                    }
-                    else {
-                        text = `Missing QotM? ${e.message}`
-                        shape = "19.000,49.000 31.000,49.000 31.000,1.000 19.000,1.000"
-                        fgColor = Cell.colors.purple
-                    }
-                }
-            }
-
-            // OK, build up messages to show the user, and while we're at it,
-            // check to see if we have a new session now. We can't actually see
-            // the real auth token (that's marked HTTPOnly), but we can see the
-            // XSRF-protection cookie, and it changes whenever the auth token does.
-            let decoration = `${latency}ms`
-
-            let bgColor = Cell.colors.green
-            let curXSRF = getCookie("ambassador_xsrf.keycloak-multi.default")
-
-            if (curXSRF != this.lastXSRF) {
-                bgColor = Cell.colors.blue
-                decoration += ", new session token"
-                this.lastXSRF = curXSRF
-            }
-
-            // FINALLY: show 'em what we got.
-            let msg = `[${this.count}] XHR success (${decoration}): ${text}`
-            // this.success(msg);
-
-            let nowISO = now.toISOString()
-            this.xhrdiv.innerHTML = `<span style="background-color:${bgColor}"><p>${nowISO}: ${msg}</p></span>`
-            this.markers.mark(shape, fgColor, bgColor)
-        })
-
-        xhr.addEventListener("error", () => {
-            // This is the failure case: something went wrong. A really
-            // annoying thing about XHR is that we don't get anything useful
-            // about _what_ went wrong, but, well, c'est la vie.
-            //
-            // Start, again, with the latency...
-            let now = new Date()
-            let latency = now - this.sentAt
-
-            // ...and then just show that something failed.
-            let msg = `[${this.count}] XHR error (${latency}ms)`
-            // this.fail(msg);
-
-            let nowISO = now.toISOString()
-            this.xhrdiv.innerHTML = `<span style="background-color:${Cell.colors.red}"><p>${nowISO}: Failed!</p></span>`
-
-            // FIXME: this looks like the wrong arguments for calling this.markers.mark
-            this.markers.mark("red")
-        })
-
-        // Here's where we actually prep and send the request...
-        this.count++
-
-        // This business with appending the date as a query-string is because
-        // Safari (at least) just _refuses_ to pay attention to the Cache-Control
-        // header we add below, and we _really_ don't want this to be cached.
-        //
-        // Safari is why we can't have nice things.
-        let now = new Date().toISOString()
-        xhr.open("GET", `${this.fetchURL}?now=${now}`);
-        xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
-
-        // We must send credentials...
-        xhr.withCredentials = true
-
-        // ...and we really want to be sure that the browser turns on CORS for
-        // this, so we use a custom header to force preflighting.
-        xhr.setRequestHeader("X-Custom-Header", "custom")
-
-        // OK -- save the time we sent the request, and off we go.
-        // this.info("Sending XHR...")
-        this.sentAt = new Date()
-        xhr.send();
-
-        // this.info(`[${this.count}] XHR sent`)
-    }
-}
-
 //////// Mainline
 //
 // When the page loads, we set up the world and fire up a timer to get things
@@ -1059,7 +853,7 @@ function initializeFaces() {
     logger.info(`Page loaded; user ${initialUser}`)
     logger.info(`User-Agent: ${CONFIG.userAgent}`)
 
-    let userControl = new UserController(logger, $("userDiv"), $("userName"), initialUser)
+    let userControl = new UserController(logger, $("userName"), initialUser)
 
     let sw = new StartStop($("btnToggle"), userControl)
 
@@ -1127,12 +921,6 @@ function initializeFaces() {
 
     sw.cells = cells
 
-    // let markers = new Markers($("markers"), 16)
-    // let q = new Fetcher(logger, markers, $("xhr"), `../face/cell/`)
-
-    // let timer = new Timer($("timer"), $("btnToggle"), 2, () => {
-    // 	q.run()
-    // })
     document.getElementById('copyright-year').textContent = new Date().getFullYear();
 
     // // Scale the legend based on GRID_SIZE
