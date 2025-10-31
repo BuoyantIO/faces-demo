@@ -39,7 +39,8 @@ type GUIProvider struct {
 	bgColor     string
 	hideKey     bool
 	showPods    bool
-	gridSize    int
+	numRows     int
+	numCols     int
 	edgeSize    int
 	startActive bool
 }
@@ -74,7 +75,8 @@ func NewGUIProviderFromEnvironment() (*GUIProvider, error) {
 	gprv.bgColor = utils.StringFromEnv("COLOR", "white")
 	gprv.hideKey = utils.BoolFromEnv("HIDE_KEY", false)
 	gprv.showPods = utils.BoolFromEnv("SHOW_PODS", false)
-	gprv.gridSize = utils.IntFromEnv("GRID_SIZE", 4)
+	gprv.numRows = utils.IntFromEnv("NUM_ROWS", 4)
+	gprv.numCols = utils.IntFromEnv("NUM_COLS", 4)
 	gprv.edgeSize = utils.IntFromEnv("EDGE_SIZE", 1)
 	gprv.startActive = utils.BoolFromEnv("START_ACTIVE", true)
 
@@ -82,7 +84,8 @@ func NewGUIProviderFromEnvironment() (*GUIProvider, error) {
 	gprv.Infof("bgColor %s", gprv.bgColor)
 	gprv.Infof("hideKey %v", gprv.hideKey)
 	gprv.Infof("showPods %v", gprv.showPods)
-	gprv.Infof("gridSize %d", gprv.gridSize)
+	gprv.Infof("numRows %d", gprv.numRows)
+	gprv.Infof("numCols %d", gprv.numCols)
 	gprv.Infof("edgeSize %d", gprv.edgeSize)
 	gprv.Infof("startActive %v", gprv.startActive)
 
@@ -279,7 +282,8 @@ func (gprv *GUIProvider) HTTPGetHandler(w http.ResponseWriter, r *http.Request) 
 						rtext = strings.ReplaceAll(rtext, "%%{color}", gprv.bgColor)
 						rtext = strings.ReplaceAll(rtext, "%%{hide_key}", fmt.Sprintf("%v", gprv.hideKey))
 						rtext = strings.ReplaceAll(rtext, "%%{show_pods}", fmt.Sprintf("%v", gprv.showPods))
-						rtext = strings.ReplaceAll(rtext, "%%{grid_size}", fmt.Sprintf("%d", gprv.gridSize))
+						rtext = strings.ReplaceAll(rtext, "%%{num_rows}", fmt.Sprintf("%d", gprv.numRows))
+						rtext = strings.ReplaceAll(rtext, "%%{num_cols}", fmt.Sprintf("%d", gprv.numCols))
 						rtext = strings.ReplaceAll(rtext, "%%{edge_size}", fmt.Sprintf("%d", gprv.edgeSize))
 						rtext = strings.ReplaceAll(rtext, "%%{start_active}", fmt.Sprintf("%v", gprv.startActive))
 						rtext = strings.ReplaceAll(rtext, "%%{user}", user)
