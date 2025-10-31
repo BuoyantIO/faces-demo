@@ -34,10 +34,21 @@
       <input id="btnToggle" type="button" value="Init..." class="roundedButton" />
       <input id="btnCounters" type="button" value="Init..." class="roundedButton" />
       <input id="btnShowPods" type="button" value="Init..." class="roundedButton" />
+      <input id="btnShowKey" type="button" value="Show Key" class="roundedButton" style="display: none;" />
       <div id="userDiv" class="inline">
         User: <input id="userName" contenteditable="true" placeholder="unknown">
       </div>
       <div id="timer" class="inline"></div>
+    </div>
+
+    <div id="keyPopup" class="key-popup-overlay" style="display: none;">
+      <div class="key-popup-content">
+        <div class="key-popup-header">
+          <h2>Legend</h2>
+          <button id="btnCloseKey" class="key-popup-close">&times;</button>
+        </div>
+        <div id="keyPopupBody" class="key-popup-body"></div>
+      </div>
     </div>
 
     <div id="main">
