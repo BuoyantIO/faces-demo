@@ -107,12 +107,18 @@ class Logger {
 // StartStop is a class to manage an on/off button. Very fancy, I know.
 
 class StartStop {
-    constructor(button, userControl) {
+    constructor(button, userControl, startActive) {
         this.button = button	// not an ID, the button itself
         this.button.onclick = () => { this.toggle() }
         this.userControl = userControl
         this.cells = undefined
-        this.start()
+
+        if (startActive) {
+            this.start()
+        }
+        else {
+            this.stop()
+        }
     }
 
     toggle() {
@@ -125,7 +131,7 @@ class StartStop {
             if (this.cells != undefined) {
                 for (let cell of this.cells) {
                     // console.log(`start cell ${cell.row}-${cell.col}`)
-                    cell.reschedule(0)
+                    cell.becomeActive()
                 }
             }
         }
@@ -420,7 +426,9 @@ class Cell {
 
         this.interval = PAINT_INTERVAL_MS;
 
-        setTimeout(() => { this.run() }, (row * ROW_INTERVAL) + (col * CELL_INTERVAL))
+        if (this.sw.active) {
+            this.becomeActive()
+        }
     }
 
     // Helpers to save on keystrokes
@@ -429,6 +437,12 @@ class Cell {
     fail(msg) { this.logger.fail(msg) }
 
     name() { return `${this.row}-${this.col}-${this.count}` }
+
+    becomeActive() {
+        // Start the cell's update loop after an initial delay based
+        // on its position in the grid.
+        setTimeout(() => { this.run() }, (this.row * ROW_INTERVAL) + (this.col * CELL_INTERVAL))
+    }
 
     reschedule(latency) {
         if (!this.sw.active) {
@@ -855,7 +869,7 @@ function initializeFaces() {
 
     let userControl = new UserController(logger, $("userName"), initialUser)
 
-    let sw = new StartStop($("btnToggle"), userControl)
+    let sw = new StartStop($("btnToggle"), userControl, CONFIG.startActive)
 
     let enableCounters = new CounterSwitch(
         $("btnCounters"), "Hide", "Show",
