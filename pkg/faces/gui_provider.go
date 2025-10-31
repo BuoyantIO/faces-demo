@@ -38,7 +38,8 @@ type GUIProvider struct {
 	bgColor     string
 	hideKey     bool
 	showPods    bool
-	gridSize    int
+	numRows     int
+	numCols     int
 	edgeSize    int
 }
 
@@ -63,14 +64,16 @@ func NewGUIProviderFromEnvironment() *GUIProvider {
 	gprv.bgColor = utils.StringFromEnv("COLOR", "white")
 	gprv.hideKey = utils.BoolFromEnv("HIDE_KEY", false)
 	gprv.showPods = utils.BoolFromEnv("SHOW_PODS", false)
-	gprv.gridSize = utils.IntFromEnv("GRID_SIZE", 4)
+	gprv.numRows = utils.IntFromEnv("NUM_ROWS", 4)
+	gprv.numCols = utils.IntFromEnv("NUM_COLS", 4)
 	gprv.edgeSize = utils.IntFromEnv("EDGE_SIZE", 1)
 
 	gprv.Infof("dataPath %s", gprv.dataPath)
+	gprv.Infof("faceService %s", gprv.faceService)
 	gprv.Infof("bgColor %s", gprv.bgColor)
 	gprv.Infof("hideKey %v", gprv.hideKey)
 	gprv.Infof("showPods %v", gprv.showPods)
-	gprv.Infof("gridSize %d", gprv.gridSize)
+	gprv.Infof("grid %dx%d", gprv.numRows, gprv.numCols)
 	gprv.Infof("edgeSize %d", gprv.edgeSize)
 
 	return gprv
@@ -132,7 +135,8 @@ func (gprv *GUIProvider) HTTPGetHandler(w http.ResponseWriter, r *http.Request) 
 			rtext = strings.ReplaceAll(rtext, "%%{color}", gprv.bgColor)
 			rtext = strings.ReplaceAll(rtext, "%%{hide_key}", fmt.Sprintf("%v", gprv.hideKey))
 			rtext = strings.ReplaceAll(rtext, "%%{show_pods}", fmt.Sprintf("%v", gprv.showPods))
-			rtext = strings.ReplaceAll(rtext, "%%{grid_size}", fmt.Sprintf("%d", gprv.gridSize))
+			rtext = strings.ReplaceAll(rtext, "%%{num_rows}", fmt.Sprintf("%d", gprv.numRows))
+			rtext = strings.ReplaceAll(rtext, "%%{num_cols}", fmt.Sprintf("%d", gprv.numCols))
 			rtext = strings.ReplaceAll(rtext, "%%{edge_size}", fmt.Sprintf("%d", gprv.edgeSize))
 			rtext = strings.ReplaceAll(rtext, "%%{user}", user)
 			rtext = strings.ReplaceAll(rtext, "%%{user_header}", fmt.Sprintf("%v", gprv.userHeaderName))
@@ -142,6 +146,7 @@ func (gprv *GUIProvider) HTTPGetHandler(w http.ResponseWriter, r *http.Request) 
 		// /face/ is a special case: we forward it to the face workload. This is
 		// here because it allows running the demo without an ingress controller.
 		// (Obviously, this is _NOT_ a good idea outside of demos!)
+
 		key = "face"
 		reqStart := time.Now()
 
