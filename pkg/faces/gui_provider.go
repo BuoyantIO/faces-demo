@@ -181,9 +181,11 @@ func (gprv *GUIProvider) HTTPGetHandler(w http.ResponseWriter, r *http.Request) 
 		}
 
 		key = "static"
+		interpolate := false
 
 		if r.URL.Path == "/index.html" {
 			key = "index"
+			interpolate = true
 		}
 
 		filePath := filepath.Join(gprv.dataPath, strings.TrimPrefix(r.URL.Path, "/"))
@@ -201,8 +203,6 @@ func (gprv *GUIProvider) HTTPGetHandler(w http.ResponseWriter, r *http.Request) 
 			rcode = http.StatusOK
 			rtext = string(raw)
 
-			interpolate := false
-
 			switch filepath.Ext(filePath) {
 			case ".html":
 				rtype = "text/html"
@@ -210,7 +210,6 @@ func (gprv *GUIProvider) HTTPGetHandler(w http.ResponseWriter, r *http.Request) 
 				rtype = "text/css"
 			case ".js":
 				rtype = "application/javascript"
-				interpolate = true
 			case ".json":
 				rtype = "application/json"
 			case ".png":

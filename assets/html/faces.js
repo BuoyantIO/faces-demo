@@ -15,9 +15,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-const GRID_SIZE = %%{grid_size};
-const CENTER_MIN = %%{edge_size};
-const CENTER_MAX = (GRID_SIZE - 1) - %%{edge_size};
+// Load configuration from embedded JSON
+const CONFIG = JSON.parse(document.getElementById('faces-config').textContent);
+
+const GRID_SIZE = CONFIG.gridSize;
+const CENTER_MIN = CONFIG.edgeSize;
+const CENTER_MAX = (GRID_SIZE - 1) - CONFIG.edgeSize;
 
 // How often do we want to repaint the whole screen?
 const PAINT_INTERVAL_MS = 2000;
@@ -604,7 +607,7 @@ class Cell {
         let now = new Date().toISOString()
         xhr.open("GET", `${this.fetchURL}?row=${this.row}&col=${this.col}&now=${now}`);
         xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
-        xhr.setRequestHeader("%%{user_header}", this.sw.userControl.user);
+        xhr.setRequestHeader(CONFIG.userHeader, this.sw.userControl.user);
 
         // We must send credentials...
         xhr.withCredentials = true
@@ -1050,11 +1053,11 @@ class Fetcher {
 // When the page loads, we set up the world and fire up a timer to get things
 // moving.
 function initializeFaces() {
-    let initialUser = "%%{user}";
+    let initialUser = CONFIG.user;
     let logger = new Logger($("log"))
 
     logger.info(`Page loaded; user ${initialUser}`)
-    logger.info(`User-Agent: %%{user_agent}`)
+    logger.info(`User-Agent: ${CONFIG.userAgent}`)
 
     let userControl = new UserController(logger, $("userDiv"), $("userName"), initialUser)
 
@@ -1108,7 +1111,7 @@ function initializeFaces() {
         $("cells").innerHTML += "<br/>"
     }
 
-    if (!%%{hide_key}) {
+    if (!CONFIG.hideKey) {
         key = new Key($("key"));
         updateWrapperMax();
     } else {
@@ -1116,7 +1119,7 @@ function initializeFaces() {
         updateWrapperMax();
     }
 
-    if (%%{show_pods}) {
+    if (CONFIG.showPods) {
         showPods.toggle()
     }
 
