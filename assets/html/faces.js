@@ -32,7 +32,8 @@ try {
         user: "unknown",
         userAgent: "unknown-agent",
         userHeader: "x-faces-user",
-        gridSize: 4,
+        numRows: 4,
+        numCols: 4,
         edgeSize: 1,
         startActive: true,
         hideKey: false,
@@ -41,18 +42,22 @@ try {
 }
 
 
-const GRID_SIZE = CONFIG.gridSize;
-const CENTER_MIN = CONFIG.edgeSize;
-const CENTER_MAX = (GRID_SIZE - 1) - CONFIG.edgeSize;
+const NUM_ROWS = CONFIG.numRows;
+const CENTER_MIN_ROW = CONFIG.edgeSize;
+const CENTER_MAX_ROW = (NUM_ROWS - 1) - CONFIG.edgeSize;
+
+const NUM_COLS = CONFIG.numCols;
+const CENTER_MIN_COL = CONFIG.edgeSize;
+const CENTER_MAX_COL = (NUM_COLS - 1) - CONFIG.edgeSize;
 
 // How often do we want to repaint the whole screen?
 const PAINT_INTERVAL_MS = 2000;
 
 // How long should it take to paint a whole row?
-let ROW_INTERVAL = Math.floor(PAINT_INTERVAL_MS / GRID_SIZE)
+let ROW_INTERVAL = Math.floor(PAINT_INTERVAL_MS / NUM_ROWS)
 
 // How long should it take to paint a single cell?
-let CELL_INTERVAL = Math.floor(PAINT_INTERVAL_MS / (GRID_SIZE * GRID_SIZE))
+let CELL_INTERVAL = Math.floor(PAINT_INTERVAL_MS / (NUM_ROWS * NUM_COLS))
 
 //////// Utilities
 //
@@ -76,7 +81,7 @@ function updateWrapperMax() {
     const hasPods = col2El && getComputedStyle(col2El).display !== "none";
     const hasLegend = col3El && getComputedStyle(col3El).display !== "none" && col3El.childElementCount > 0;
 
-    const col1Width = GRID_SIZE * CELL_OUTER;
+    const col1Width = NUM_COLS * CELL_OUTER;
     const col2Width = hasPods ? col2Fixed : 0;
     const col3Width = hasLegend ? (col3El.offsetWidth || 260) : 0;
 
@@ -928,10 +933,10 @@ function initializeFaces() {
 
     let cells = []
 
-    for (let row = 0; row < GRID_SIZE; row++) {
-        for (let col = 0; col < GRID_SIZE; col++) {
-            let isCenterRow = (row >= CENTER_MIN && row <= CENTER_MAX);
-            let isCenterCol = (col >= CENTER_MIN && col <= CENTER_MAX);
+    for (let row = 0; row < NUM_ROWS; row++) {
+        for (let col = 0; col < NUM_COLS; col++) {
+            let isCenterRow = (row >= CENTER_MIN_ROW && row <= CENTER_MAX_ROW);
+            let isCenterCol = (col >= CENTER_MIN_COL && col <= CENTER_MAX_COL);
             let isCenter = (isCenterRow && isCenterCol);
 
             let cellURL = isCenter ? `../face/center/` : `../face/edge/`

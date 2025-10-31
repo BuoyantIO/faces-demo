@@ -224,7 +224,7 @@ body {
 #main {
     display: flex;
     justify-content: center;
-    align-items: flex-start;
+    align-items: stretch;
     gap: 16px;
     flex-wrap: wrap;
 }
@@ -245,4 +245,5 @@ body {
     gap: 8px;
     margin: 0 0 12px 0;
     align-items: center;
+    justify-content: center;
 }
