@@ -134,7 +134,8 @@ func (gprv *GUIProvider) HTTPGetHandler(w http.ResponseWriter, r *http.Request) 
 		key = "face"
 		reqStart := time.Now()
 
-		url := fmt.Sprintf("http://%s/%s", gprv.faceService, r.URL.Path[6:])
+		facePath := strings.TrimPrefix(r.URL.Path, "/face/")
+		url := fmt.Sprintf("http://%s/%s", gprv.faceService, facePath)
 
 		rq := r.URL.RawQuery
 
@@ -204,8 +205,8 @@ func (gprv *GUIProvider) HTTPGetHandler(w http.ResponseWriter, r *http.Request) 
 		// Turn the query path into an absolute path and make sure it stays
 		// within the dataPath directory.
 		relURLPath := strings.TrimPrefix(r.URL.Path, "/")
-		filePath := filepath.Join(gprv.absDataPath, relURLPath)
-		absFilePath, err := filepath.Abs(filepath.Clean(filePath))
+		relFilePath := filepath.Join(gprv.absDataPath, relURLPath)
+		absFilePath, err := filepath.Abs(filepath.Clean(relFilePath))
 
 		gprv.Debugf("%s: rel %s abs %s", r.URL.Path, relURLPath, absFilePath)
 
@@ -234,21 +235,23 @@ func (gprv *GUIProvider) HTTPGetHandler(w http.ResponseWriter, r *http.Request) 
 				rtype = "text/plain"
 				rtext = "file not found"
 			} else {
-				raw, err := os.ReadFile(filePath)
+				raw, err := os.ReadFile(absFilePath)
 
 				if err != nil {
-					gprv.Infof("%s: file not found", filePath)
+					gprv.Infof("%s: file not found", absFilePath)
 
 					rcode = http.StatusNotFound
 					rtype = "text/plain"
-					rtext = fmt.Sprintf("error loading %s: %s", filePath, err)
+					// We deliberately use relFilePath here to avoid leaking our
+					// data path to clients.
+					rtext = fmt.Sprintf("error loading %s: %s", relFilePath, err)
 				} else {
-					gprv.Debugf("%s: loaded", filePath)
+					gprv.Debugf("%s: loaded", absFilePath)
 
 					rcode = http.StatusOK
 					rtext = string(raw)
 
-					switch filepath.Ext(filePath) {
+					switch filepath.Ext(absFilePath) {
 					case ".html":
 						rtype = "text/html"
 					case ".css":
@@ -272,7 +275,7 @@ func (gprv *GUIProvider) HTTPGetHandler(w http.ResponseWriter, r *http.Request) 
 					}
 
 					if interpolate {
-						gprv.Debugf("%s: interpolating", filePath)
+						gprv.Debugf("%s: interpolating", absFilePath)
 						rtext = strings.ReplaceAll(rtext, "%%{color}", gprv.bgColor)
 						rtext = strings.ReplaceAll(rtext, "%%{hide_key}", fmt.Sprintf("%v", gprv.hideKey))
 						rtext = strings.ReplaceAll(rtext, "%%{show_pods}", fmt.Sprintf("%v", gprv.showPods))
