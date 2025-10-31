@@ -113,35 +113,11 @@ func (gprv *GUIProvider) HTTPGetHandler(w http.ResponseWriter, r *http.Request) 
 		rcode = http.StatusOK
 		rtype = "text/plain"
 		rtext = "Ready and waiting!"
-	} else if r.URL.Path == "/" || r.URL.Path == "/index.html" {
-		// "/" means "index.html", which we expect to find in the dataPath.
-		key = "index"
-		rcode = http.StatusOK
-
-		indexPath := filepath.Join(gprv.dataPath, "index.html")
-		gprv.Debugf("...loading %s", indexPath)
-
-		raw, err := os.ReadFile(indexPath)
-
-		if err != nil {
-			rcode = http.StatusNotFound
-			rtype = "text/plain"
-			rtext = fmt.Sprintf("error loading %s: %s", indexPath, err)
-		} else {
-			rtext = string(raw)
-			rtext = strings.ReplaceAll(rtext, "%%{color}", gprv.bgColor)
-			rtext = strings.ReplaceAll(rtext, "%%{hide_key}", fmt.Sprintf("%v", gprv.hideKey))
-			rtext = strings.ReplaceAll(rtext, "%%{show_pods}", fmt.Sprintf("%v", gprv.showPods))
-			rtext = strings.ReplaceAll(rtext, "%%{grid_size}", fmt.Sprintf("%d", gprv.gridSize))
-			rtext = strings.ReplaceAll(rtext, "%%{edge_size}", fmt.Sprintf("%d", gprv.edgeSize))
-			rtext = strings.ReplaceAll(rtext, "%%{user}", user)
-			rtext = strings.ReplaceAll(rtext, "%%{user_header}", fmt.Sprintf("%v", gprv.userHeaderName))
-			rtext = strings.ReplaceAll(rtext, "%%{user_agent}", userAgent)
-		}
-	} else if strings.HasPrefix(r.URL.Path, "/face/") {
+	} else if (r.Method == "GET") && strings.HasPrefix(r.URL.Path, "/face/") {
 		// /face/ is a special case: we forward it to the face workload. This is
 		// here because it allows running the demo without an ingress controller.
 		// (Obviously, this is _NOT_ a good idea outside of demos!)
+
 		key = "face"
 		reqStart := time.Now()
 
@@ -197,6 +173,71 @@ func (gprv *GUIProvider) HTTPGetHandler(w http.ResponseWriter, r *http.Request) 
 			reqLatencyMs := reqEnd.Sub(reqStart).Milliseconds()
 
 			gprv.Debugf("...%s (%dms): %d", url, reqLatencyMs, rcode)
+		}
+	} else if r.Method == "GET" && r.URL.RawQuery == "" {
+		// Try to read the file from our dataPath.
+		if r.URL.Path == "/" {
+			r.URL.Path = "/index.html"
+		}
+
+		key = "static"
+
+		if r.URL.Path == "/index.html" {
+			key = "index"
+		}
+
+		filePath := filepath.Join(gprv.dataPath, strings.TrimPrefix(r.URL.Path, "/"))
+		raw, err := os.ReadFile(filePath)
+
+		if err != nil {
+			gprv.Infof("%s: file not found", filePath)
+
+			rcode = http.StatusNotFound
+			rtype = "text/plain"
+			rtext = fmt.Sprintf("error loading %s: %s", filePath, err)
+		} else {
+			gprv.Debugf("%s: loaded", filePath)
+
+			rcode = http.StatusOK
+			rtext = string(raw)
+
+			interpolate := false
+
+			switch filepath.Ext(filePath) {
+			case ".html":
+				rtype = "text/html"
+			case ".css":
+				rtype = "text/css"
+			case ".js":
+				rtype = "application/javascript"
+				interpolate = true
+			case ".json":
+				rtype = "application/json"
+			case ".png":
+				rtype = "image/png"
+			case ".jpg", ".jpeg":
+				rtype = "image/jpeg"
+			case ".gif":
+				rtype = "image/gif"
+			case ".svg":
+				rtype = "image/svg+xml"
+			case ".ico":
+				rtype = "image/x-icon"
+			default:
+				rtype = "application/octet-stream"
+			}
+
+			if interpolate {
+				gprv.Debugf("%s: interpolating", filePath)
+				rtext = strings.ReplaceAll(rtext, "%%{color}", gprv.bgColor)
+				rtext = strings.ReplaceAll(rtext, "%%{hide_key}", fmt.Sprintf("%v", gprv.hideKey))
+				rtext = strings.ReplaceAll(rtext, "%%{show_pods}", fmt.Sprintf("%v", gprv.showPods))
+				rtext = strings.ReplaceAll(rtext, "%%{grid_size}", fmt.Sprintf("%d", gprv.gridSize))
+				rtext = strings.ReplaceAll(rtext, "%%{edge_size}", fmt.Sprintf("%d", gprv.edgeSize))
+				rtext = strings.ReplaceAll(rtext, "%%{user}", user)
+				rtext = strings.ReplaceAll(rtext, "%%{user_header}", fmt.Sprintf("%v", gprv.userHeaderName))
+				rtext = strings.ReplaceAll(rtext, "%%{user_agent}", userAgent)
+			}
 		}
 	}
 

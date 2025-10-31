@@ -1,0 +1,1158 @@
+// SPDX-FileCopyrightText: 2022 Buoyant Inc.
+// SPDX-License-Identifier: Apache-2.0
+//
+// Copyright 2022 Buoyant Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License.  You may obtain
+// a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+const GRID_SIZE = %%{grid_size};
+const CENTER_MIN = %%{edge_size};
+const CENTER_MAX = (GRID_SIZE - 1) - %%{edge_size};
+
+// How often do we want to repaint the whole screen?
+const PAINT_INTERVAL_MS = 2000;
+
+// How long should it take to paint a whole row?
+let ROW_INTERVAL = Math.floor(PAINT_INTERVAL_MS / GRID_SIZE)
+
+// How long should it take to paint a single cell?
+let CELL_INTERVAL = Math.floor(PAINT_INTERVAL_MS / (GRID_SIZE * GRID_SIZE))
+
+//////// Utilities
+//
+// Sucking in all of jQuery is massive overkill, but the $() shorthand
+// is really nice, so...
+function $(id) {
+    return document.getElementById(id)
+}
+
+// getCookie (from MDN) clearly demonstrates why we can't have nice things.
+
+function getCookie(name) {
+    // Split cookie string and get all individual name=value pairs in an array
+    var cookieArr = document.cookie.split(";");
+
+    // Loop through the array elements
+    for (var i = 0; i < cookieArr.length; i++) {
+        var cookiePair = cookieArr[i].split("=");
+
+        /* Removing whitespace at the beginning of the cookie name
+        and compare it with the given string */
+        if (name == cookiePair[0].trim()) {
+            // Decode the cookie value and return
+            return decodeURIComponent(cookiePair[1]);
+        }
+    }
+
+    // Return null if not found
+    return null;
+}
+
+// ===== Wrapper sizing: keep white wrapper aligned to visible content =====
+function updateWrapperMax() {
+    // Column widths
+    const CELL_OUTER = 128;
+    const GAP_BETWEEN_COLS = 16; // matches #main
+    const PADDING_X = 64;        // wrapper padding + small safety
+    const col2Fixed = 258;       // .pod-stats width cap
+
+    const col2El = $("column2");
+    const col3El = $("column3");
+
+    const hasPods = col2El && getComputedStyle(col2El).display !== "none";
+    const hasLegend = col3El && getComputedStyle(col3El).display !== "none" && col3El.childElementCount > 0;
+
+    const col1Width = GRID_SIZE * CELL_OUTER;
+    const col2Width = hasPods ? col2Fixed : 0;
+    const col3Width = hasLegend ? (col3El.offsetWidth || 260) : 0;
+
+    const visibleCols = 1 + (hasPods ? 1 : 0) + (hasLegend ? 1 : 0);
+    const gaps = Math.max(0, visibleCols - 1) * GAP_BETWEEN_COLS;
+
+    const total = col1Width + col2Width + col3Width + gaps + PADDING_X;
+
+    const minCap = Math.min(800, total);
+    const maxCap = Math.max(minCap, Math.ceil(total));
+
+    document.documentElement.style.setProperty("--wrapper-max", `${maxCap}px`);
+}
+
+//////// Logger
+//
+// Logger is a simple logging class. It logs datestamped text to
+// the console and to its div (where it's colored for semantics).
+
+class Logger {
+    constructor(logdiv) {
+        // this.logdiv = logdiv	// not an ID, the div itself
+        this.info("Startup")
+    }
+
+    // logmsg does most of the heavy lifting.
+    logmsg(color, msg) {
+        let now = new Date().toISOString()
+        console.log(`${now} ${msg}`)
+        // this.logdiv.innerHTML = `<span style="color:${color}">${now}: ${msg}</span><br/>` + this.logdiv.innerHTML
+    }
+
+    // success, fail, and info are wrappers around logmsg to avoid
+    // having to always pass the color by hand.
+
+    success(msg) {
+        this.logmsg(Cell.colors.green, msg)
+    }
+
+    fail(msg) {
+        this.logmsg(Cell.colors.purple, msg)
+    }
+
+    info(msg) {
+        this.logmsg(Cell.colors.grey, msg)
+    }
+}
+
+//////// StartStop
+//
+// StartStop is a class to manage an on/off button. Very fancy, I know.
+
+class StartStop {
+    constructor(button, userControl) {
+        this.button = button	// not an ID, the button itself
+        this.button.onclick = () => { this.toggle() }
+        this.userControl = userControl
+        this.cells = undefined
+        this.start()
+    }
+
+    toggle() {
+        if (this.active) {
+            this.stop()
+        }
+        else {
+            this.start()
+
+            if (this.cells != undefined) {
+                for (let cell of this.cells) {
+                    // console.log(`start cell ${cell.row}-${cell.col}`)
+                    cell.reschedule(0)
+                }
+            }
+        }
+    }
+
+    start() {
+        this.active = true
+        this.button.value = "Stop"
+    }
+
+    stop() {
+        this.active = false
+        this.button.value = "Start"
+    }
+}
+
+//////// UserController
+//
+// UserController is a class to (totally insecurely) manage the username.
+
+class UserController {
+    constructor(logger, userDiv, userInput, initialUser) {
+        this.logger = logger;
+        this.logger.info("Starting UserController")
+        this.userDiv = userDiv;		// not an ID, the div itself
+        this.userInput = userInput;	// not an ID, the element itself
+        this.userInput.addEventListener("keydown",
+            (event) => {
+                this.keydownHandler(event)
+            }
+        );
+
+        this.start(initialUser)
+    }
+
+    keydownHandler(event) {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            this.updateUser(this.userInput.value.trim());
+        }
+    }
+
+    updateUser(user) {
+        this.user = user;
+        this.logger.info(`User: ${this.user}`);
+
+        this.userInput.value = this.user;
+        this.userInput.blur();
+    }
+
+    start(initialUser) {
+        this.updateUser(initialUser);
+    }
+}
+
+//////// CounterSwitch
+//
+// CounterSwitch is a class to manage an on/off button. Very fancy, I know.
+
+class CounterSwitch {
+    constructor(button, startLabel, stopLabel, onstart, onstop) {
+        this.button = button	// not an ID, the button itself
+        this.button.onclick = () => { this.toggle() }
+        this.startLabel = startLabel
+        this.stopLabel = stopLabel
+        this.onstart = () => { onstart(this) }
+        this.onstop = () => { onstop(this) }
+        this.start()
+    }
+
+    toggle() {
+        if (this.active) {
+            this.stop()
+        }
+        else {
+            this.start()
+        }
+    }
+
+    start() {
+        this.active = true
+        this.button.value = this.startLabel
+        this.onstart()
+    }
+
+    stop() {
+        this.active = false
+        this.button.value = this.stopLabel
+        this.onstop()
+    }
+}
+
+//////// PodSet
+
+class PodInfo {
+    constructor(logger, name, infoDiv, idDiv, smileySpan, countDiv) {
+        this.logger = logger
+        this.name = name
+        this.infoDiv = infoDiv
+        this.idDiv = idDiv
+        this.smileySpan = smileySpan
+        this.countDiv = countDiv
+        this.lastUpdated = 0
+    }
+
+    update(status, anyTimeouts, smiley, bgColor, borderColor) {
+        let bumpCounter = false
+
+        if (status == 599) {
+            // Latched error state.
+            smiley = Cell.smilies.neutral
+            bgColor = Cell.colors.yellow
+            bumpCounter = true
+        }
+        else if (status == 429) {
+            smiley = Cell.smilies.sleeping
+            bgColor = Cell.colors.red
+            bumpCounter = true
+        }
+        else if (status == 200) {
+            if (smiley == "504") {
+                smiley = Cell.smilies.sleeping
+            }
+
+            if (bgColor == "504") {
+                bgColor = Cell.colors.red
+            }
+
+            this.countDiv.innerHTML = 0
+            this.countDiv.style.opacity = 0.0
+        }
+        else {
+            // This should probably never happen.
+            borderColor = Cell.colors.purple
+            smiley = Cell.smilies.upset
+            bgColor = Cell.colors.purple
+            bumpCounter = true
+        }
+
+        // OK, bump the counter if we need to...
+        if (bumpCounter) {
+            let currCountText = this.countDiv.innerHTML
+            let currCount = 0
+
+            if (currCountText != "") {
+                currCount = parseInt(currCountText)
+            }
+
+            this.countDiv.innerHTML = currCount + 1
+            this.countDiv.style.opacity = 1.0
+        }
+
+        // ...then update the cell.
+        this.infoDiv.style.opacity = 1.0
+        this.infoDiv.style.background = bgColor
+        this.infoDiv.style.borderColor = borderColor
+        this.idDiv.classList.remove("faded-pod-id")
+        this.smileySpan.innerHTML = smiley
+
+        this.lastUpdated = new Date().getTime()
+    }
+}
+
+class PodSet {
+    constructor(logger, enclosingDiv) {
+        this.logger = logger
+        this.enclosingDiv = enclosingDiv
+        this.pods = {}
+    }
+
+    dropPod(name) {
+        let podDiv = document.getElementById(`cell-pod-${name}`)
+        podDiv.remove()
+        delete this.pods[name]
+    }
+
+    getPod(name) {
+        let nameFields = name.split("-")
+        let firstField = nameFields[0]
+        let lastField = nameFields[nameFields.length - 1]
+        let shortName = `${firstField}-${lastField}`
+
+        if (!(shortName in this.pods)) {
+            // New pod!
+            let podDiv = document.createElement("div")
+            podDiv.id = `cell-pod-${shortName}`
+            podDiv.className = "cell-pod-info"
+
+            let podIDDiv = document.createElement("div")
+            podIDDiv.id = `cell-pod-id-${shortName}`
+            podIDDiv.className = "cell-pod-id"
+            podIDDiv.innerHTML = shortName
+            podDiv.appendChild(podIDDiv)
+
+            let podInfoDiv = document.createElement("div")
+            podInfoDiv.id = `cell-pod-info-${shortName}`
+            podInfoDiv.className = "cell"
+            podDiv.appendChild(podInfoDiv)
+
+            let podSmileySpan = document.createElement("span")
+            podSmileySpan.id = `cell-pod-smiley-${shortName}`
+            podSmileySpan.className = "cell-smiley"
+            podInfoDiv.appendChild(podSmileySpan)
+
+            let podCountDiv = document.createElement("div")
+            podCountDiv.id = `cell-pod-count-${shortName}`
+            podCountDiv.className = "cell-count"
+            podCountDiv.style.opacity = 0.0
+            podInfoDiv.appendChild(podCountDiv)
+
+            // Create a PodInfo for this pod...
+            let podInfo = new PodInfo(this.logger, shortName,
+                podInfoDiv, podIDDiv, podSmileySpan, podCountDiv)
+
+            // ...and add the PodInfo to our pod dict.
+            this.pods[shortName] = podInfo
+
+            // After all that, append the entire podDiv to our enclosingDiv.
+            this.enclosingDiv.appendChild(podDiv)
+        }
+
+        return this.pods[shortName]
+    }
+}
+
+//////// Cell
+//
+// Cell is a class that represents a single cell in the grid. A cell
+// contains a colored shape on a colored background, plus a quote of the
+// moment.
+
+class Cell {
+    static smilies = {
+        "confused": "&#x1F615;",
+        "cursing": "&#x1F92C;",
+        "kaboom": "&#x1F92F;",
+        "neutral": "&#x1F610;",
+        "screaming": "&#x1F631;",
+        "sleeping": "&#x1F634;",
+        "grinning": "&#x1F603;",
+        "thinking": "&#x1F914;",
+        "tongue": "&#x1F61B;",
+        "upset": "&#x1F62C;",
+        "yay": "&#x1F389;",
+    };
+
+    // There are many many notes about these colors in pkg/faces/constants.go.
+    // Go read that: the short version is that colorblindness is a thing, so
+    // don't muck with these too much.
+    static colors = {
+        "grey": "#BBBBBB",
+        "black": "#000000",
+        "white": "#FFFFFF",
+        "darkblue": "#4477AA",
+        "blue": "#66CCEE",
+        "green": "#228833",
+        "yellow": "#CCBB44",
+        "red": "#EE6677",
+        "purple": "#AA3377",
+    }
+
+    constructor(logger, sw, podSet, fetchURL, enclosingDiv, row, col) {
+        this.logger = logger
+        this.sw = sw
+        this.podSet = podSet
+        this.fetchURL = fetchURL
+        this.count = 0
+        this.pending = false
+
+        this.row = row
+        this.col = col
+
+        let cellDiv = document.createElement("div")
+        cellDiv.id = `cell-${row}-${col}`
+        cellDiv.className = "cell"
+        cellDiv.style.background = Cell.colors.grey
+        cellDiv.style.opacity = 0.5
+
+        let smileySpan = document.createElement("span")
+        smileySpan.id = `smiley-${row}-${col}`
+        smileySpan.className = "cell-smiley"
+        cellDiv.appendChild(smileySpan)
+
+        let cellCountDiv = document.createElement("div")
+        cellCountDiv.id = `cell-count-${row}-${col}`
+        cellCountDiv.className = "cell-count"
+        cellDiv.appendChild(cellCountDiv)
+
+        enclosingDiv.appendChild(cellDiv)
+
+        this.lastUpdated = new Date().getTime()
+        this.lastStatus = 0		// will be an HTTP status code
+        this.sentAt = {}
+
+        this.interval = PAINT_INTERVAL_MS;
+
+        setTimeout(() => { this.run() }, (row * ROW_INTERVAL) + (col * CELL_INTERVAL))
+    }
+
+    // Helpers to save on keystrokes
+    info(msg) { this.logger.info(msg) }
+    success(msg) { this.logger.success(msg) }
+    fail(msg) { this.logger.fail(msg) }
+
+    name() { return `${this.row}-${this.col}-${this.count}` }
+
+    reschedule(latency) {
+        if (!this.sw.active) {
+            return
+        }
+
+        if (this.pending) {
+            return
+        }
+
+        let toWait = this.interval - latency
+        if (toWait < 0) {
+            toWait = 0
+        }
+
+        this.pending = true
+        setTimeout(() => { this.run() }, toWait)
+    }
+
+    // Run can be called manually, but it's most useful when used as the
+    // callable of a Timer.
+    run() {
+        this.pending = false
+        // this.info("Setting up XHR...")
+
+        let xhr = new XMLHttpRequest();
+        let xhrName = this.name()
+        let sentAt = new Date().getTime()
+        this.count++;
+
+        xhr.addEventListener("load", () => {
+            // This is the success case: our XHR succeeded, and we should
+            // have a JSON quote dictionary as a response. It has several
+            // attributes, but the only one we're interested in is the quote
+            // of the moment itself.
+            //
+            // Start by figuring out how long it took to get the response...
+            let now = new Date()
+            let latency = now - sentAt
+
+            // ...then figure out what we got.
+
+            let { curStatus, anyTimeouts,
+                smiley, bgColor, borderColor, errors } = this.parseResults(xhr);
+
+            // let msg = `[${xhrName}] (${latency}ms): ${smiley} ${bgColor} ${borderColor} -- ${errors}`
+            // this.success(msg);
+
+            // Update the pod, if we can...
+            let pod = xhr.getResponseHeader("x-faces-pod");
+
+            // If we got a pod and it's _not_ a faces-* pod, update it. (It can
+            // only be a faces-* pod if we're running with no ingress controller and
+            // something weird has happened, in which case... just ignore it.)
+
+            if ((pod != null) && !pod.startsWith("faces-")) {
+                this.podSet.getPod(pod).update(curStatus, anyTimeouts,
+                    smiley, bgColor, borderColor);
+            }
+
+            // ...then go on to update the main cell.
+            //
+            // For our purposes here, a 504 for the smiley or bgColor means
+            // that we won't update that element.
+            if (smiley == "504") {
+                smiley = undefined
+            }
+
+            if (bgColor == "504") {
+                bgColor = undefined
+            }
+
+            // OK. We can update lastStatus and lastUpdated.
+            this.lastUpdated = now.getTime()
+            this.lastStatus = curStatus
+
+            // this.info(`lastStatus ${this.lastStatus} for ${this.row} ${this.col}`)
+
+            // Next up: if there are any timeouts, we need to update the cell
+            // counter. If not, we need to clear it.
+            if (anyTimeouts) {
+                let currCountText = $(`cell-count-${this.row}-${this.col}`).innerHTML;
+                let currCount = 0;
+
+                if (currCountText != "") {
+                    currCount = parseInt(currCountText);
+                }
+
+                currCount++
+                $(`cell-count-${this.row}-${this.col}`).innerHTML = currCount
+            }
+            else {
+                $(`cell-count-${this.row}-${this.col}`).innerHTML = ""
+            }
+
+            if ((smiley != undefined) || (bgColor != undefined)) {
+                $(`cell-${this.row}-${this.col}`).style.opacity = 0.0
+
+                setTimeout(() => {
+                    if (smiley != undefined) {
+                        $(`smiley-${this.row}-${this.col}`).innerHTML = smiley
+                    }
+
+                    if (bgColor != undefined) {
+                        $(`cell-${this.row}-${this.col}`).style.background = bgColor
+                    }
+
+                    if (borderColor != undefined) {
+                        $(`cell-${this.row}-${this.col}`).style.borderColor = borderColor
+                    }
+
+                    $(`cell-${this.row}-${this.col}`).style.opacity = 1.0
+                }, 50)
+            }
+
+            this.reschedule(latency)
+        })
+
+        xhr.addEventListener("error", () => {
+            // This is the failure case: something went wrong. A really
+            // annoying thing about XHR is that we don't get anything useful
+            // about _what_ went wrong, but, well, c'est la vie.
+            //
+            // Start, again, with the latency...
+            let now = new Date()
+            let latency = now - sentAt
+            this.lastUpdated = now.getTime()
+
+            // ...and then just show that something failed.
+            let msg = `[${xhrName}] XHR error (${latency}ms)`
+            this.fail(msg);
+
+            $(`cell-${this.row}-${this.col}`).style.opacity = 0.0
+
+            setTimeout(() => {
+                $(`smiley-${this.row}-${this.col}`).innerHTML = Cell.smilies.confused
+                $(`cell-${this.row}-${this.col}`).style.opacity = 1.0
+                $(`cell-${this.row}-${this.col}`).style.background = Cell.colors.purple
+                $(`cell-${this.row}-${this.col}`).style.borderColor = "grey"
+            }, 50)
+
+            this.reschedule(latency)
+        })
+
+        // Here's where we actually prep and send the request...
+        //
+        // This business with appending the date as a query-string is because
+        // Safari (at least) just _refuses_ to pay attention to the Cache-Control
+        // header we add below, and we _really_ don't want this to be cached.
+        //
+        // Safari is why we can't have nice things.
+        let now = new Date().toISOString()
+        xhr.open("GET", `${this.fetchURL}?row=${this.row}&col=${this.col}&now=${now}`);
+        xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+        xhr.setRequestHeader("%%{user_header}", this.sw.userControl.user);
+
+        // We must send credentials...
+        xhr.withCredentials = true
+
+        // ...and we really want to be sure that the browser turns on CORS for
+        // this, so we use a custom header to force preflighting.
+        xhr.setRequestHeader("X-Custom-Header", "custom")
+
+        // OK -- save the time we sent the request, and off we go.
+        // this.info(`[${xhrName}] sending XHR`)
+        xhr.send();
+    }
+
+    parseResults(xhr) {
+        let errors = "unknown";
+        let smiley = undefined;
+        let bgColor = undefined;
+        let borderColor = Cell.colors.grey;
+
+        // Start by assuming that we didn't get any timeouts.
+        let anyTimeouts = false;
+
+        // Stash the status of this XHR to reduce typing...
+        let curStatus = xhr.status;
+
+        // ...then figure out what happened.
+        if (curStatus == 200) {
+            // The face service itself succeeded. Parse JSON.
+            try {
+                let obj = JSON.parse(xhr.responseText);
+                smiley = obj.smiley;
+                bgColor = obj.color;
+
+                if ((obj.errors != undefined) && (obj.errors.length > 0)) {
+                    errors = obj.errors.join(",");
+                    borderColor = Cell.colors.purple
+                }
+                else {
+                    errors = "success!";
+                }
+
+                // If we get "504" for either the smiley or the color, flag
+                // that as a timeout (the "504" means that the smiley or color
+                // service timed out when the face service tried to call it).
+                if ((smiley == "504") || (bgColor == "504")) {
+                    anyTimeouts = true;
+                }
+            }
+            catch (e) {
+                // Whoops, something went wrong. If it's a SyntaxError, that
+                // probably means we got bad JSON. Otherwise, it's... who knows?
+                borderColor = Cell.colors.purple
+                smiley = Cell.smilies.confused;
+                bgColor = Cell.colors.purple;
+
+                if (e instanceof SyntaxError) {
+                    errors = "parse error";
+                }
+                else {
+                    errors = "unknown error";
+                }
+            }
+        }
+        else if ((curStatus == 504) || (curStatus == 429)) {
+            // Timeout (504) or ratelimit (429) talking to the face
+            // service. We treat these the same: remember that a timeout
+            // happened...
+            anyTimeouts = true;
+
+            // ...and force the smiley & color to "timed out" too.
+            smiley = "504";
+            bgColor = "504";
+        }
+        else if (curStatus == 599) {
+            // This is our latched-error status. Show it as a neutral face
+            // on a yellow background.
+            smiley = Cell.smilies.neutral;
+            bgColor = Cell.colors.yellow;
+        }
+        else if (Math.floor(curStatus / 100) == 5) {
+            // Some other 5yz, so an unknown kind of server error. (In
+            // practice, this is probably a 503 because there's some kind
+            // of connectivity error, but whatever, we don't care.
+            smiley = Cell.smilies.confused;
+            bgColor = Cell.colors.purple;
+            errors = "server error";
+        }
+
+        if (smiley == undefined) {
+            smiley = Cell.smilies.upset
+        }
+
+        if (bgColor == undefined) {
+            bgColor = Cell.colors.purple
+        }
+
+        return { curStatus, anyTimeouts, smiley, bgColor, borderColor, errors };
+    }
+}
+
+class Key {
+    constructor(keyDiv) {
+        let keyEntries = [
+            ["Success!",
+                "grinning", Cell.colors.blue, Cell.colors.grey, "24px"],
+
+            ["Face service error",
+                "confused", Cell.colors.purple, Cell.colors.grey, ""],
+
+            ["Timeout",
+                "sleeping", Cell.colors.red, Cell.colors.grey, ""],
+
+            ["Service overwhelmed",
+                "kaboom", Cell.colors.yellow, Cell.colors.purple, "24px"],
+
+            ["Color service error",
+                "grinning", Cell.colors.grey, Cell.colors.purple, ""],
+
+            ["Smiley service error",
+                "cursing", Cell.colors.blue, Cell.colors.purple, "24px"],
+
+            ["Slow service",
+                "-", "-", "-", ""]
+        ]
+
+        for (let i = 0; i < keyEntries.length; i++) {
+            let [text, smileyName, bgColor, borderColor, margin] = keyEntries[i]
+
+            if (smileyName != "-") {
+                let smiley = ""
+
+                if (smileyName != "") {
+                    smiley = Cell.smilies[smileyName]
+                }
+
+                let style = `background: ${bgColor}; border: 2px solid ${borderColor};`
+
+                if (margin) {
+                    style += ` margin-bottom: ${margin};`
+                }
+
+                let keyEntry = document.createElement("div")
+                keyEntry.id = `key-${i}`
+                keyEntry.className = "key float-left"
+                keyEntry.innerHTML = `
+			<div id="key-cell-${i}" class="key-cell" style="${style}">
+				<span id="key-smiley-${i}">${smiley}</span>
+			</div>
+			<span>${text}</span>
+		`
+                keyDiv.appendChild(keyEntry)
+            }
+            else {
+                let keyEntry = document.createElement("div")
+                keyEntry.id = `key-${i}`
+                keyEntry.className = "key float-left"
+                keyEntry.innerHTML = `
+			<div id="key-cell-${i}" class="key-cell" style="background: transparent; border: 2px dashed grey;">
+				<span id="key-smiley-${i}">&nbsp;</span>
+			</div>
+			<span>${text}</span>
+		`
+                keyDiv.appendChild(keyEntry)
+            }
+
+            keyDiv.appendChild(document.createElement("br"))
+        }
+    }
+}
+
+class CellWatcher {
+    constructor(logger, sw, cells, podSet) {
+        this.logger = logger
+        this.sw = sw
+        this.cells = cells
+        this.podSet = podSet
+        this.count = 0
+        this.maxSolid = 2000
+        this.maxVisible = 2500
+
+        setInterval(() => { this.run() }, 200)
+    }
+
+    run() {
+        if (!this.sw.active) {
+            // Nothing to do...
+            return
+        }
+
+        let now = new Date().getTime()
+
+        this.count++
+
+        for (let cell of this.cells) {
+            if (cell.lastUpdated == 0) {
+                continue
+            }
+
+            let age = now - cell.lastUpdated
+            let cellCount = 0
+            let cellCountDiv = $(`cell-count-${cell.row}-${cell.col}`)
+
+            if (cellCountDiv != null) {
+                let cellCountText = cellCountDiv.innerHTML
+
+                if (cellCountText != "") {
+                    cellCount = parseInt(cellCountText)
+                }
+            }
+
+            let opacity = 1.0
+
+            if (age > this.maxVisible) {
+                opacity = 0.0
+            }
+            else if (age > this.maxSolid) {
+                opacity = (this.maxVisible - age) / (this.maxVisible - this.maxSolid)
+            }
+            // else {
+            // 	if (cellCount > 0) {
+            // 		opacity = 0.5
+            // 	}
+            // }
+
+            if (cellCount > 4) {
+                let smiley = Cell.smilies.sleeping
+                let bgColor = Cell.colors.red
+
+                if (cell.lastStatus == 599) {
+                    smiley = Cell.smilies.neutral
+                    bgColor = Cell.colors.yellow
+                }
+
+                $(`smiley-${cell.row}-${cell.col}`).innerHTML = smiley
+                $(`cell-${cell.row}-${cell.col}`).style.background = bgColor
+                opacity = 0.2
+            }
+
+            $(`cell-${cell.row}-${cell.col}`).style.opacity = opacity
+        }
+
+        for (let podInfo of Object.values(this.podSet.pods)) {
+            let opacity = podInfo.infoDiv.style.opacity
+
+            if (opacity > 0.0) {
+                podInfo.infoDiv.style.opacity = opacity - 0.1
+
+                if (podInfo.infoDiv.style.opacity <= 0.0) {
+                    podInfo.idDiv.classList.add("faded-pod-id")
+                }
+            }
+            else if ((now - podInfo.lastUpdated) > 30000) {
+                this.podSet.dropPod(podInfo.name)
+            }
+        }
+    }
+}
+
+//////// Markers
+//
+// Markers is a class that updates a div with colored squares to provide
+// hints about what happened over time.
+
+class Markers {
+    constructor(markerdiv, rowlength) {
+        this.markerdiv = markerdiv	// not an ID, the div itself
+        this.rowlength = rowlength	// how many markers per row?
+        this.currentrow = 0 		// how many markers are on the current row?
+    }
+
+    mark(shape, fgColor, bgColor) {
+        this.markerdiv.innerHTML += `
+	<div class="marker" style="background-color:${bgColor}">
+		<svg width="50" height="50" xmlns="http://www.w3.org/2000/svg">
+		    <g transform="rotate(0 25 25)">
+			    <polygon points="${shape}" fill="${fgColor}" stroke="black"></polygon>
+		    </g>
+		</svg>
+	</div>`
+
+        this.currentrow++
+
+        if (this.currentrow >= this.rowlength) {
+            $("markers").innerHTML += "<br />"
+            this.currentrow = 0
+        }
+    }
+}
+
+//////// XHR
+//
+// Fetcher is our real test class: fetch from the face service and render the response
+// in the UI.
+
+class Fetcher {
+    constructor(logger, markers, xhrdiv, fetchURL) {
+        this.logger = logger		// Logger object
+        this.markers = markers		// Markers object
+        this.xhrdiv = xhrdiv		// Div (not the ID, the div!) to update with XHR results
+        this.fetchURL = fetchURL	// URL to fetch
+
+        this.count = 0				// How many requests have we done?
+        this.lastXSRF = undefined	// Last XSRF value we saw
+        this.sentAt = undefined		// When we last sent a request
+    }
+
+    // Helpers to save on keystrokes
+    info(msg) { this.logger.info(msg) }
+    success(msg) { this.logger.success(msg) }
+    fail(msg) { this.logger.fail(msg) }
+
+    // Run can be called manually, but it's most useful when used as the
+    // callable of a Timer.
+    run() {
+        // this.info("Setting up XHR...")
+
+        let xhr = new XMLHttpRequest();
+
+        xhr.addEventListener("load", () => {
+            // This is the success case: our XHR succeeded, and we should
+            // have a JSON quote dictionary as a response. It has several
+            // attributes, but the only one we're interested in is the quote
+            // of the moment itself.
+            //
+            // Start by figuring out how long it took to get the response...
+            let now = new Date()
+            let latency = now - this.sentAt
+
+            // ...then figure out what we got.
+            let text = undefined
+            let shape = undefined
+            let fgColor = undefined	// color of the shape, as opposed to color of the background
+
+            // ...then check the status code.
+            if (xhr.status == 504) {
+                text = `Timeout after ${latency}ms`
+                shape = "19.000,49.000 31.000,49.000 31.000,1.000 19.000,1.000"
+                fgColor = Cell.colors.cyan
+            }
+            else if (xhr.status != 200) {
+                text = `Unknown status ${xhr.status} after ${latency}ms`
+                shape = "19.000,49.000 31.000,49.000 31.000,1.000 19.000,1.000"
+                fgColor = Cell.colors.purple
+            }
+            else {
+                // Parse JSON!
+                try {
+                    let obj = JSON.parse(xhr.responseText)
+                    text = obj.quote
+                    shape = obj.shape
+                    fgColor = obj.color
+                }
+                catch (e) {
+                    // Whoops, something went wrong. If it's a SyntaxError, that
+                    // probably means we got bad JSON. Otherwise, it's... who knows?
+                    if (e instanceof SyntaxError) {
+                        text = `Could not parse QotM: ${e.message}\n${xhr.responseText}`
+                        shape = "19.000,49.000 31.000,49.000 31.000,1.000 19.000,1.000"
+                        fgColor = Cell.colors.purple
+                    }
+                    else {
+                        text = `Missing QotM? ${e.message}`
+                        shape = "19.000,49.000 31.000,49.000 31.000,1.000 19.000,1.000"
+                        fgColor = Cell.colors.purple
+                    }
+                }
+            }
+
+            // OK, build up messages to show the user, and while we're at it,
+            // check to see if we have a new session now. We can't actually see
+            // the real auth token (that's marked HTTPOnly), but we can see the
+            // XSRF-protection cookie, and it changes whenever the auth token does.
+            let decoration = `${latency}ms`
+
+            let bgColor = Cell.colors.green
+            let curXSRF = getCookie("ambassador_xsrf.keycloak-multi.default")
+
+            if (curXSRF != this.lastXSRF) {
+                bgColor = Cell.colors.blue
+                decoration += ", new session token"
+                this.lastXSRF = curXSRF
+            }
+
+            // FINALLY: show 'em what we got.
+            let msg = `[${this.count}] XHR success (${decoration}): ${text}`
+            // this.success(msg);
+
+            let nowISO = now.toISOString()
+            this.xhrdiv.innerHTML = `<span style="background-color:${bgColor}"><p>${nowISO}: ${msg}</p></span>`
+            this.markers.mark(shape, fgColor, bgColor)
+        })
+
+        xhr.addEventListener("error", () => {
+            // This is the failure case: something went wrong. A really
+            // annoying thing about XHR is that we don't get anything useful
+            // about _what_ went wrong, but, well, c'est la vie.
+            //
+            // Start, again, with the latency...
+            let now = new Date()
+            let latency = now - this.sentAt
+
+            // ...and then just show that something failed.
+            let msg = `[${this.count}] XHR error (${latency}ms)`
+            // this.fail(msg);
+
+            let nowISO = now.toISOString()
+            this.xhrdiv.innerHTML = `<span style="background-color:${Cell.colors.red}"><p>${nowISO}: Failed!</p></span>`
+
+            // FIXME: this looks like the wrong arguments for calling this.markers.mark
+            this.markers.mark("red")
+        })
+
+        // Here's where we actually prep and send the request...
+        this.count++
+
+        // This business with appending the date as a query-string is because
+        // Safari (at least) just _refuses_ to pay attention to the Cache-Control
+        // header we add below, and we _really_ don't want this to be cached.
+        //
+        // Safari is why we can't have nice things.
+        let now = new Date().toISOString()
+        xhr.open("GET", `${this.fetchURL}?now=${now}`);
+        xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+
+        // We must send credentials...
+        xhr.withCredentials = true
+
+        // ...and we really want to be sure that the browser turns on CORS for
+        // this, so we use a custom header to force preflighting.
+        xhr.setRequestHeader("X-Custom-Header", "custom")
+
+        // OK -- save the time we sent the request, and off we go.
+        // this.info("Sending XHR...")
+        this.sentAt = new Date()
+        xhr.send();
+
+        // this.info(`[${this.count}] XHR sent`)
+    }
+}
+
+//////// Mainline
+//
+// When the page loads, we set up the world and fire up a timer to get things
+// moving.
+function initializeFaces() {
+    let initialUser = "%%{user}";
+    let logger = new Logger($("log"))
+
+    logger.info(`Page loaded; user ${initialUser}`)
+    logger.info(`User-Agent: %%{user_agent}`)
+
+    let userControl = new UserController(logger, $("userDiv"), $("userName"), initialUser)
+
+    let sw = new StartStop($("btnToggle"), userControl)
+
+    let enableCounters = new CounterSwitch(
+        $("btnCounters"), "Hide", "Show",
+        () => {
+            for (let rule of document.styleSheets[0].cssRules) {
+                if (rule.selectorText == ".cell-count") {
+                    rule.style.opacity = 1
+                }
+            }
+        },
+        () => {
+            for (let rule of document.styleSheets[0].cssRules) {
+                if (rule.selectorText == ".cell-count") {
+                    rule.style.opacity = 0
+                }
+            }
+        }
+    )
+
+    let showPods = new CounterSwitch(
+        $("btnShowPods"), "Show Pods", "Hide Pods",
+        () => {
+            $("column2").style.display = "none";
+            updateWrapperMax(); // keep wrapper aligned when pods are hidden
+        },
+        () => {
+            $("column2").style.display = "block";
+            updateWrapperMax(); // keep wrapper aligned when pods are shown
+        },
+    )
+
+    let podSet = new PodSet(logger, $("pods"))
+
+    let cells = []
+
+    for (let row = 0; row < GRID_SIZE; row++) {
+        for (let col = 0; col < GRID_SIZE; col++) {
+            let isCenterRow = (row >= CENTER_MIN && row <= CENTER_MAX);
+            let isCenterCol = (col >= CENTER_MIN && col <= CENTER_MAX);
+            let isCenter = (isCenterRow && isCenterCol);
+
+            let cellURL = isCenter ? `../face/center/` : `../face/edge/`
+
+            let cell = new Cell(logger, sw, podSet, cellURL, $("cells"), row, col)
+            cells.push(cell)
+        }
+        $("cells").innerHTML += "<br/>"
+    }
+
+    if (!%%{hide_key}) {
+        key = new Key($("key"));
+        updateWrapperMax();
+    } else {
+        $("column3").style.display = "none";
+        updateWrapperMax();
+    }
+
+    if (%%{show_pods}) {
+        showPods.toggle()
+    }
+
+    let watcher = new CellWatcher(logger, sw, cells, podSet)
+
+    sw.cells = cells
+
+    // let markers = new Markers($("markers"), 16)
+    // let q = new Fetcher(logger, markers, $("xhr"), `../face/cell/`)
+
+    // let timer = new Timer($("timer"), $("btnToggle"), 2, () => {
+    // 	q.run()
+    // })
+    document.getElementById('copyright-year').textContent = new Date().getFullYear();
+
+    // // Scale the legend based on GRID_SIZE
+    // function updateLegendScale() {
+    //     const scale = Math.max(0.55, Math.min(1, 4 / GRID_SIZE));
+    //     document.documentElement.style.setProperty("--legend-scale", String(scale));
+    // }
+    // updateLegendScale();
+
+    // Initial wrapper sizing + keep it responsive on resize
+    updateWrapperMax();
+    window.addEventListener("resize", updateWrapperMax);
+}
+
+// Initialize when DOM is ready
+console.log("Setting up Faces.js...");
+
+if (document.readyState === 'loading') {
+    // Document still loading, wait for DOMContentLoaded
+    document.addEventListener('DOMContentLoaded', initializeFaces);
+    console.log("Waiting for DOMContentLoaded...");
+} else {
+    // Document already loaded, initialize immediately
+    console.log("DOM already loaded, initializing immediately...");
+    initializeFaces();
+}

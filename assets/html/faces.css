@@ -1,0 +1,248 @@
+/* SPDX-FileCopyrightText: 2022 Buoyant Inc.
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Copyright 2022 Buoyant Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may
+ * not use this file except in compliance with the License.  You may obtain
+ * a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+:root {
+    --legend-scale: 1;
+    --wrapper-max: 1500px;
+}
+
+h1 {
+    font-family: sans-serif;
+}
+
+.key {
+    font-family: sans-serif;
+    font-size: calc(32px * var(--legend-scale));
+    font-weight: bold;
+    display: inline-block;
+}
+
+.key-cell {
+    display: inline-block;
+    border: 2px solid grey;
+    border-radius: 8px;
+    height: calc(60px * var(--legend-scale));
+    width: calc(60px * var(--legend-scale));
+    margin: 2px;
+    font-size: calc(48px * var(--legend-scale));
+    text-align: center;
+    vertical-align: middle;
+}
+
+.margin-left {
+    margin-left: 1em;
+}
+
+.inline-block {
+    display: inline-block;
+}
+
+.float-left {
+    float: left;
+}
+
+.cell {
+    display: inline-block;
+    border: 2px solid grey;
+    border-radius: 16px;
+    height: 120px;
+    width: 120px;
+    margin: 2px;
+    text-align: center;
+    vertical-align: middle;
+    position: relative;
+}
+
+.cell-count {
+    position: absolute;
+    background: white;
+    border-radius: 14px 0px 14px 0px;
+    width: 2em;
+    bottom: 1px;
+    right: 1px;
+    color: black;
+    z-index: 999;
+}
+
+.cell-pod-info {
+    display: inline-block;
+    position: relative;
+    text-align: center;
+}
+
+.cell-pod-id {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 120px;
+    border-radius: 14px 14px 0px 0px;
+    font-family: sans-serif;
+    background: white;
+    z-index: 999;
+}
+
+.faded-pod-id {
+    color: rgba(.5, .5, .5, .5);
+    font-style: italic;
+}
+
+.cell-smiley {
+    background: transparent;
+    text-align: center;
+    font-size: 96px;
+}
+
+.cell-shape {
+    display: inline-block;
+    height: 120px;
+    width: 120px;
+}
+
+.cell-quote {
+    display: inline-block;
+    vertical-align: top;
+}
+
+.cell-quote-text {
+    vertical-align: top;
+    margin: 1px;
+}
+
+.qtext {
+    position: relative;
+    font-size: 14px;
+    color: black;
+    width: 215px;
+    margin: 5px;
+}
+
+.qtext-concat {
+    position: relative;
+    display: inline-block;
+    word-wrap: break-word;
+    overflow: hidden;
+    max-height: 4.8em;
+    /* (Number of lines you want visible) * (line-height) */
+    line-height: 1.2em;
+    text-align: left;
+}
+
+.qtext.ellipsis::after {
+    content: "...";
+    position: absolute;
+    right: -12px;
+    bottom: 4px;
+}
+
+.marker {
+    display: inline-block;
+    border: 1px solid black;
+    width: 50px;
+    height: 50px;
+    margin: 2px;
+}
+
+.pod-stats {
+    margin-left: .5em;
+    margin-right: .5em;
+    border-left: 2px solid grey;
+    border-right: 2px solid grey;
+    padding-left: .5em;
+    padding-right: .5em;
+    max-width: 258px !important;
+    width: 258px !important;
+}
+
+.inline {
+    display: inline;
+}
+
+.margins {
+    margin-left: .5em;
+    margin-right: 0.5em;
+}
+
+.vert-margins {
+    margin-top: .5em;
+    margin-bottom: .5em;
+}
+
+.roundedButton {
+    border-radius: 7px;
+    min-width: 5em;
+}
+
+.log {
+    border-top: 1px solid gray;
+    padding-top: .3em;
+}
+
+.wrapper {
+    width: min(95vw, var(--wrapper-max));
+    max-width: var(--wrapper-max);
+    margin: 2em auto;
+    padding: 2em;
+    border: 3px solid #888;
+    border-radius: 10px;
+    background-color: #fdfdfd;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    overflow: auto;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.site-footer {
+    margin-top: auto;
+    text-align: center;
+    padding: 0.75rem 1rem;
+    font-family: sans-serif;
+    font-size: 14px;
+    color: #ffffff;
+    background: rgba(0, 0, 0, 0.25);
+    backdrop-filter: saturate(180%) blur(6px);
+}
+
+#main {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+#column1,
+#column2,
+#column3 {
+    float: none;
+}
+
+#column3:empty {
+    display: none;
+}
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 12px 0;
+    align-items: center;
+}
