@@ -46,7 +46,13 @@ func main() {
 
 	// Order matters here: you MUST call SetHTTPGetHandler _after_
 	// creating the BaseHTTPServer. Yuck.
-	gprv := faces.NewGUIProviderFromEnvironment()
+	gprv, err := faces.NewGUIProviderFromEnvironment()
+
+	if err != nil {
+		slog.Error(fmt.Sprintf("Unable to create GUIProvider: %v", err))
+		os.Exit(1)
+	}
+
 	server := faces.NewBaseHTTPServer(&gprv.BaseProvider)
 
 	if whisperAddr != "" {
@@ -62,7 +68,7 @@ func main() {
 		faces.StartPrometheusServer()
 	}
 
-	err := server.Start(fmt.Sprintf(":%d", *port))
+	err = server.Start(fmt.Sprintf(":%d", *port))
 
 	if err != nil {
 		slog.Error(fmt.Sprintf("Unable to serve HTTP: %v", err))

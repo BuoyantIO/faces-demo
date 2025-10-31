@@ -34,6 +34,7 @@ import (
 type GUIProvider struct {
 	BaseProvider
 	dataPath    string
+	absDataPath string
 	faceService string
 	bgColor     string
 	hideKey     bool
@@ -43,7 +44,7 @@ type GUIProvider struct {
 	startActive bool
 }
 
-func NewGUIProviderFromEnvironment() *GUIProvider {
+func NewGUIProviderFromEnvironment() (*GUIProvider, error) {
 	gprv := &GUIProvider{
 		BaseProvider: BaseProvider{
 			Name: "GUI",
@@ -60,6 +61,15 @@ func NewGUIProviderFromEnvironment() *GUIProvider {
 	gprv.BaseProvider.SetupBasicsFromEnvironment()
 
 	gprv.dataPath = utils.StringFromEnv("DATA_PATH", "/app/data")
+
+	var err error
+	gprv.absDataPath, err = filepath.Abs(gprv.dataPath)
+
+	// This should never, ever happen.
+	if err != nil {
+		return nil, fmt.Errorf("Failed to resolve dataPath %s: %w", gprv.dataPath, err)
+	}
+
 	gprv.faceService = utils.StringFromEnv("FACE_SERVICE", "face")
 	gprv.bgColor = utils.StringFromEnv("COLOR", "white")
 	gprv.hideKey = utils.BoolFromEnv("HIDE_KEY", false)
@@ -76,7 +86,7 @@ func NewGUIProviderFromEnvironment() *GUIProvider {
 	gprv.Infof("edgeSize %d", gprv.edgeSize)
 	gprv.Infof("startActive %v", gprv.startActive)
 
-	return gprv
+	return gprv, nil
 }
 
 // This should never ever be called.
@@ -177,7 +187,7 @@ func (gprv *GUIProvider) HTTPGetHandler(w http.ResponseWriter, r *http.Request) 
 
 			gprv.Debugf("...%s (%dms): %d", url, reqLatencyMs, rcode)
 		}
-	} else if r.Method == "GET" && r.URL.RawQuery == "" {
+	} else if r.Method == "GET" {
 		// Try to read the file from our dataPath.
 		if r.URL.Path == "/" {
 			r.URL.Path = "/index.html"
@@ -191,55 +201,89 @@ func (gprv *GUIProvider) HTTPGetHandler(w http.ResponseWriter, r *http.Request) 
 			interpolate = true
 		}
 
-		filePath := filepath.Join(gprv.dataPath, strings.TrimPrefix(r.URL.Path, "/"))
-		raw, err := os.ReadFile(filePath)
+		// Turn the query path into an absolute path and make sure it stays
+		// within the dataPath directory.
+		relURLPath := strings.TrimPrefix(r.URL.Path, "/")
+		filePath := filepath.Join(gprv.absDataPath, relURLPath)
+		absFilePath, err := filepath.Abs(filepath.Clean(filePath))
+
+		gprv.Debugf("%s: rel %s abs %s", r.URL.Path, relURLPath, absFilePath)
 
 		if err != nil {
-			gprv.Infof("%s: file not found", filePath)
-
+			gprv.Infof("%s: could not resolve to absolute path: %s", relURLPath, err)
+			rcode = http.StatusInternalServerError
+			rtype = "text/plain"
+			rtext = fmt.Sprintf("error resolving path %s", relURLPath)
+		} else if !strings.HasPrefix(absFilePath, gprv.absDataPath+string(os.PathSeparator)) {
+			gprv.Infof("%s: path traversal attempt blocked", absFilePath)
 			rcode = http.StatusNotFound
 			rtype = "text/plain"
-			rtext = fmt.Sprintf("error loading %s: %s", filePath, err)
+			rtext = "file not found"
 		} else {
-			gprv.Debugf("%s: loaded", filePath)
+			// Is this a plain file?
+			fileInfo, err := os.Stat(absFilePath)
 
-			rcode = http.StatusOK
-			rtext = string(raw)
+			if err != nil {
+				gprv.Infof("%s: file not found", absFilePath)
+				rcode = http.StatusNotFound
+				rtype = "text/plain"
+				rtext = "file not found"
+			} else if !fileInfo.Mode().IsRegular() {
+				gprv.Infof("%s: not a plain file", absFilePath)
+				rcode = http.StatusNotFound
+				rtype = "text/plain"
+				rtext = "file not found"
+			} else {
+				raw, err := os.ReadFile(filePath)
 
-			switch filepath.Ext(filePath) {
-			case ".html":
-				rtype = "text/html"
-			case ".css":
-				rtype = "text/css"
-			case ".js":
-				rtype = "application/javascript"
-			case ".json":
-				rtype = "application/json"
-			case ".png":
-				rtype = "image/png"
-			case ".jpg", ".jpeg":
-				rtype = "image/jpeg"
-			case ".gif":
-				rtype = "image/gif"
-			case ".svg":
-				rtype = "image/svg+xml"
-			case ".ico":
-				rtype = "image/x-icon"
-			default:
-				rtype = "application/octet-stream"
-			}
+				if err != nil {
+					gprv.Infof("%s: file not found", filePath)
 
-			if interpolate {
-				gprv.Debugf("%s: interpolating", filePath)
-				rtext = strings.ReplaceAll(rtext, "%%{color}", gprv.bgColor)
-				rtext = strings.ReplaceAll(rtext, "%%{hide_key}", fmt.Sprintf("%v", gprv.hideKey))
-				rtext = strings.ReplaceAll(rtext, "%%{show_pods}", fmt.Sprintf("%v", gprv.showPods))
-				rtext = strings.ReplaceAll(rtext, "%%{grid_size}", fmt.Sprintf("%d", gprv.gridSize))
-				rtext = strings.ReplaceAll(rtext, "%%{edge_size}", fmt.Sprintf("%d", gprv.edgeSize))
-				rtext = strings.ReplaceAll(rtext, "%%{start_active}", fmt.Sprintf("%v", gprv.startActive))
-				rtext = strings.ReplaceAll(rtext, "%%{user}", user)
-				rtext = strings.ReplaceAll(rtext, "%%{user_header}", fmt.Sprintf("%v", gprv.userHeaderName))
-				rtext = strings.ReplaceAll(rtext, "%%{user_agent}", userAgent)
+					rcode = http.StatusNotFound
+					rtype = "text/plain"
+					rtext = fmt.Sprintf("error loading %s: %s", filePath, err)
+				} else {
+					gprv.Debugf("%s: loaded", filePath)
+
+					rcode = http.StatusOK
+					rtext = string(raw)
+
+					switch filepath.Ext(filePath) {
+					case ".html":
+						rtype = "text/html"
+					case ".css":
+						rtype = "text/css"
+					case ".js":
+						rtype = "application/javascript"
+					case ".json":
+						rtype = "application/json"
+					case ".png":
+						rtype = "image/png"
+					case ".jpg", ".jpeg":
+						rtype = "image/jpeg"
+					case ".gif":
+						rtype = "image/gif"
+					case ".svg":
+						rtype = "image/svg+xml"
+					case ".ico":
+						rtype = "image/x-icon"
+					default:
+						rtype = "application/octet-stream"
+					}
+
+					if interpolate {
+						gprv.Debugf("%s: interpolating", filePath)
+						rtext = strings.ReplaceAll(rtext, "%%{color}", gprv.bgColor)
+						rtext = strings.ReplaceAll(rtext, "%%{hide_key}", fmt.Sprintf("%v", gprv.hideKey))
+						rtext = strings.ReplaceAll(rtext, "%%{show_pods}", fmt.Sprintf("%v", gprv.showPods))
+						rtext = strings.ReplaceAll(rtext, "%%{grid_size}", fmt.Sprintf("%d", gprv.gridSize))
+						rtext = strings.ReplaceAll(rtext, "%%{edge_size}", fmt.Sprintf("%d", gprv.edgeSize))
+						rtext = strings.ReplaceAll(rtext, "%%{start_active}", fmt.Sprintf("%v", gprv.startActive))
+						rtext = strings.ReplaceAll(rtext, "%%{user}", user)
+						rtext = strings.ReplaceAll(rtext, "%%{user_header}", fmt.Sprintf("%v", gprv.userHeaderName))
+						rtext = strings.ReplaceAll(rtext, "%%{user_agent}", userAgent)
+					}
+				}
 			}
 		}
 	}

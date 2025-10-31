@@ -16,7 +16,30 @@
 // limitations under the License.
 
 // Load configuration from embedded JSON
-const CONFIG = JSON.parse(document.getElementById('faces-config').textContent);
+let CONFIG;
+
+try {
+    const configEl = document.getElementById('faces-config');
+    if (!configEl) {
+        throw new Error("Missing 'faces-config' element in DOM.");
+    }
+
+    CONFIG = JSON.parse(configEl.textContent);
+} catch (err) {
+    console.error("Failed to load configuration:", err);
+
+    CONFIG = {
+        user: "unknown",
+        userAgent: "unknown-agent",
+        userHeader: "x-faces-user",
+        gridSize: 4,
+        edgeSize: 1,
+        startActive: true,
+        hideKey: false,
+        showPods: false,
+    };
+}
+
 
 const GRID_SIZE = CONFIG.gridSize;
 const CENTER_MIN = CONFIG.edgeSize;
@@ -871,7 +894,7 @@ function initializeFaces() {
 
     let sw = new StartStop($("btnToggle"), userControl, CONFIG.startActive)
 
-    let enableCounters = new CounterSwitch(
+    new CounterSwitch(
         $("btnCounters"), "Hide", "Show",
         () => {
             for (let rule of document.styleSheets[0].cssRules) {
@@ -931,7 +954,7 @@ function initializeFaces() {
         showPods.toggle()
     }
 
-    let watcher = new CellWatcher(logger, sw, cells, podSet)
+    new CellWatcher(logger, sw, cells, podSet)
 
     sw.cells = cells
 
