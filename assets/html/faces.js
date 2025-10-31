@@ -953,6 +953,44 @@ function initializeFaces() {
     } else {
         $("column3").style.display = "none";
         updateWrapperMax();
+
+        // Show the "Show Key" button when key is hidden
+        let btnShowKey = $("btnShowKey");
+        btnShowKey.style.display = "inline-block";
+
+        // Setup popup key functionality
+        let keyPopup = $("keyPopup");
+        let keyPopupBody = $("keyPopupBody");
+        let btnCloseKey = $("btnCloseKey");
+
+        let keyCreated = false;
+
+        btnShowKey.onclick = () => {
+            // Create key in popup if not already created
+            if (!keyCreated) {
+                new Key(keyPopupBody);
+                keyCreated = true;
+            }
+            keyPopup.style.display = "flex";
+        };
+
+        btnCloseKey.onclick = () => {
+            keyPopup.style.display = "none";
+        };
+
+        // Close popup when clicking outside the content
+        keyPopup.onclick = (e) => {
+            if (e.target === keyPopup) {
+                keyPopup.style.display = "none";
+            }
+        };
+
+        // Close popup with Escape key
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && keyPopup.style.display === "flex") {
+                keyPopup.style.display = "none";
+            }
+        });
     }
 
     if (CONFIG.showPods) {
