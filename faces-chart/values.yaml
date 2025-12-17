@@ -154,16 +154,102 @@ rollouts:
         name: "argoproj-labs/gatewayAPI"             # e.g., "argoproj-labs/gatewayAPI"
         autocreateRoutes: true                       # if true, chart creates routes & fills plugin config automatically
         config: {}                                   # arbitrary key/values, e.g. { httpRoute: argo-rollouts-http-route, namespace: test }
-    steps:
-      - setWeight: 10
-      - pause: { duration: 30 }
-      - setWeight: 20
-      - pause: { duration: 30 }
-      - setWeight: 50
-      - pause: { duration: 30 }
-      - setWeight: 70
-      - pause: { duration: 60 }
-      - setWeight: 100
+    # Canary steps for each workload
+    gui:
+      steps:
+        - setWeight: 10
+        - pause: { duration: 10 }
+        - setWeight: 20
+        - pause: { duration: 10 }
+        - setWeight: 50
+        - pause: { duration: 10 }
+        - setWeight: 70
+        - pause: { duration: 60 }
+        - setWeight: 100
+
+    face:
+      steps:
+        - setWeight: 10
+        - pause: { duration: 10 }
+        - setWeight: 20
+        - pause: { duration: 10 }
+        - setWeight: 50
+        - pause: { duration: 20 }
+        - setWeight: 70
+        - pause: { duration: 60 }
+        - setWeight: 100
+
+    smiley:
+      steps:
+        - setWeight: 10
+        - pause: { duration: 10 }
+        - setWeight: 20
+        - pause: { duration: 10 }
+        - setWeight: 50
+        - pause: { duration: 10 }
+        - setWeight: 70
+        - pause: { duration: 10 }
+        - setWeight: 100
+
+    smiley2:
+      steps:
+        - setWeight: 10
+        - pause: { duration: 20 }
+        - setWeight: 20
+        - pause: { duration: 20 }
+        - setWeight: 50
+        - pause: { duration: 20 }
+        - setWeight: 70
+        - pause: { duration: 20 }
+        - setWeight: 100
+
+    smiley3:
+      steps:
+        - setWeight: 10
+        - pause: { duration: 30 }
+        - setWeight: 20
+        - pause: { duration: 30 }
+        - setWeight: 50
+        - pause: { duration: 30 }
+        - setWeight: 70
+        - pause: { duration: 60 }
+        - setWeight: 100
+
+    color:
+      steps:
+        - setWeight: 10
+        - pause: { duration: 10 }
+        - setWeight: 20
+        - pause: { duration: 10 }
+        - setWeight: 50
+        - pause: { duration: 10 }
+        - setWeight: 70
+        - pause: { duration: 60 }
+        - setWeight: 100
+
+    color2:
+      steps:
+        - setWeight: 10
+        - pause: { duration: 20 }
+        - setWeight: 20
+        - pause: { duration: 20 }
+        - setWeight: 50
+        - pause: { duration: 30 }
+        - setWeight: 70
+        - pause: { duration: 30 }
+        - setWeight: 100
+
+    color3:
+      steps:
+        - setWeight: 10
+        - pause: { duration: 30 }
+        - setWeight: 20
+        - pause: { duration: 30 }
+        - setWeight: 50
+        - pause: { duration: 30 }
+        - setWeight: 70
+        - pause: { duration: 60 }
+        - setWeight: 100
     # Service names (stable stays the original; canary gets a -canary suffix)
     serviceSuffix:
       canary: "-canary"
