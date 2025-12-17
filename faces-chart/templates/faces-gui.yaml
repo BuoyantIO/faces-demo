@@ -137,6 +137,12 @@ spec:
         env:
         - name: USER_HEADER_NAME
           value: {{ .Values.authHeader | quote }}
+        - name: HIDE_KEY
+          value: {{ .Values.gui.hideKey | quote }}
+        - name: NUM_ROWS
+          value: {{ .Values.gui.numberRows | quote }}
+        - name: NUM_COLS
+          value: {{ .Values.gui.numberColumns | quote }}
         {{- if .Values.whisperAddress }}
         - name: WHISPER_ADDRESS
           value: {{ .Values.whisperAddress | quote }}
@@ -184,6 +190,20 @@ spec:
         env:
         - name: USER_HEADER_NAME
           value: {{ .Values.authHeader | quote }}
+        - name: HIDE_KEY
+          value: {{ .Values.gui.hideKey | quote }}
+        - name: NUM_ROWS
+          value: {{ .Values.gui.numberRows | quote }}
+        - name: NUM_COLS
+          value: {{ .Values.gui.numberColumns | quote }}
+        {{- if .Values.whisperAddress }}
+        - name: WHISPER_ADDRESS
+          value: {{ .Values.whisperAddress | quote }}
+        {{- if .Values.whisperNode }}
+        - name: WHISPER_NODE_NUMBER
+          value: {{ .Values.whisperNode | quote }}
+        {{- end }}
+        {{- end }}
         ports:
         - name: http
           containerPort: 8000

@@ -26,6 +26,9 @@ gui:
   imageTag: ""                  # If not set, uses the defaultImageTag
   imagePullPolicy: ""           # If not set, uses the default imagePullPolicy
   serviceType: ClusterIP        # Override with LoadBalancer or NodePort if desired
+  hideKey: false
+  numberRows: 4
+  numberColumns: 4
 
 face:
   image: ""                     # If set, overrides the imageName/imageTag pair
