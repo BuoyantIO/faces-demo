@@ -110,7 +110,7 @@ spec:
 
       {{- if .Values.rollouts.canary.face.steps }}
       steps:
-{{ toYaml .Values.rollouts.canary.face.steps | nindent 8 }}
+      {{ toYaml .Values.rollouts.canary.face.steps | nindent 8 }}
       {{- end }}
 
     {{- else }}

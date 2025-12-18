@@ -256,7 +256,7 @@ spec:
           {{ $pluginName }}:
             {{- /* If user provided config, honor it; otherwise auto-fill for gatewayAPI */ -}}
             {{- if $pluginCfg }}
-{{ toYaml $pluginCfg | nindent 12 }}
+            {{ toYaml $pluginCfg | nindent 12 }}
             {{- else if and (eq $pluginName "argoproj-labs/gatewayAPI") $autocreate (eq $routeKind "HTTPRoute") }}
               httpRoute: {{ $routeName }}
               namespace: {{ .root.Release.Namespace }}
