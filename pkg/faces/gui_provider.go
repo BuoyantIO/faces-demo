@@ -80,6 +80,7 @@ func NewGUIProviderFromEnvironment() (*GUIProvider, error) {
 	gprv.edgeSize = utils.IntFromEnv("EDGE_SIZE", 1)
 	gprv.startActive = utils.BoolFromEnv("START_ACTIVE", true)
 
+	gprv.Infof("faceServer %s", gprv.faceService)
 	gprv.Infof("dataPath %s", gprv.dataPath)
 	gprv.Infof("bgColor %s", gprv.bgColor)
 	gprv.Infof("hideKey %v", gprv.hideKey)
@@ -122,6 +123,8 @@ func (gprv *GUIProvider) HTTPGetHandler(w http.ResponseWriter, r *http.Request) 
 	rcode := http.StatusNotFound
 	rtext := fmt.Sprintf("%s not found", r.URL.Path)
 	rtype := "text/html"
+
+	gprv.Debugf("GET %s (user %s, user-agent %s)", r.URL.Path, user, userAgent)
 
 	// Handle readiness checks first (they're simple).
 	if r.URL.Path == "/ready" {
