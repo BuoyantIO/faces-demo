@@ -119,8 +119,15 @@ func (sprv *SmileyProvider) HandlePutRequest(w http.ResponseWriter, r *http.Requ
 	resp.Add("smiley", sprv.GetSmiley())
 	resp.Add("message", "Smiley updated successfully")
 
-	// Use the base HTTP server's standard response method
-	respJSON, _ := json.Marshal(resp.Data)
+	// I don't think this can really fail, but handle it just in case.
+	respJSON, err := json.Marshal(resp.Data)
+
+	if err != nil {
+		sprv.Warnf("Failed to marshal update response: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to marshal update response: %v", err), http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(respJSON)
