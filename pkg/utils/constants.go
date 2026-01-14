@@ -19,7 +19,6 @@ package utils
 
 import (
 	"strings"
-	"unicode/utf8"
 )
 
 type SmileyMap struct {
@@ -42,41 +41,35 @@ var Smileys = SmileyMap{
 
 // Lookup a smiley by name. If found, return the HTML entity for the smiley
 // and true; if not found, return Vomiting.
-func (sm *SmileyMap) Lookup(name string) string {
+func (sm *SmileyMap) Lookup(name string) (string, bool) {
 	if smiley, ok := sm.smileys[name]; ok {
-		return smiley
+		return smiley, true
 	}
 
 	// If the smiley starts with '&#x', assume it's already an HTML entity
 	// and return it as-is.
 	if strings.HasPrefix(name, "&#x") {
-		return name
+		return name, true
 	}
 
 	// If the smiley starts with 'U+', assume it's a unicode and
 	// convert it to HTML entity format.
 	if strings.HasPrefix(name, "U+") {
 		// Replace "U+" with "&#x" and append a trailing ";"
-		return strings.Replace(name, "U+", "&#x", 1) + ";"
+		return strings.Replace(name, "U+", "&#x", 1) + ";", true
 	}
 
 	// If the string contains actual Unicode emoji characters (non-ASCII),
 	// assume it's a literal emoji and return it as-is.
 	for _, r := range name {
 		if r > 127 {
-			return name
+			return name, true
 		}
 	}
 
-	// If the string is short and contains only non-ASCII runes after decoding,
-	// it's likely a multi-byte emoji - return as-is
-	if utf8.RuneCountInString(name) <= 4 && len(name) != utf8.RuneCountInString(name) {
-		return name
-	}
-
-	// It doesn't look like a unicode and it's not in list,
-	// so return Vomiting as a fallback.
-	return sm.smileys["Vomiting"]
+	// It doesn't look like a unicode and it's not in the list, so return
+	// Vomiting as a fallback.
+	return sm.smileys["Vomiting"], false
 }
 
 func (sm *SmileyMap) LookupValue(value string) string {
@@ -142,21 +135,21 @@ var Colors = Palette{
 	},
 }
 
-func (p *Palette) Lookup(name string) string {
+func (p *Palette) Lookup(name string) (string, bool) {
 	if color, ok := p.colors[name]; ok {
-		return color
+		return color, true
 	}
 
 	// If the color starts with '#', assume it's a hex color code and
 	// return it as-is.
 
 	if name[0] == '#' {
-		return name
+		return name, true
 	}
 
 	// It doesn't look like a hex code and it's not a color code we know,
 	// so just return yellow as a fallback.
-	return p.colors["yellow"]
+	return p.colors["yellow"], false
 }
 
 var Defaults = map[string]string{

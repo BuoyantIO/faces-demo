@@ -273,10 +273,10 @@ func (sprv *FaceProvider) Get(prvReq *ProviderRequest) ProviderResponse {
 	if smileyResp.statusCode != http.StatusOK {
 		resp.AddError(fmt.Sprintf("smiley: %s", smileyResp.data))
 
-		mapped := mapStatus("smiley", smileyResp.statusCode)
-		smiley = utils.Smileys.Lookup(mapped)
+		smileyName := mapStatus("smiley", smileyResp.statusCode)
+		smiley, _ = utils.Smileys.Lookup(smileyName)
 
-		sprv.Debugf("(%s) mapped smiley %d to %s (%s)", prvReq.InfoStr(), smileyResp.statusCode, mapped, smiley)
+		sprv.Debugf("(%s) smiley status %d => %s (%s)", prvReq.InfoStr(), smileyResp.statusCode, smileyName, smiley)
 	} else {
 		smiley = smileyResp.data
 	}
@@ -285,9 +285,11 @@ func (sprv *FaceProvider) Get(prvReq *ProviderRequest) ProviderResponse {
 
 	if colorResp.statusCode != http.StatusOK {
 		resp.AddError(fmt.Sprintf("color: %s", colorResp.data))
-		color = utils.Colors.Lookup(mapStatus("color", colorResp.statusCode))
 
-		sprv.Debugf("(%s) mapped color %d to %s (%s)", prvReq.InfoStr(), colorResp.statusCode, color)
+		colorName := mapStatus("color", colorResp.statusCode)
+		color, _ = utils.Colors.Lookup(colorName)
+
+		sprv.Debugf("(%s) color status %d => %s (%s)", prvReq.InfoStr(), colorResp.statusCode, colorName, color)
 	} else {
 		color = colorResp.data
 	}

@@ -60,18 +60,38 @@ func (sprv *SmileyProvider) Get(prvReq *ProviderRequest) ProviderResponse {
 	// provider
 
 	resp := ProviderResponseEmpty()
-	resp.Add("smiley", sprv.smiley)
+	resp.Add("smiley", sprv.GetSmiley())
 
 	return resp
 }
 
-func (sprv *SmileyProvider) SetSmiley(success string) {
-	sprv.smiley = utils.Smileys.Lookup(success)
-	successNameUsed := utils.Smileys.LookupValue(sprv.smiley)
+func (sprv *SmileyProvider) GetSmiley() string {
+	sprv.Lock()
+	defer sprv.Unlock()
 
-	sprv.Infof("Updated smiley: %s (%s)", success, successNameUsed)
+	return sprv.smiley
 }
 
+func (sprv *SmileyProvider) SetSmiley(smiley string) error {
+	if smiley == "" {
+		return fmt.Errorf("smiley cannot be empty")
+	}
+
+	sprv.Lock()
+	defer sprv.Unlock()
+
+	newSmiley, found := utils.Smileys.Lookup(smiley)
+
+	if !found {
+		sprv.Warnf("Unknown smiley '%s', not changing smiley", smiley)
+		return fmt.Errorf("unknown smiley '%s'", smiley)
+	}
+
+	sprv.smiley = newSmiley
+	sprv.Infof("Updated smiley: %s (%s)", smiley, newSmiley)
+
+	return nil
+}
 func (sprv *SmileyProvider) HandlePutRequest(w http.ResponseWriter, r *http.Request) {
 	// Parse JSON body to get success and failure emojis
 	var updateData struct {
@@ -84,11 +104,17 @@ func (sprv *SmileyProvider) HandlePutRequest(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Update emojis
-	sprv.SetSmiley(updateData.Smiley)
-	// Return success response
+	// ...and update the smiley accordingly.
+	err = sprv.SetSmiley(updateData.Smiley)
+
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to set smiley: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Finally, return a success response.
 	resp := ProviderResponseEmpty()
-	resp.Add("smiley", sprv.smiley)
+	resp.Add("smiley", sprv.GetSmiley())
 	resp.Add("message", "Smiley updated successfully")
 
 	// Use the base HTTP server's standard response method

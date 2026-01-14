@@ -18,7 +18,9 @@
 package faces
 
 import (
+	"fmt"
 	"log/slog"
+	"os"
 
 	"github.com/BuoyantIO/faces-demo/v2/pkg/utils"
 )
@@ -45,7 +47,19 @@ func NewColorProviderFromEnvironment() *ColorProvider {
 
 	colorName := utils.StringFromEnv("COLOR", "blue")
 	cprv.Key = colorName
-	cprv.SetColor(colorName)
+
+	err := cprv.SetColor(colorName)
+
+	if err != nil {
+		cprv.Warnf("Failed to set initial color: %v", err)
+		err = cprv.SetColor("yellow")
+	}
+
+	// Wow this is unsatisfying.
+	if err != nil {
+		cprv.Warnf("Failed to set fallback color: %v", err)
+		os.Exit(1)
+	}
 
 	return cprv
 }
@@ -55,12 +69,34 @@ func (cprv *ColorProvider) Get(prvReq *ProviderRequest) ProviderResponse {
 	// provider
 
 	resp := ProviderResponseEmpty()
-	resp.Add("color", cprv.color)
+	resp.Add("color", cprv.GetColor())
 	return resp
 }
 
-func (cprv *ColorProvider) SetColor(color string) {
-	cprv.color = utils.Colors.Lookup(color)
+func (cprv *ColorProvider) GetColor() string {
+	cprv.Lock()
+	defer cprv.Unlock()
 
+	return cprv.color
+}
+
+func (cprv *ColorProvider) SetColor(color string) error {
+	if color == "" {
+		return fmt.Errorf("color cannot be empty")
+	}
+
+	cprv.Lock()
+	defer cprv.Unlock()
+
+	newColor, found := utils.Colors.Lookup(color)
+
+	if !found {
+		cprv.Warnf("Unknown color '%s', not changing color", color)
+		return fmt.Errorf("unknown color '%s'", color)
+	}
+
+	cprv.color = newColor
 	cprv.Infof("Using color %s => %s", color, cprv.color)
+
+	return nil
 }
