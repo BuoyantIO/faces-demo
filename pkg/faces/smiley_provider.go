@@ -92,8 +92,10 @@ func (sprv *SmileyProvider) SetSmiley(smiley string) error {
 
 	return nil
 }
+
+// HandlePutRequest processes HTTP PUT requests to update the smiley emoji.
 func (sprv *SmileyProvider) HandlePutRequest(w http.ResponseWriter, r *http.Request) {
-	// Parse JSON body to get success and failure emojis
+	// Grab the new smiley from the request body...
 	var updateData struct {
 		Smiley string `json:"smiley"`
 	}
