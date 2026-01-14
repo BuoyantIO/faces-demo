@@ -17,7 +17,10 @@
 
 package utils
 
-import "strings"
+import (
+	"strings"
+	"unicode/utf8"
+)
 
 type SmileyMap struct {
 	smileys map[string]string
@@ -44,13 +47,31 @@ func (sm *SmileyMap) Lookup(name string) string {
 		return smiley
 	}
 
-	// If the smiley starts with 'U+', assume it's a unicode and
-	// return it as-is.
+	// If the smiley starts with '&#x', assume it's already an HTML entity
+	// and return it as-is.
+	if strings.HasPrefix(name, "&#x") {
+		return name
+	}
 
-    // If the smiley starts with 'U', assume it's a unicode and return it as-is
+	// If the smiley starts with 'U+', assume it's a unicode and
+	// convert it to HTML entity format.
 	if strings.HasPrefix(name, "U+") {
 		// Replace "U+" with "&#x" and append a trailing ";"
 		return strings.Replace(name, "U+", "&#x", 1) + ";"
+	}
+
+	// If the string contains actual Unicode emoji characters (non-ASCII),
+	// assume it's a literal emoji and return it as-is.
+	for _, r := range name {
+		if r > 127 {
+			return name
+		}
+	}
+
+	// If the string is short and contains only non-ASCII runes after decoding,
+	// it's likely a multi-byte emoji - return as-is
+	if utf8.RuneCountInString(name) <= 4 && len(name) != utf8.RuneCountInString(name) {
+		return name
 	}
 
 	// It doesn't look like a unicode and it's not in list,
