@@ -164,6 +164,7 @@ type ProviderInterface interface {
 }
 
 type HTTPGetHandler func(w http.ResponseWriter, r *http.Request)
+type HTTPPutHandler func(w http.ResponseWriter, r *http.Request)
 type ProviderGetHandler func(prvReq *ProviderRequest) ProviderResponse
 
 // A ProviderUpdater is a function that updates the provider's state based on external
@@ -193,6 +194,7 @@ type BaseProvider struct {
 	debugEnabled       bool
 	providerGetHandler ProviderGetHandler
 	httpGetHandler     HTTPGetHandler
+	httpPutHandler     HTTPPutHandler
 
 	updaters  []ProviderUpdater
 	preHooks  []ProviderHook
@@ -344,6 +346,12 @@ func (bprv *BaseProvider) SetGetHandler(handler ProviderGetHandler) {
 // that don't trip the error fraction or get rate limited.
 func (bprv *BaseProvider) SetHTTPGetHandler(handler HTTPGetHandler) {
 	bprv.httpGetHandler = handler
+}
+
+// SetHTTPPutHandler sets the function that will be called to handle HTTP PUT
+// requests. If this is not set, PUT requests will return Method Not Allowed.
+func (bprv *BaseProvider) SetHTTPPutHandler(handler HTTPPutHandler) {
+	bprv.httpPutHandler = handler
 }
 
 func (bprv *BaseProvider) AddUpdater(updater ProviderUpdater) {

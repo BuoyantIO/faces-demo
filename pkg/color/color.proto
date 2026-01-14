@@ -7,6 +7,7 @@ option go_package="github.com/BuoyantIO/faces-demo/v2/pkg/color";
 service ColorService {
   rpc Center (ColorRequest) returns (ColorResponse);
   rpc Edge (ColorRequest) returns (ColorResponse);
+  rpc UpdateColor (ColorUpdate) returns (ColorResponse);
 }
 
 message ColorRequest {
@@ -18,4 +19,8 @@ message ColorResponse {
   string color = 1;
   string rate = 2;
   repeated string errors = 3;
+}
+
+message ColorUpdate {
+  string color = 1;
 }

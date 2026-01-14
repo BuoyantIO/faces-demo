@@ -98,3 +98,11 @@ func (srv *colorServer) Edge(ctx context.Context, req *color.ColorRequest) (*col
 
 	return srv.BuildResponse(resp)
 }
+
+func (srv *colorServer) UpdateColor(ctx context.Context, req *color.ColorUpdate) (*color.ColorResponse, error) {
+	srv.provider.SetColor(req.Color)
+
+	return &color.ColorResponse{
+		Color: srv.provider.color,
+	}, nil
+}

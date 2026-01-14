@@ -45,9 +45,8 @@ func NewColorProviderFromEnvironment() *ColorProvider {
 
 	colorName := utils.StringFromEnv("COLOR", "blue")
 	cprv.Key = colorName
-	cprv.color = utils.Colors.Lookup(colorName)
+	cprv.SetColor(colorName)
 
-	cprv.Infof("Using color %s => %s", colorName, cprv.color)
 	return cprv
 }
 
@@ -58,4 +57,10 @@ func (cprv *ColorProvider) Get(prvReq *ProviderRequest) ProviderResponse {
 	resp := ProviderResponseEmpty()
 	resp.Add("color", cprv.color)
 	return resp
+}
+
+func (cprv *ColorProvider) SetColor(color string) {
+	cprv.color = utils.Colors.Lookup(color)
+
+	cprv.Infof("Using color %s => %s", color, cprv.color)
 }

@@ -18,7 +18,10 @@
 package faces
 
 import (
+	"encoding/json"
+	"fmt"
 	"log/slog"
+	"net/http"
 
 	"github.com/BuoyantIO/faces-demo/v2/pkg/utils"
 )
@@ -43,13 +46,12 @@ func NewSmileyProviderFromEnvironment() *SmileyProvider {
 
 	sprv.BaseProvider.SetupFromEnvironment()
 
-	smileyName := utils.StringFromEnv("SMILEY", "Grinning")
-	sprv.Key = smileyName
-	sprv.smiley = utils.Smileys.Lookup(smileyName)
+	sprv.Key = utils.StringFromEnv("SMILEY", "Grinning")
+	sprv.SetSmiley(sprv.Key)
 
-	smileyNameUsed := utils.Smileys.LookupValue(sprv.smiley)
+	// Set up PUT handler for emoji updates
+	sprv.BaseProvider.SetHTTPPutHandler(sprv.HandlePutRequest)
 
-	sprv.Infof("Using smiley %s", smileyNameUsed)
 	return sprv
 }
 
@@ -61,4 +63,37 @@ func (sprv *SmileyProvider) Get(prvReq *ProviderRequest) ProviderResponse {
 	resp.Add("smiley", sprv.smiley)
 
 	return resp
+}
+
+func (sprv *SmileyProvider) SetSmiley(success string) {
+	sprv.smiley = utils.Smileys.Lookup(success)
+	successNameUsed := utils.Smileys.LookupValue(sprv.smiley)
+
+	sprv.Infof("Updated smiley: %s (%s)", success, successNameUsed)
+}
+
+func (sprv *SmileyProvider) HandlePutRequest(w http.ResponseWriter, r *http.Request) {
+	// Parse JSON body to get success and failure emojis
+	var updateData struct {
+		Smiley string `json:"smiley"`
+	}
+
+	err := json.NewDecoder(r.Body).Decode(&updateData)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Update emojis
+	sprv.SetSmiley(updateData.Smiley)
+	// Return success response
+	resp := ProviderResponseEmpty()
+	resp.Add("smiley", sprv.smiley)
+	resp.Add("message", "Smiley updated successfully")
+
+	// Use the base HTTP server's standard response method
+	respJSON, _ := json.Marshal(resp.Data)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(respJSON)
 }
