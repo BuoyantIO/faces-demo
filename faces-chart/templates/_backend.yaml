@@ -256,7 +256,7 @@ spec:
           {{ $pluginName }}:
             {{- /* If user provided config, honor it; otherwise auto-fill for gatewayAPI */ -}}
             {{- if $pluginCfg }}
-{{ toYaml $pluginCfg | nindent 12 }}
+            {{ toYaml $pluginCfg | nindent 12 }}
             {{- else if and (eq $pluginName "argoproj-labs/gatewayAPI") $autocreate (eq $routeKind "HTTPRoute") }}
               httpRoute: {{ $routeName }}
               namespace: {{ .root.Release.Namespace }}
@@ -267,9 +267,11 @@ spec:
               {}
             {{- end }}
       {{- end }}
-      {{- if .root.Values.rollouts.canary.steps }}
+      {{- $canaryCfg := .root.Values.rollouts.canary | default dict -}}
+      {{- $workloadCfg := index $canaryCfg .name | default dict -}}
+      {{- if $workloadCfg.steps }}
       steps:
-{{ toYaml .root.Values.rollouts.canary.steps | nindent 8 }}
+      {{ toYaml $workloadCfg.steps | nindent 8 }}
       {{- end }}
     {{- else if eq $strategy "blueGreen" }}
     blueGreen:
