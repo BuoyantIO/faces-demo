@@ -98,3 +98,16 @@ func (srv *colorServer) Edge(ctx context.Context, req *color.ColorRequest) (*col
 
 	return srv.BuildResponse(resp)
 }
+
+func (srv *colorServer) UpdateColor(ctx context.Context, req *color.ColorUpdate) (*color.ColorUpdateResponse, error) {
+	newColor, err := srv.provider.SetColor(req.Which, req.Color)
+
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "failed to set color: %v", err)
+	}
+
+	return &color.ColorUpdateResponse{
+		Which: req.Which,
+		Color: newColor,
+	}, nil
+}

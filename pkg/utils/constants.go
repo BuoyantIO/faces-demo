@@ -17,13 +17,17 @@
 
 package utils
 
-import "strings"
+import (
+	"strings"
+)
 
 type SmileyMap struct {
-	smileys map[string]string
+	fallback string
+	smileys  map[string]string
 }
 
 var Smileys = SmileyMap{
+	fallback: "&#x1F92E;", // Vomiting emoji
 	smileys: map[string]string{
 		"Grinning":    "&#x1F603;",
 		"Sleeping":    "&#x1F634;",
@@ -39,23 +43,39 @@ var Smileys = SmileyMap{
 
 // Lookup a smiley by name. If found, return the HTML entity for the smiley
 // and true; if not found, return Vomiting.
-func (sm *SmileyMap) Lookup(name string) string {
+func (sm *SmileyMap) Lookup(name string) (string, bool) {
+	if name == "" {
+		return sm.fallback, false
+	}
+
 	if smiley, ok := sm.smileys[name]; ok {
-		return smiley
+		return smiley, true
+	}
+
+	// If the smiley starts with '&#x', assume it's already an HTML entity
+	// and return it as-is.
+	if strings.HasPrefix(name, "&#x") {
+		return name, true
 	}
 
 	// If the smiley starts with 'U+', assume it's a unicode and
-	// return it as-is.
-
-    // If the smiley starts with 'U', assume it's a unicode and return it as-is
+	// convert it to HTML entity format.
 	if strings.HasPrefix(name, "U+") {
 		// Replace "U+" with "&#x" and append a trailing ";"
-		return strings.Replace(name, "U+", "&#x", 1) + ";"
+		return strings.Replace(name, "U+", "&#x", 1) + ";", true
 	}
 
-	// It doesn't look like a unicode and it's not in list,
-	// so return Vomiting as a fallback.
-	return sm.smileys["Vomiting"]
+	// If the string contains actual Unicode emoji characters (non-ASCII),
+	// assume it's a literal emoji and return it as-is.
+	for _, r := range name {
+		if r > 127 {
+			return name, true
+		}
+	}
+
+	// It doesn't look like a unicode and it's not in the list, so return
+	// Vomiting as a fallback.
+	return sm.fallback, false
 }
 
 func (sm *SmileyMap) LookupValue(value string) string {
@@ -69,7 +89,8 @@ func (sm *SmileyMap) LookupValue(value string) string {
 }
 
 type Palette struct {
-	colors map[string]string
+	fallback string
+	colors   map[string]string
 }
 
 // These colors are from the "Bright" color scheme shown in the "Qualitative
@@ -105,6 +126,7 @@ type Palette struct {
 // and, hopefully, that's a decent compromise.
 
 var Colors = Palette{
+	fallback: "#CCBB44", // Yellow as a fallback
 	colors: map[string]string{
 		// Include grey/black/white because they're sometimes convenient.
 		"grey":  "#BBBBBB",
@@ -121,21 +143,25 @@ var Colors = Palette{
 	},
 }
 
-func (p *Palette) Lookup(name string) string {
+func (p *Palette) Lookup(name string) (string, bool) {
+	if name == "" {
+		return p.fallback, false
+	}
+
 	if color, ok := p.colors[name]; ok {
-		return color
+		return color, true
 	}
 
 	// If the color starts with '#', assume it's a hex color code and
 	// return it as-is.
 
 	if name[0] == '#' {
-		return name
+		return name, true
 	}
 
 	// It doesn't look like a hex code and it's not a color code we know,
 	// so just return yellow as a fallback.
-	return p.colors["yellow"]
+	return p.fallback, false
 }
 
 var Defaults = map[string]string{

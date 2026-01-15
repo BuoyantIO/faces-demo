@@ -18,14 +18,17 @@
 package faces
 
 import (
+	"encoding/json"
+	"fmt"
 	"log/slog"
+	"net/http"
 
 	"github.com/BuoyantIO/faces-demo/v2/pkg/utils"
 )
 
 type SmileyProvider struct {
 	BaseProvider
-	smiley string
+	smilies map[string]string
 }
 
 func NewSmileyProviderFromEnvironment() *SmileyProvider {
@@ -33,6 +36,7 @@ func NewSmileyProviderFromEnvironment() *SmileyProvider {
 		BaseProvider: BaseProvider{
 			Name: "Smiley",
 		},
+		smilies: make(map[string]string),
 	}
 
 	sprv.SetLogger(slog.Default().With(
@@ -43,13 +47,22 @@ func NewSmileyProviderFromEnvironment() *SmileyProvider {
 
 	sprv.BaseProvider.SetupFromEnvironment()
 
+	// Set the initial smilies by hand: we explicitly want to use the
+	// fallback smiley if anything goes wrong here.
 	smileyName := utils.StringFromEnv("SMILEY", "Grinning")
+	smiley, _ := utils.Smileys.Lookup(smileyName)
+
+	sprv.Infof("Starting with smiley %s => %s", smileyName, smiley)
+
+	sprv.smilies["center"] = smiley
+	sprv.smilies["edge"] = smiley
+
+	// This isn't really ideal.
 	sprv.Key = smileyName
-	sprv.smiley = utils.Smileys.Lookup(smileyName)
 
-	smileyNameUsed := utils.Smileys.LookupValue(sprv.smiley)
+	// Set up PUT handler for emoji updates
+	sprv.BaseProvider.SetHTTPPutHandler(sprv.HandlePutRequest)
 
-	sprv.Infof("Using smiley %s", smileyNameUsed)
 	return sprv
 }
 
@@ -58,7 +71,96 @@ func (sprv *SmileyProvider) Get(prvReq *ProviderRequest) ProviderResponse {
 	// provider
 
 	resp := ProviderResponseEmpty()
-	resp.Add("smiley", sprv.smiley)
+	resp.Add("smiley", sprv.GetSmiley(prvReq.subrequest))
 
 	return resp
+}
+
+func (sprv *SmileyProvider) GetSmiley(which string) string {
+	sprv.Lock()
+	defer sprv.Unlock()
+
+	smiley, found := sprv.smilies[which]
+
+	if !found {
+		sprv.Warnf("Unknown smiley key '%s', returning center smiley", which)
+		smiley = sprv.smilies["center"]
+	}
+
+	return smiley
+}
+
+func (sprv *SmileyProvider) SetSmiley(which string, smiley string) (string, error) {
+	if which != "all" && which != "center" && which != "edge" {
+		return "", fmt.Errorf("unknown smiley key '%s'", which)
+	}
+
+	if smiley == "" {
+		return "", fmt.Errorf("smiley cannot be empty")
+	}
+
+	// It's safe to do the lookup without holding the lock, since
+	// utils.Smileys is immutable.
+	newSmiley, found := utils.Smileys.Lookup(smiley)
+
+	if !found {
+		sprv.Warnf("Unknown %s smiley %s, not changing smiley", which, smiley)
+		return "", fmt.Errorf("unknown smiley '%s'", smiley)
+	}
+
+	sprv.Lock()
+	defer sprv.Unlock()
+
+	if which == "all" {
+		sprv.smilies["center"] = newSmiley
+		sprv.smilies["edge"] = newSmiley
+	} else {
+		sprv.smilies[which] = newSmiley
+	}
+
+	sprv.Infof("Set smiley '%s' to %s => %s", which, smiley, newSmiley)
+
+	return newSmiley, nil
+}
+
+// HandlePutRequest processes HTTP PUT requests to update the smiley emoji.
+func (sprv *SmileyProvider) HandlePutRequest(w http.ResponseWriter, r *http.Request) {
+	// Grab the new smiley from the request body...
+	var updateData struct {
+		Which  string `json:"which"`
+		Smiley string `json:"smiley"`
+	}
+
+	err := json.NewDecoder(r.Body).Decode(&updateData)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// ...and update the smiley accordingly.
+	newSmiley, err := sprv.SetSmiley(updateData.Which, updateData.Smiley)
+
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to set smiley: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Finally, return a success response.
+	resp := ProviderResponseEmpty()
+	resp.Add("which", updateData.Which)
+	resp.Add("smiley", newSmiley)
+	resp.Add("message", "Smiley updated successfully")
+
+	// I don't think this can really fail, but handle it just in case.
+	respJSON, err := json.Marshal(resp.Data)
+
+	if err != nil {
+		sprv.Warnf("Failed to marshal update response: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to marshal update response: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(respJSON)
 }

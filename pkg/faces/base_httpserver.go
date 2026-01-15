@@ -58,6 +58,12 @@ func (bsrv *BaseHTTPServer) handleRequest(w http.ResponseWriter, r *http.Request
 		bsrv.StandardResponse(w, r, ProviderResponseEmpty())
 	} else if r.Method == http.MethodGet {
 		bsrv.provider.httpGetHandler(w, r)
+	} else if r.Method == http.MethodPut {
+		if bsrv.provider.httpPutHandler != nil {
+			bsrv.provider.httpPutHandler(w, r)
+		} else {
+			bsrv.StandardResponse(w, r, ProviderResponseMethodNotAllowed(r.Method))
+		}
 	} else {
 		bsrv.StandardResponse(w, r, ProviderResponseMethodNotAllowed(r.Method))
 	}
