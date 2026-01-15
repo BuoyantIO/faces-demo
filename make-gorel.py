@@ -89,6 +89,8 @@ BUILDS = [
     ),
     Build("load",
           build_styles=[ BuildStyleGeneric("load") ]),
+    Build("mcp",
+          build_styles=[ BuildStyleGeneric("mcp") ]),
     Build("face",
           build_styles=[ BuildStyleGeneric("face"),
                          BuildStyleExternal("face") ]),
