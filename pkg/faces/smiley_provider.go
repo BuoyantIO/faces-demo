@@ -28,7 +28,7 @@ import (
 
 type SmileyProvider struct {
 	BaseProvider
-	smiley string
+	smilies map[string]string
 }
 
 func NewSmileyProviderFromEnvironment() *SmileyProvider {
@@ -36,6 +36,7 @@ func NewSmileyProviderFromEnvironment() *SmileyProvider {
 		BaseProvider: BaseProvider{
 			Name: "Smiley",
 		},
+		smilies: make(map[string]string),
 	}
 
 	sprv.SetLogger(slog.Default().With(
@@ -46,8 +47,18 @@ func NewSmileyProviderFromEnvironment() *SmileyProvider {
 
 	sprv.BaseProvider.SetupFromEnvironment()
 
-	sprv.Key = utils.StringFromEnv("SMILEY", "Grinning")
-	sprv.SetSmiley(sprv.Key)
+	// Set the initial smilies by hand: we explicitly want to use the
+	// fallback smiley if anything goes wrong here.
+	smileyName := utils.StringFromEnv("SMILEY", "Grinning")
+	smiley, _ := utils.Smileys.Lookup(smileyName)
+
+	sprv.Infof("Starting with smiley %s => %s", smileyName, smiley)
+
+	sprv.smilies["center"] = smiley
+	sprv.smilies["edge"] = smiley
+
+	// This isn't really ideal.
+	sprv.Key = smileyName
 
 	// Set up PUT handler for emoji updates
 	sprv.BaseProvider.SetHTTPPutHandler(sprv.HandlePutRequest)
@@ -60,19 +71,30 @@ func (sprv *SmileyProvider) Get(prvReq *ProviderRequest) ProviderResponse {
 	// provider
 
 	resp := ProviderResponseEmpty()
-	resp.Add("smiley", sprv.GetSmiley())
+	resp.Add("smiley", sprv.GetSmiley(prvReq.subrequest))
 
 	return resp
 }
 
-func (sprv *SmileyProvider) GetSmiley() string {
+func (sprv *SmileyProvider) GetSmiley(which string) string {
 	sprv.Lock()
 	defer sprv.Unlock()
 
-	return sprv.smiley
+	smiley, found := sprv.smilies[which]
+
+	if !found {
+		sprv.Warnf("Unknown smiley key '%s', returning center smiley", which)
+		smiley = sprv.smilies["center"]
+	}
+
+	return smiley
 }
 
-func (sprv *SmileyProvider) SetSmiley(smiley string) error {
+func (sprv *SmileyProvider) SetSmiley(which string, smiley string) error {
+	if which != "all" && which != "center" && which != "edge" {
+		return fmt.Errorf("unknown smiley key '%s'", which)
+	}
+
 	if smiley == "" {
 		return fmt.Errorf("smiley cannot be empty")
 	}
@@ -83,12 +105,18 @@ func (sprv *SmileyProvider) SetSmiley(smiley string) error {
 	newSmiley, found := utils.Smileys.Lookup(smiley)
 
 	if !found {
-		sprv.Warnf("Unknown smiley '%s', not changing smiley", smiley)
+		sprv.Warnf("Unknown %s smiley %s, not changing smiley", which, smiley)
 		return fmt.Errorf("unknown smiley '%s'", smiley)
 	}
 
-	sprv.smiley = newSmiley
-	sprv.Infof("Updated smiley: %s (%s)", smiley, newSmiley)
+	if which == "all" {
+		sprv.smilies["center"] = newSmiley
+		sprv.smilies["edge"] = newSmiley
+	} else {
+		sprv.smilies[which] = newSmiley
+	}
+
+	sprv.Infof("Set smiley '%s' to %s => %s", which, smiley, newSmiley)
 
 	return nil
 }
@@ -97,6 +125,7 @@ func (sprv *SmileyProvider) SetSmiley(smiley string) error {
 func (sprv *SmileyProvider) HandlePutRequest(w http.ResponseWriter, r *http.Request) {
 	// Grab the new smiley from the request body...
 	var updateData struct {
+		Which  string `json:"which"`
 		Smiley string `json:"smiley"`
 	}
 
@@ -107,7 +136,7 @@ func (sprv *SmileyProvider) HandlePutRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// ...and update the smiley accordingly.
-	err = sprv.SetSmiley(updateData.Smiley)
+	err = sprv.SetSmiley(updateData.Which, updateData.Smiley)
 
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to set smiley: %v", err), http.StatusBadRequest)
@@ -116,7 +145,8 @@ func (sprv *SmileyProvider) HandlePutRequest(w http.ResponseWriter, r *http.Requ
 
 	// Finally, return a success response.
 	resp := ProviderResponseEmpty()
-	resp.Add("smiley", sprv.GetSmiley())
+	resp.Add("which", updateData.Which)
+	resp.Add("smiley", sprv.GetSmiley(updateData.Which))
 	resp.Add("message", "Smiley updated successfully")
 
 	// I don't think this can really fail, but handle it just in case.

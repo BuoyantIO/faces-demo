@@ -20,14 +20,13 @@ package faces
 import (
 	"fmt"
 	"log/slog"
-	"os"
 
 	"github.com/BuoyantIO/faces-demo/v2/pkg/utils"
 )
 
 type ColorProvider struct {
 	BaseProvider
-	color string
+	colors map[string]string
 }
 
 func NewColorProviderFromEnvironment() *ColorProvider {
@@ -35,6 +34,7 @@ func NewColorProviderFromEnvironment() *ColorProvider {
 		BaseProvider: BaseProvider{
 			Name: "Color",
 		},
+		colors: make(map[string]string),
 	}
 
 	cprv.SetLogger(slog.Default().With(
@@ -45,21 +45,18 @@ func NewColorProviderFromEnvironment() *ColorProvider {
 
 	cprv.BaseProvider.SetupFromEnvironment()
 
+	// Set the initial colors by hand: we explicitly want to use the
+	// fallback color if anything goes wrong here.
 	colorName := utils.StringFromEnv("COLOR", "blue")
+	color, _ := utils.Colors.Lookup(colorName)
+
+	cprv.Infof("Starting with color %s => %s", colorName, color)
+
+	cprv.colors["center"] = color
+	cprv.colors["edge"] = color
+
+	// This isn't really ideal.
 	cprv.Key = colorName
-
-	err := cprv.SetColor(colorName)
-
-	if err != nil {
-		cprv.Warnf("Failed to set initial color: %v", err)
-		err = cprv.SetColor("yellow")
-	}
-
-	// Wow this is unsatisfying.
-	if err != nil {
-		cprv.Warnf("Failed to set fallback color: %v", err)
-		os.Exit(1)
-	}
 
 	return cprv
 }
@@ -69,34 +66,51 @@ func (cprv *ColorProvider) Get(prvReq *ProviderRequest) ProviderResponse {
 	// provider
 
 	resp := ProviderResponseEmpty()
-	resp.Add("color", cprv.GetColor())
+	resp.Add("color", cprv.GetColor(prvReq.subrequest))
 	return resp
 }
 
-func (cprv *ColorProvider) GetColor() string {
+func (cprv *ColorProvider) GetColor(which string) string {
 	cprv.Lock()
 	defer cprv.Unlock()
 
-	return cprv.color
+	color, found := cprv.colors[which]
+
+	if !found {
+		cprv.Warnf("Unknown color key '%s', returning center color", which)
+		color = cprv.colors["center"]
+	}
+
+	return color
 }
 
-func (cprv *ColorProvider) SetColor(color string) error {
+func (cprv *ColorProvider) SetColor(which string, color string) error {
+	if which != "all" && which != "center" && which != "edge" {
+		return fmt.Errorf("unknown color key '%s'", which)
+	}
+
 	if color == "" {
 		return fmt.Errorf("color cannot be empty")
 	}
 
-	cprv.Lock()
-	defer cprv.Unlock()
-
 	newColor, found := utils.Colors.Lookup(color)
 
 	if !found {
-		cprv.Warnf("Unknown color '%s', not changing color", color)
+		cprv.Warnf("Unknown %s color %s, not changing color", which, color)
 		return fmt.Errorf("unknown color '%s'", color)
 	}
 
-	cprv.color = newColor
-	cprv.Infof("Using color %s => %s", color, cprv.color)
+	cprv.Lock()
+	defer cprv.Unlock()
+
+	if which == "all" {
+		cprv.colors["center"] = newColor
+		cprv.colors["edge"] = newColor
+	} else {
+		cprv.colors[which] = newColor
+	}
+
+	cprv.Infof("Set color '%s' to %s => %s", which, color, cprv.colors[which])
 
 	return nil
 }

@@ -24,7 +24,7 @@ const _ = grpc.SupportPackageIsVersion7
 type ColorServiceClient interface {
 	Center(ctx context.Context, in *ColorRequest, opts ...grpc.CallOption) (*ColorResponse, error)
 	Edge(ctx context.Context, in *ColorRequest, opts ...grpc.CallOption) (*ColorResponse, error)
-	UpdateColor(ctx context.Context, in *ColorUpdate, opts ...grpc.CallOption) (*ColorResponse, error)
+	UpdateColor(ctx context.Context, in *ColorUpdate, opts ...grpc.CallOption) (*ColorUpdateResponse, error)
 }
 
 type colorServiceClient struct {
@@ -53,8 +53,8 @@ func (c *colorServiceClient) Edge(ctx context.Context, in *ColorRequest, opts ..
 	return out, nil
 }
 
-func (c *colorServiceClient) UpdateColor(ctx context.Context, in *ColorUpdate, opts ...grpc.CallOption) (*ColorResponse, error) {
-	out := new(ColorResponse)
+func (c *colorServiceClient) UpdateColor(ctx context.Context, in *ColorUpdate, opts ...grpc.CallOption) (*ColorUpdateResponse, error) {
+	out := new(ColorUpdateResponse)
 	err := c.cc.Invoke(ctx, "/ColorService/UpdateColor", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -68,7 +68,7 @@ func (c *colorServiceClient) UpdateColor(ctx context.Context, in *ColorUpdate, o
 type ColorServiceServer interface {
 	Center(context.Context, *ColorRequest) (*ColorResponse, error)
 	Edge(context.Context, *ColorRequest) (*ColorResponse, error)
-	UpdateColor(context.Context, *ColorUpdate) (*ColorResponse, error)
+	UpdateColor(context.Context, *ColorUpdate) (*ColorUpdateResponse, error)
 	mustEmbedUnimplementedColorServiceServer()
 }
 
@@ -82,7 +82,7 @@ func (UnimplementedColorServiceServer) Center(context.Context, *ColorRequest) (*
 func (UnimplementedColorServiceServer) Edge(context.Context, *ColorRequest) (*ColorResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Edge not implemented")
 }
-func (UnimplementedColorServiceServer) UpdateColor(context.Context, *ColorUpdate) (*ColorResponse, error) {
+func (UnimplementedColorServiceServer) UpdateColor(context.Context, *ColorUpdate) (*ColorUpdateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateColor not implemented")
 }
 func (UnimplementedColorServiceServer) mustEmbedUnimplementedColorServiceServer() {}

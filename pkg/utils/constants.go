@@ -22,10 +22,12 @@ import (
 )
 
 type SmileyMap struct {
-	smileys map[string]string
+	fallback string
+	smileys  map[string]string
 }
 
 var Smileys = SmileyMap{
+	fallback: "&#x1F92E;", // Vomiting emoji
 	smileys: map[string]string{
 		"Grinning":    "&#x1F603;",
 		"Sleeping":    "&#x1F634;",
@@ -42,6 +44,10 @@ var Smileys = SmileyMap{
 // Lookup a smiley by name. If found, return the HTML entity for the smiley
 // and true; if not found, return Vomiting.
 func (sm *SmileyMap) Lookup(name string) (string, bool) {
+	if name == "" {
+		return sm.fallback, false
+	}
+
 	if smiley, ok := sm.smileys[name]; ok {
 		return smiley, true
 	}
@@ -69,7 +75,7 @@ func (sm *SmileyMap) Lookup(name string) (string, bool) {
 
 	// It doesn't look like a unicode and it's not in the list, so return
 	// Vomiting as a fallback.
-	return sm.smileys["Vomiting"], false
+	return sm.fallback, false
 }
 
 func (sm *SmileyMap) LookupValue(value string) string {
@@ -83,7 +89,8 @@ func (sm *SmileyMap) LookupValue(value string) string {
 }
 
 type Palette struct {
-	colors map[string]string
+	fallback string
+	colors   map[string]string
 }
 
 // These colors are from the "Bright" color scheme shown in the "Qualitative
@@ -119,6 +126,7 @@ type Palette struct {
 // and, hopefully, that's a decent compromise.
 
 var Colors = Palette{
+	fallback: "#CCBB44", // Yellow as a fallback
 	colors: map[string]string{
 		// Include grey/black/white because they're sometimes convenient.
 		"grey":  "#BBBBBB",
@@ -136,6 +144,10 @@ var Colors = Palette{
 }
 
 func (p *Palette) Lookup(name string) (string, bool) {
+	if name == "" {
+		return p.fallback, false
+	}
+
 	if color, ok := p.colors[name]; ok {
 		return color, true
 	}
@@ -149,7 +161,7 @@ func (p *Palette) Lookup(name string) (string, bool) {
 
 	// It doesn't look like a hex code and it's not a color code we know,
 	// so just return yellow as a fallback.
-	return p.colors["yellow"], false
+	return p.fallback, false
 }
 
 var Defaults = map[string]string{
