@@ -90,24 +90,26 @@ func (sprv *SmileyProvider) GetSmiley(which string) string {
 	return smiley
 }
 
-func (sprv *SmileyProvider) SetSmiley(which string, smiley string) error {
+func (sprv *SmileyProvider) SetSmiley(which string, smiley string) (string, error) {
 	if which != "all" && which != "center" && which != "edge" {
-		return fmt.Errorf("unknown smiley key '%s'", which)
+		return "", fmt.Errorf("unknown smiley key '%s'", which)
 	}
 
 	if smiley == "" {
-		return fmt.Errorf("smiley cannot be empty")
+		return "", fmt.Errorf("smiley cannot be empty")
 	}
 
-	sprv.Lock()
-	defer sprv.Unlock()
-
+	// It's safe to do the lookup without holding the lock, since
+	// utils.Smileys is immutable.
 	newSmiley, found := utils.Smileys.Lookup(smiley)
 
 	if !found {
 		sprv.Warnf("Unknown %s smiley %s, not changing smiley", which, smiley)
-		return fmt.Errorf("unknown smiley '%s'", smiley)
+		return "", fmt.Errorf("unknown smiley '%s'", smiley)
 	}
+
+	sprv.Lock()
+	defer sprv.Unlock()
 
 	if which == "all" {
 		sprv.smilies["center"] = newSmiley
@@ -118,7 +120,7 @@ func (sprv *SmileyProvider) SetSmiley(which string, smiley string) error {
 
 	sprv.Infof("Set smiley '%s' to %s => %s", which, smiley, newSmiley)
 
-	return nil
+	return newSmiley, nil
 }
 
 // HandlePutRequest processes HTTP PUT requests to update the smiley emoji.
@@ -136,7 +138,7 @@ func (sprv *SmileyProvider) HandlePutRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// ...and update the smiley accordingly.
-	err = sprv.SetSmiley(updateData.Which, updateData.Smiley)
+	newSmiley, err := sprv.SetSmiley(updateData.Which, updateData.Smiley)
 
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to set smiley: %v", err), http.StatusBadRequest)
@@ -146,7 +148,7 @@ func (sprv *SmileyProvider) HandlePutRequest(w http.ResponseWriter, r *http.Requ
 	// Finally, return a success response.
 	resp := ProviderResponseEmpty()
 	resp.Add("which", updateData.Which)
-	resp.Add("smiley", sprv.GetSmiley(updateData.Which))
+	resp.Add("smiley", newSmiley)
 	resp.Add("message", "Smiley updated successfully")
 
 	// I don't think this can really fail, but handle it just in case.

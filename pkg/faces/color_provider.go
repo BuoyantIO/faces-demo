@@ -84,20 +84,22 @@ func (cprv *ColorProvider) GetColor(which string) string {
 	return color
 }
 
-func (cprv *ColorProvider) SetColor(which string, color string) error {
+func (cprv *ColorProvider) SetColor(which string, color string) (string, error) {
 	if which != "all" && which != "center" && which != "edge" {
-		return fmt.Errorf("unknown color key '%s'", which)
+		return "", fmt.Errorf("unknown color key '%s'", which)
 	}
 
 	if color == "" {
-		return fmt.Errorf("color cannot be empty")
+		return "", fmt.Errorf("color cannot be empty")
 	}
 
+	// It's safe to do the lookup without holding the lock, since
+	// utils.Colors is immutable.
 	newColor, found := utils.Colors.Lookup(color)
 
 	if !found {
 		cprv.Warnf("Unknown %s color %s, not changing color", which, color)
-		return fmt.Errorf("unknown color '%s'", color)
+		return "", fmt.Errorf("unknown color '%s'", color)
 	}
 
 	cprv.Lock()
@@ -110,7 +112,7 @@ func (cprv *ColorProvider) SetColor(which string, color string) error {
 		cprv.colors[which] = newColor
 	}
 
-	cprv.Infof("Set color '%s' to %s => %s", which, color, cprv.colors[which])
+	cprv.Infof("Set color '%s' to %s => %s", which, color, newColor)
 
-	return nil
+	return newColor, nil
 }
