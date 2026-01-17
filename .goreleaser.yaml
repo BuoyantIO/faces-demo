@@ -73,6 +73,16 @@ builds:
   - linux
   id: generic-load
   main: ./cmd/generic/load
+- binary: mcp-workload
+  env:
+  - CGO_ENABLED=0
+  goarch:
+  - arm64
+  - amd64
+  goos:
+  - linux
+  id: generic-mcp
+  main: ./cmd/generic/mcp
 - binary: face-workload
   env:
   - CGO_ENABLED=0
@@ -152,6 +162,22 @@ docker_manifests:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-load:latest-arm64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-load:latest-amd64'
   name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-load:latest'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-mcp:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-mcp:{{ .Version }}-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-mcp:{{ .Version }}'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-mcp:latest-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-mcp:latest-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-mcp:latest'
   push_flags:
   - --insecure
 - create_flags:
@@ -415,6 +441,30 @@ dockers:
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-load:{{ .Version }}-amd64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-load:latest-amd64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/arm64
+  - --build-arg=WORKLOAD=mcp-workload
+  dockerfile: Dockerfiles/Dockerfile.workload
+  goarch: arm64
+  goos: linux
+  ids:
+  - generic-mcp
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-mcp:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-mcp:latest-arm64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/amd64
+  - --build-arg=WORKLOAD=mcp-workload
+  dockerfile: Dockerfiles/Dockerfile.workload
+  goarch: amd64
+  goos: linux
+  ids:
+  - generic-mcp
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-mcp:{{ .Version }}-amd64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-mcp:latest-amd64'
   use: buildx
 - build_flag_templates:
   - --platform=linux/arm64
