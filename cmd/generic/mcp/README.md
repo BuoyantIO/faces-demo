@@ -42,3 +42,9 @@ default being 3000.
 ## Building
 
 `gmake images` will do the right thing.
+
+## Installing
+
+Set `mcp.enabled=true` with Helm. Check out `faces-chart/values.yaml` for
+more details.
+

@@ -20,6 +20,14 @@ whisperAddress: ""
 # Whisper node number. Only needed if multiple nodes of a service are run.
 whisperNode: 1
 
+mcp:
+  enabled: false                # If set to True, enables the MCP server
+  image: ""                     # If set, overrides the imageName/imageTag pair
+  imageName: ghcr.io/buoyantio/faces-mcp
+  imageTag: ""                  # If not set, uses the defaultImageTag
+  imagePullPolicy: ""           # If not set, uses the default imagePullPolicy
+  serviceType: ClusterIP        # Override with LoadBalancer or NodePort if desired
+
 gui:
   image: ""                     # If set, overrides the imageName/imageTag pair
   imageName: ghcr.io/buoyantio/faces-gui
