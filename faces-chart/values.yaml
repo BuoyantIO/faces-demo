@@ -199,6 +199,18 @@ rollouts:
         - pause: { duration: 10 }
         - setWeight: 100
 
+    mcp:
+      steps:
+        - setWeight: 10
+        - pause: { duration: 10 }
+        - setWeight: 20
+        - pause: { duration: 10 }
+        - setWeight: 50
+        - pause: { duration: 10 }
+        - setWeight: 70
+        - pause: { duration: 10 }
+        - setWeight: 100
+
     smiley2:
       steps:
         - setWeight: 10
