@@ -1,0 +1,1077 @@
+#!/usr/bin/env python3
+# ---------------------------------------------------------------------------
+# Faces Demo Terminal UI
+# Created with love by Buoyant Inc. (https://buoyant.io) for the Faces Demo project.
+# Brought to you by Linkerd users like you!
+# ---------------------------------------------------------------------------
+"""
+faces-tui: a terminal UI replacement for the Faces demo GUI.
+
+It renders the Faces grid in a terminal, calls the same center/edge face
+endpoints that faces-gui uses, and maps responses using the same visual rules
+from assets/html/faces.js.
+"""
+
+import argparse
+import concurrent.futures
+import datetime as _dt
+import html
+import json
+import os
+import select
+import shutil
+import sys
+import termios
+import textwrap
+import time
+import tty
+import urllib.error
+import urllib.parse
+import urllib.request
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple
+
+RESET = "\033[0m"
+CLEAR = "\033[2J"
+HOME = "\033[H"
+ALT_SCREEN_ON = "\033[?1049h"
+ALT_SCREEN_OFF = "\033[?1049l"
+HIDE_CURSOR = "\033[?25l"
+SHOW_CURSOR = "\033[?25h"
+BOLD = "\033[1m"
+DIM = "\033[2m"
+
+DEFAULT_BLUE = "#66CCEE"
+DEFAULT_ERROR = "#AA3377"
+DEFAULT_GREY = "#BBBBBB"
+DEFAULT_YELLOW = "#CCBB44"
+DEFAULT_RED = "#EE6677"
+DEFAULT_WHITE = "#FFFFFF"
+DEFAULT_BLACK = "#000000"
+
+COLORS = {
+    "grey": "#BBBBBB",
+    "black": "#000000",
+    "white": "#FFFFFF",
+    "darkblue": "#4477AA",
+    "blue": "#66CCEE",
+    "green": "#228833",
+    "yellow": "#CCBB44",
+    "red": "#EE6677",
+    "purple": "#AA3377",
+}
+
+SMILIES = {
+    "confused": "&#x1F615;",
+    "cursing": "&#x1F92C;",
+    "kaboom": "&#x1F92F;",
+    "neutral": "&#x1F610;",
+    "screaming": "&#x1F631;",
+    "sleeping": "&#x1F634;",
+    "grinning": "&#x1F603;",
+    "thinking": "&#x1F914;",
+    "tongue": "&#x1F61B;",
+    "upset": "&#x1F62C;",
+    "yay": "&#x1F389;",
+}
+
+LEGEND = [
+    ("Success!", "grinning", COLORS["blue"], COLORS["grey"]),
+    ("Face service error", "confused", COLORS["purple"], COLORS["grey"]),
+    ("Timeout", "sleeping", COLORS["red"], COLORS["grey"]),
+    ("Service overwhelmed", "kaboom", COLORS["yellow"], COLORS["purple"]),
+    ("Color service error", "grinning", COLORS["grey"], COLORS["purple"]),
+    ("Smiley service error", "cursing", COLORS["blue"], COLORS["purple"]),
+    ("Slow service", "", "transparent", COLORS["grey"]),
+]
+
+
+@dataclass
+class FetchResult:
+    status: object
+    text: str
+    color: str
+    border_color: str = DEFAULT_GREY
+    ok: bool = False
+    any_timeouts: bool = False
+    errors: str = ""
+    update_text: bool = True
+    update_color: bool = True
+    pod: str = ""
+    http_status: object = 0
+    latency_ms: int = 0
+
+
+@dataclass
+class CellState:
+    row: int
+    col: int
+    kind: str
+    text: str = ""
+    color: str = DEFAULT_GREY
+    border_color: str = DEFAULT_GREY
+    count: int = 0
+    last_status: object = 0
+    last_updated: float = 0.0
+    pending: Optional[concurrent.futures.Future] = None
+    next_due: float = 0.0
+    latency_ms: int = 0
+    errors: str = ""
+
+
+@dataclass
+class PodState:
+    name: str
+    text: str = ""
+    color: str = DEFAULT_GREY
+    border_color: str = DEFAULT_GREY
+    count: int = 0
+    last_status: object = 0
+    last_updated: float = 0.0
+
+
+@dataclass
+class AppState:
+    active: bool = True
+    show_counters: bool = True
+    show_pods: bool = False
+    show_key: bool = False
+    show_help: bool = False
+    quit: bool = False
+    mode: str = "auto"
+    detected_mode: str = ""
+    last_error: str = ""
+    pods: Dict[str, PodState] = field(default_factory=dict)
+
+
+def env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None or value == "":
+        return default
+    return value.strip().lower() in ("1", "true", "yes", "y", "on")
+
+
+def env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None or value == "":
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
+def move(row: int, col: int) -> str:
+    return f"\033[{max(row, 1)};{max(col, 1)}H"
+
+
+def hex_to_rgb(value: str) -> Optional[Tuple[int, int, int]]:
+    value = str(value or "").strip().lstrip("#")
+    if len(value) != 6:
+        return None
+    try:
+        return tuple(int(value[i:i + 2], 16) for i in (0, 2, 4))
+    except ValueError:
+        return None
+
+
+def ansi_bg(color: str) -> str:
+    rgb = hex_to_rgb(color)
+    if rgb is None:
+        return ""
+    r, g, b = rgb
+    return f"\033[48;2;{r};{g};{b}m"
+
+
+def ansi_fg(color: str) -> str:
+    rgb = hex_to_rgb(color)
+    if rgb is None:
+        return ""
+    r, g, b = rgb
+    return f"\033[38;2;{r};{g};{b}m"
+
+
+def ansi_fg_for_bg(color: str) -> str:
+    r, g, b = hex_to_rgb(color) or (0, 0, 0)
+    brightness = (r * 299 + g * 587 + b * 114) / 1000
+    if brightness > 140:
+        return ansi_fg(DEFAULT_BLACK)
+    return ansi_fg(DEFAULT_WHITE)
+
+
+def display_len(text: str, emoji_width: int = 2) -> int:
+    text = str(text)
+    if text.isascii():
+        return len(text)
+    return emoji_width
+
+
+def strip_trailing_slash(value: str) -> str:
+    return value.rstrip("/")
+
+
+def add_query(url: str, row: int, col: int) -> str:
+    parts = urllib.parse.urlsplit(url)
+    query = urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+    query.extend([
+        ("row", str(row)),
+        ("col", str(col)),
+        ("now", _dt.datetime.now(_dt.timezone.utc).isoformat()),
+    ])
+    return urllib.parse.urlunsplit((
+        parts.scheme,
+        parts.netloc,
+        parts.path,
+        urllib.parse.urlencode(query),
+        parts.fragment,
+    ))
+
+
+def build_cell_url(base_url: str, mode: str, kind: str, row: int, col: int) -> str:
+    base = strip_trailing_slash(base_url)
+    if mode == "gui-proxy":
+        url = f"{base}/face/{kind}/"
+    elif mode == "direct":
+        url = f"{base}/{kind}/"
+    elif mode == "root":
+        url = base or base_url
+    else:
+        raise ValueError(f"unsupported mode {mode}")
+    return add_query(url, row, col)
+
+
+def make_request(url: str, timeout: float, user: str, user_header: str, user_agent: str) -> Tuple[object, Dict[str, str], str, int, str]:
+    headers = {
+        "User-Agent": user_agent,
+        "Cache-Control": "no-cache, no-store, max-age=0",
+        # faces-gui sends this to force CORS preflight in browsers. It is not
+        # needed for a terminal client, but keeping it is harmless and closer
+        # to faces-gui behavior.
+        "X-Custom-Header": "custom",
+    }
+    if user:
+        headers[user_header] = user
+
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    start = time.monotonic()
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+            latency_ms = int((time.monotonic() - start) * 1000)
+            return resp.status, dict(resp.headers.items()), body, latency_ms, ""
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        latency_ms = int((time.monotonic() - start) * 1000)
+        return e.code, dict(e.headers.items()), body, latency_ms, ""
+    except Exception as exc:
+        latency_ms = int((time.monotonic() - start) * 1000)
+        return "ERR", {}, "", latency_ms, str(exc)
+
+
+def normalize_smiley(value: str) -> str:
+    value = str(value or "")
+    return html.unescape(value)
+
+
+def named_smiley(name: str) -> str:
+    return normalize_smiley(SMILIES[name])
+
+
+def parse_faces_response(http_status: object, headers: Dict[str, str], body: str, latency_ms: int, transport_error: str) -> FetchResult:
+    pod = headers.get("X-Faces-Pod", "") or headers.get("x-faces-pod", "")
+
+    if transport_error:
+        return FetchResult(
+            status="ERR",
+            http_status="ERR",
+            text=named_smiley("confused"),
+            color=COLORS["purple"],
+            border_color=COLORS["grey"],
+            ok=False,
+            errors=transport_error,
+            pod=pod,
+            latency_ms=latency_ms,
+        )
+
+    cur_status = http_status
+    try:
+        cur_status = int(http_status)
+    except Exception:
+        pass
+
+    errors = "unknown"
+    smiley = None
+    bg_color = None
+    border_color = COLORS["grey"]
+    any_timeouts = False
+
+    if cur_status == 200:
+        try:
+            obj = json.loads(body)
+            smiley = obj.get("smiley")
+            bg_color = obj.get("color")
+
+            obj_errors = obj.get("errors")
+            if isinstance(obj_errors, list) and len(obj_errors) > 0:
+                errors = ",".join(str(e) for e in obj_errors)
+                border_color = COLORS["purple"]
+            else:
+                errors = "success!"
+
+            if smiley == "504" or bg_color == "504":
+                any_timeouts = True
+        except Exception as exc:
+            border_color = COLORS["purple"]
+            smiley = SMILIES["confused"]
+            bg_color = COLORS["purple"]
+            if isinstance(exc, json.JSONDecodeError):
+                errors = "parse error"
+            else:
+                errors = "unknown error"
+    elif cur_status in (504, 429):
+        any_timeouts = True
+        smiley = "504"
+        bg_color = "504"
+        errors = "timeout" if cur_status == 504 else "rate limited"
+    elif cur_status == 599:
+        smiley = SMILIES["neutral"]
+        bg_color = COLORS["yellow"]
+        errors = "latched error"
+    else:
+        try:
+            is_5xx = int(cur_status) // 100 == 5
+        except Exception:
+            is_5xx = False
+
+        if is_5xx:
+            smiley = SMILIES["confused"]
+            bg_color = COLORS["purple"]
+            errors = "server error"
+
+    if smiley is None:
+        smiley = SMILIES["upset"]
+
+    if bg_color is None:
+        bg_color = COLORS["purple"]
+
+    return FetchResult(
+        status=cur_status,
+        http_status=cur_status,
+        text=normalize_smiley(smiley),
+        color=bg_color,
+        border_color=border_color,
+        ok=(cur_status == 200 and not any_timeouts),
+        any_timeouts=any_timeouts,
+        errors=errors,
+        update_text=(smiley != "504"),
+        update_color=(bg_color != "504"),
+        pod=pod,
+        latency_ms=latency_ms,
+    )
+
+
+def looks_like_faces_response(http_status: object, body: str, transport_error: str) -> bool:
+    if transport_error:
+        return False
+    try:
+        data = json.loads(body)
+    except Exception:
+        return False
+    if not isinstance(data, dict):
+        return False
+    keys = set(data.keys())
+    return bool(keys.intersection({"status", "smiley", "color", "errors"}))
+
+
+def detect_mode(args, state: AppState) -> str:
+    if args.mode != "auto":
+        return args.mode
+
+    for candidate in ("gui-proxy", "direct", "root"):
+        url = build_cell_url(args.url, candidate, "center", 0, 0)
+        http_status, headers, body, latency_ms, err = make_request(
+            url,
+            args.timeout,
+            args.user,
+            args.user_header,
+            args.user_agent,
+        )
+        if looks_like_faces_response(http_status, body, err):
+            state.detected_mode = candidate
+            return candidate
+
+    state.detected_mode = "root"
+    state.last_error = "could not auto-detect endpoint mode; falling back to root"
+    return "root"
+
+
+def fetch_cell(args, mode: str, cell: CellState) -> FetchResult:
+    url = build_cell_url(args.url, mode, cell.kind, cell.row, cell.col)
+    http_status, headers, body, latency_ms, err = make_request(
+        url,
+        args.timeout,
+        args.user,
+        args.user_header,
+        args.user_agent,
+    )
+    return parse_faces_response(http_status, headers, body, latency_ms, err)
+
+
+def short_pod_name(name: str) -> str:
+    fields = str(name).split("-")
+    if len(fields) >= 2:
+        return f"{fields[0]}-{fields[-1]}"
+    return str(name)
+
+
+def update_pod(state: AppState, result: FetchResult) -> None:
+    pod_name = result.pod
+    if not pod_name or pod_name.startswith("faces-"):
+        return
+
+    name = short_pod_name(pod_name)
+    pod = state.pods.get(name)
+    if pod is None:
+        pod = PodState(name=name)
+        state.pods[name] = pod
+
+    bump_counter = False
+    text = result.text
+    color = result.color
+    border_color = result.border_color
+
+    if result.status == 599:
+        text = named_smiley("neutral")
+        color = COLORS["yellow"]
+        bump_counter = True
+    elif result.status == 429:
+        text = named_smiley("sleeping")
+        color = COLORS["red"]
+        bump_counter = True
+    elif result.status == 200:
+        if not result.update_text:
+            text = named_smiley("sleeping")
+        if not result.update_color:
+            color = COLORS["red"]
+        pod.count = 0
+    else:
+        border_color = COLORS["purple"]
+        text = named_smiley("upset")
+        color = COLORS["purple"]
+        bump_counter = True
+
+    if bump_counter:
+        pod.count += 1
+
+    pod.text = text
+    pod.color = color
+    pod.border_color = border_color
+    pod.last_status = result.status
+    pod.last_updated = time.monotonic()
+
+
+def apply_result(cell: CellState, result: FetchResult, args, state: AppState) -> None:
+    if result.any_timeouts:
+        cell.count += 1
+    else:
+        cell.count = 0
+
+    if result.update_text:
+        cell.text = result.text
+
+    if result.update_color:
+        cell.color = result.color
+
+    cell.border_color = result.border_color
+    cell.last_status = result.status
+    cell.last_updated = time.monotonic()
+    cell.latency_ms = result.latency_ms
+    cell.errors = result.errors
+
+    if args.error_mode == "status" and result.status != 200:
+        cell.text = str(result.status)
+        if result.status in (429, 504):
+            cell.color = COLORS["red"]
+        elif result.status == 599:
+            cell.color = COLORS["yellow"]
+        else:
+            cell.color = COLORS["purple"]
+
+    update_pod(state, result)
+
+
+def build_cells(args) -> List[CellState]:
+    cells: List[CellState] = []
+    center_min_row = args.edge_size
+    center_max_row = (args.rows - 1) - args.edge_size
+    center_min_col = args.edge_size
+    center_max_col = (args.cols - 1) - args.edge_size
+
+    total = max(args.rows * args.cols, 1)
+    row_interval = args.paint_interval_ms / max(args.rows, 1)
+    cell_interval = args.paint_interval_ms / total
+    now = time.monotonic()
+
+    for row in range(args.rows):
+        for col in range(args.cols):
+            is_center_row = center_min_row <= row <= center_max_row
+            is_center_col = center_min_col <= col <= center_max_col
+            kind = "center" if is_center_row and is_center_col else "edge"
+            initial_delay = ((row * row_interval) + (col * cell_interval)) / 1000.0
+            cells.append(CellState(row=row, col=col, kind=kind, next_due=now + initial_delay))
+    return cells
+
+
+def grid_dimensions(args) -> Tuple[int, int]:
+    width = args.cols * args.tile_width + max(args.cols - 1, 0) * args.col_gap
+    height = args.rows * args.tile_height + max(args.rows - 1, 0) * args.row_gap
+    return width, height
+
+
+def calculate_start_position(args, state: AppState) -> Tuple[int, int]:
+    term = shutil.get_terminal_size(fallback=(100, 30))
+    grid_width, grid_height = grid_dimensions(args)
+    header_height = 2 if args.header else 0
+    footer_height = 2
+    key_height = len(LEGEND) + 2 if state.show_key else 0
+    reserved_height = header_height + footer_height + key_height
+
+    start_col = max(1, ((term.columns - grid_width) // 2) + 1)
+    start_row = max(1 + header_height, ((term.lines - grid_height - reserved_height) // 2) + 1 + header_height)
+    return start_row, start_col
+
+
+def draw_rect(output: List[str], top: int, left: int, width: int, height: int, color: str) -> None:
+    bg = ansi_bg(color)
+    blank = " " * max(width, 0)
+    for dy in range(max(height, 0)):
+        output.append(move(top + dy, left))
+        output.append(bg)
+        output.append(blank)
+        output.append(RESET)
+
+
+def draw_tile(output: List[str], top: int, left: int, width: int, height: int, color: str, border_color: str, show_borders: bool) -> None:
+    if show_borders and width >= 3 and height >= 3:
+        draw_rect(output, top, left, width, height, border_color)
+        draw_rect(output, top + 1, left + 1, width - 2, height - 2, color)
+    else:
+        draw_rect(output, top, left, width, height, color)
+
+
+def draw_center_text(output: List[str], top: int, left: int, width: int, height: int, color: str, text: str, emoji_width: int) -> None:
+    text = str(text or "")
+    if not text:
+        return
+
+    text_width = display_len(text, emoji_width)
+    center_row = top + height // 2
+    center_col = left + max(0, (width - text_width) // 2)
+    output.append(move(center_row, center_col))
+    output.append(ansi_bg(color))
+    output.append(ansi_fg_for_bg(color))
+    output.append(text)
+    output.append(RESET)
+
+
+def draw_counter(output: List[str], top: int, left: int, width: int, height: int, count: int) -> None:
+    if count <= 0:
+        return
+    text = str(count)
+    text = text[-2:]
+    row = top + height - 1
+    col = left + max(0, width - len(text))
+    output.append(move(row, col))
+    output.append(ansi_bg(DEFAULT_WHITE))
+    output.append(ansi_fg(DEFAULT_BLACK))
+    output.append(text)
+    output.append(RESET)
+
+
+def render_cell(output: List[str], cell: CellState, top: int, left: int, args, state: AppState) -> None:
+    color = cell.color
+    text = cell.text
+    border = cell.border_color
+
+    age_ms = (time.monotonic() - cell.last_updated) * 1000 if cell.last_updated else 999999
+    dim = False
+
+    if cell.count > 4:
+        if cell.last_status == 599:
+            text = named_smiley("neutral")
+            color = COLORS["yellow"]
+        else:
+            text = named_smiley("sleeping")
+            color = COLORS["red"]
+        dim = True
+    elif args.fade and cell.last_updated:
+        if age_ms > args.max_visible_ms:
+            text = ""
+            color = DEFAULT_GREY
+        elif age_ms > args.max_solid_ms:
+            dim = True
+
+    if dim:
+        output.append(DIM)
+
+    draw_tile(output, top, left, args.tile_width, args.tile_height, color, border, args.show_borders)
+
+    inner_top = top + 1 if args.show_borders and args.tile_height >= 3 else top
+    inner_left = left + 1 if args.show_borders and args.tile_width >= 3 else left
+    inner_width = args.tile_width - 2 if args.show_borders and args.tile_width >= 3 else args.tile_width
+    inner_height = args.tile_height - 2 if args.show_borders and args.tile_height >= 3 else args.tile_height
+
+    draw_center_text(output, inner_top, inner_left, inner_width, inner_height, color, text, args.emoji_width)
+
+    if state.show_counters:
+        draw_counter(output, top, left, args.tile_width, args.tile_height, cell.count)
+
+    if dim:
+        output.append(RESET)
+
+
+def render_pods(output: List[str], args, state: AppState, start_row: int, start_col: int) -> None:
+    if not state.show_pods:
+        return
+
+    now = time.monotonic()
+    for name in list(state.pods.keys()):
+        if now - state.pods[name].last_updated > 30:
+            del state.pods[name]
+
+    output.append(move(start_row, start_col))
+    output.append(BOLD + "Pods" + RESET)
+
+    row = start_row + 2
+    if not state.pods:
+        output.append(move(row, start_col))
+        output.append("No pod responses yet")
+        return
+
+    for pod in sorted(state.pods.values(), key=lambda p: p.name):
+        age = now - pod.last_updated
+        prefix = DIM if age > 5 else ""
+        output.append(move(row, start_col))
+        output.append(prefix)
+        output.append(ansi_bg(pod.color))
+        output.append(ansi_fg_for_bg(pod.color))
+        output.append(f" {pod.text or '?'} ")
+        output.append(RESET)
+        count = f" count={pod.count}" if pod.count else ""
+        output.append(f" {pod.name} status={pod.last_status}{count}")
+        row += 1
+
+
+def render_key(output: List[str], args, state: AppState, start_row: int, start_col: int) -> None:
+    if not state.show_key:
+        return
+
+    output.append(move(start_row, start_col))
+    output.append(BOLD + "Legend" + RESET)
+    row = start_row + 1
+    for label, smiley_name, bg_color, border_color in LEGEND:
+        output.append(move(row, start_col))
+        if bg_color == "transparent":
+            output.append("[    ]")
+        else:
+            text = named_smiley(smiley_name) if smiley_name else " "
+            output.append(ansi_bg(bg_color))
+            output.append(ansi_fg_for_bg(bg_color))
+            output.append(f" {text} ")
+            output.append(RESET)
+        output.append(f"  {label}")
+        row += 1
+
+
+def render_help_overlay(output: List[str], args, state: AppState) -> None:
+    if not state.show_help:
+        return
+
+    term = shutil.get_terminal_size(fallback=(100, 30))
+    lines = [
+        "faces-tui keys",
+        "",
+        "q or Ctrl-C  quit",
+        "space       start or stop requests",
+        "c           show or hide counters",
+        "p           show or hide pod panel",
+        "k           show or hide legend",
+        "r           refresh all cells now",
+        "u           change user header value",
+        "h or ?      close this help overlay",
+        "",
+        f"mode: {state.detected_mode or args.mode}",
+        f"user header: {args.user_header}={args.user or 'unknown'}",
+    ]
+    width = min(max(len(line) for line in lines) + 4, term.columns - 4)
+    height = len(lines) + 2
+    top = max(1, (term.lines - height) // 2)
+    left = max(1, (term.columns - width) // 2)
+    draw_rect(output, top, left, width, height, DEFAULT_BLACK)
+    for idx, line in enumerate(lines):
+        output.append(move(top + 1 + idx, left + 2))
+        output.append(ansi_bg(DEFAULT_BLACK) + ansi_fg(DEFAULT_WHITE))
+        output.append(line[:max(0, width - 4)])
+        output.append(RESET)
+
+
+def render(cells: List[CellState], args, state: AppState) -> None:
+    output: List[str] = [HOME, CLEAR]
+    start_row, start_col = calculate_start_position(args, state)
+    grid_width, grid_height = grid_dimensions(args)
+
+    if args.header:
+        mode_label = state.detected_mode or args.mode
+        status = "running" if state.active else "paused"
+        output.append(move(1, 1))
+        output.append(
+            f"faces-tui  {args.url}  mode={mode_label}  user={args.user or 'unknown'}  {status}  "
+            "q=quit h=help space=start/stop"
+        )
+        if state.last_error:
+            output.append(move(2, 1))
+            output.append(ansi_fg(COLORS["yellow"]) + state.last_error + RESET)
+
+    by_pos = {(cell.row, cell.col): cell for cell in cells}
+    for row in range(args.rows):
+        for col in range(args.cols):
+            cell = by_pos[(row, col)]
+            top = start_row + row * (args.tile_height + args.row_gap)
+            left = start_col + col * (args.tile_width + args.col_gap)
+            render_cell(output, cell, top, left, args, state)
+
+    side_col = start_col + grid_width + 4
+    render_pods(output, args, state, start_row, side_col)
+
+    key_row = start_row + grid_height + 2
+    render_key(output, args, state, key_row, start_col)
+
+    footer_row = shutil.get_terminal_size(fallback=(100, 30)).lines
+    output.append(move(footer_row, 1))
+    output.append(RESET)
+    output.append("q quit | space start/stop | c counters | p pods | k legend | r refresh | u user | h help")
+
+    render_help_overlay(output, args, state)
+
+    sys.stdout.write("".join(output))
+    sys.stdout.flush()
+
+
+class TerminalMode:
+    def __init__(self):
+        self.enabled = False
+        self.old_settings = None
+
+    def __enter__(self):
+        if sys.stdin.isatty():
+            self.old_settings = termios.tcgetattr(sys.stdin)
+            tty.setcbreak(sys.stdin.fileno())
+            self.enabled = True
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.restore()
+
+    def restore(self):
+        if self.enabled and self.old_settings is not None:
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.old_settings)
+            self.enabled = False
+
+    def enable(self):
+        if not self.enabled and sys.stdin.isatty():
+            tty.setcbreak(sys.stdin.fileno())
+            self.enabled = True
+
+
+def read_key() -> Optional[str]:
+    if not sys.stdin.isatty():
+        return None
+    readable, _, _ = select.select([sys.stdin], [], [], 0)
+    if not readable:
+        return None
+    return sys.stdin.read(1)
+
+
+def prompt_for_user(args, terminal_mode: TerminalMode) -> None:
+    terminal_mode.restore()
+    try:
+        term = shutil.get_terminal_size(fallback=(100, 30))
+        sys.stdout.write(move(term.lines, 1) + CLEAR + "New user value: ")
+        sys.stdout.flush()
+        value = input().strip()
+        if value:
+            args.user = value
+    finally:
+        terminal_mode.enable()
+
+
+def handle_key(key: Optional[str], args, state: AppState, cells: List[CellState], terminal_mode: TerminalMode) -> None:
+    if not key:
+        return
+    if key in ("q", "\x03"):
+        state.quit = True
+    elif key == " ":
+        state.active = not state.active
+        if state.active:
+            now = time.monotonic()
+            for cell in cells:
+                cell.next_due = now
+    elif key == "c":
+        state.show_counters = not state.show_counters
+    elif key == "p":
+        state.show_pods = not state.show_pods
+    elif key == "k":
+        state.show_key = not state.show_key
+    elif key == "r":
+        now = time.monotonic()
+        for cell in cells:
+            cell.next_due = now
+    elif key == "u":
+        prompt_for_user(args, terminal_mode)
+    elif key in ("h", "?"):
+        state.show_help = not state.show_help
+
+
+def run_once_burst(args, state: AppState, cells: List[CellState], executor: concurrent.futures.ThreadPoolExecutor) -> None:
+    futures = [executor.submit(fetch_cell, args, state.detected_mode, cell) for cell in cells]
+    for cell, future in zip(cells, futures):
+        try:
+            result = future.result(timeout=args.timeout + 1)
+            apply_result(cell, result, args, state)
+        except Exception as exc:
+            state.last_error = str(exc)
+
+
+def run_event_loop(args, state: AppState, cells: List[CellState]) -> None:
+    workers = max(1, min(args.workers, max(len(cells), 1)))
+    max_refresh_sleep = max(args.refresh_interval, 0.05)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+        with TerminalMode() as terminal_mode:
+            if not args.no_alt_screen:
+                sys.stdout.write(ALT_SCREEN_ON)
+            sys.stdout.write(HIDE_CURSOR + CLEAR + HOME)
+            sys.stdout.flush()
+
+            try:
+                if args.once:
+                    run_once_burst(args, state, cells, executor)
+                    render(cells, args, state)
+                    return
+
+                while not state.quit:
+                    handle_key(read_key(), args, state, cells, terminal_mode)
+
+                    now = time.monotonic()
+
+                    for cell in cells:
+                        if cell.pending is not None and cell.pending.done():
+                            try:
+                                result = cell.pending.result()
+                                apply_result(cell, result, args, state)
+                                wait = (args.paint_interval_ms / 1000.0) - (result.latency_ms / 1000.0)
+                                cell.next_due = time.monotonic() + max(wait, 0)
+                            except Exception as exc:
+                                state.last_error = str(exc)
+                                cell.next_due = time.monotonic() + 1.0
+                            finally:
+                                cell.pending = None
+
+                    if state.active:
+                        for cell in cells:
+                            if cell.pending is None and now >= cell.next_due:
+                                cell.pending = executor.submit(fetch_cell, args, state.detected_mode, cell)
+
+                    render(cells, args, state)
+                    time.sleep(max_refresh_sleep)
+            finally:
+                sys.stdout.write(RESET + SHOW_CURSOR)
+                if not args.no_alt_screen:
+                    sys.stdout.write(ALT_SCREEN_OFF)
+                sys.stdout.flush()
+
+
+def positive_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"expected integer, got {value}") from exc
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("value must be zero or greater")
+    return parsed
+
+
+def build_parser() -> argparse.ArgumentParser:
+    examples = """
+examples:
+  faces-tui http://faces-gui.faces.svc.cluster.local
+      Auto-detect the endpoint style and render the default 5x5 terminal grid.
+
+  faces-tui http://172.20.47.122 --mode direct
+      Talk directly to a faces-face style endpoint using /center/ and /edge/.
+
+  faces-tui http://172.20.47.122 --mode gui-proxy
+      Talk to a faces-gui style endpoint using /face/center/ and /face/edge/.
+
+  faces-tui http://172.20.47.122 --rows 4 --cols 4 --edge-size 1
+      Match the default faces-gui grid shape from the Helm chart.
+
+  faces-tui http://172.20.47.122 --show-pods --show-key --header
+      Show the pod panel, legend, and header.
+
+  faces-tui http://172.20.47.122 --error-mode status
+      Show non-200 status codes instead of the faces-gui error emojis.
+
+  faces-tui http://172.20.47.122 --once --no-alt-screen
+      Render one grid in the current terminal and exit.
+
+keyboard controls:
+  q       quit
+  space   start or stop requests
+  c       show or hide timeout counters
+  p       show or hide pod panel
+  k       show or hide legend
+  r       force refresh all cells
+  u       change the user header value
+  h or ?  show or hide keyboard help
+
+argument details:
+  url                 Base URL for the Faces endpoint.
+  --mode              Endpoint style. auto probes gui-proxy, direct, then root.
+                      gui-proxy calls /face/center/ and /face/edge/ like faces-gui.
+                      direct calls /center/ and /edge/ on the face service itself.
+                      root calls only the base URL, useful for simple test endpoints.
+  --rows, --cols      Number of grid rows and columns.
+  --edge-size         Thickness of the edge ring. Cells inside the ring call center.
+                      Edge cells call edge. This matches faces-gui behavior.
+  --paint-interval-ms How often each cell should request again. faces-gui uses 2000ms.
+  --refresh-interval  How often the terminal redraws while requests are running.
+  --workers           Maximum concurrent HTTP requests.
+  --timeout           Per-request HTTP timeout in seconds.
+  --tile-width        Width of each terminal tile in columns.
+  --tile-height       Height of each terminal tile in rows.
+  --col-gap           Columns between tiles.
+  --row-gap           Rows between tiles.
+  --emoji-width       Assumed terminal column width for emoji. Most terminals use 2.
+  --error-mode        faces uses faces-gui visual mappings. status prints status codes.
+  --show-counters     Show timeout counters in cells.
+  --hide-counters     Hide timeout counters in cells.
+  --show-pods         Start with the pod panel visible.
+  --show-key          Start with the legend visible.
+  --show-borders      Draw terminal borders using the faces-gui border color logic.
+  --fade              Fade stale cells after max-solid-ms and max-visible-ms.
+  --no-fade           Keep cells visible until replaced.
+  --header            Show URL, mode, user, and key hints at the top.
+  --user              Value sent in the Faces user header.
+  --user-header       Header name to send with --user. Default: X-Faces-User.
+  --user-agent        User-Agent header sent by faces-tui.
+  --start-active      Start requests immediately.
+  --start-paused      Draw the TUI but do not request until space is pressed.
+  --once              Fetch a single full grid and exit.
+  --no-alt-screen     Do not use the terminal alternate screen.
+"""
+
+    parser = argparse.ArgumentParser(
+        prog="faces-tui",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=(
+            "Render the Faces demo app as a terminal UI. faces-tui is intended "
+            "to replace faces-gui when you want the same live center/edge grid, "
+            "color and smiley rendering, timeout counters, legend, pod view, "
+            "and user-header behavior from a Linux command line."
+        ),
+        epilog=textwrap.dedent(examples),
+    )
+
+    parser.add_argument("url", nargs="?", help="Base Faces URL, for example http://172.20.47.122")
+    parser.add_argument("--mode", choices=("auto", "gui-proxy", "direct", "root"), default="auto", help="Endpoint style. Default: auto")
+
+    parser.add_argument("--rows", type=positive_int, default=env_int("NUM_ROWS", 5), help="Grid rows. Default: NUM_ROWS or 5")
+    parser.add_argument("--cols", type=positive_int, default=env_int("NUM_COLS", 5), help="Grid columns. Default: NUM_COLS or 5")
+    parser.add_argument("--edge-size", type=positive_int, default=env_int("EDGE_SIZE", 1), help="Edge ring thickness. Default: EDGE_SIZE or 1")
+
+    parser.add_argument("--paint-interval-ms", type=positive_int, default=2000, help="Per-cell request interval in milliseconds. Default: 2000")
+    parser.add_argument("--refresh-interval", type=float, default=0.2, help="Terminal redraw interval in seconds. Default: 0.2")
+    parser.add_argument("--workers", type=positive_int, default=10, help="Maximum concurrent HTTP requests. Default: 10")
+    parser.add_argument("--timeout", type=float, default=3.0, help="HTTP timeout in seconds. Default: 3.0")
+
+    parser.add_argument("--tile-width", type=positive_int, default=6, help="Tile width in terminal columns. Default: 6")
+    parser.add_argument("--tile-height", type=positive_int, default=3, help="Tile height in terminal rows. Default: 3")
+    parser.add_argument("--col-gap", type=positive_int, default=1, help="Columns between tiles. Default: 1")
+    parser.add_argument("--row-gap", type=positive_int, default=1, help="Rows between tiles. Default: 1")
+    parser.add_argument("--emoji-width", type=positive_int, default=2, help="Assumed emoji width in terminal columns. Default: 2")
+
+    parser.add_argument("--error-mode", choices=("faces", "status"), default="faces", help="Display non-200 responses as faces-gui visuals or status codes. Default: faces")
+
+    counter_group = parser.add_mutually_exclusive_group()
+    counter_group.add_argument("--show-counters", action="store_true", default=env_bool("SHOW_COUNTERS", True), help="Start with counters visible. Default: true")
+    counter_group.add_argument("--hide-counters", action="store_false", dest="show_counters", help="Start with counters hidden")
+
+    parser.add_argument("--show-pods", action="store_true", default=env_bool("SHOW_PODS", False), help="Start with pod panel visible. Default: SHOW_PODS or false")
+    parser.add_argument("--show-key", action="store_true", default=not env_bool("HIDE_KEY", True), help="Start with legend visible. Default: hidden unless HIDE_KEY=false")
+    parser.add_argument("--show-borders", action="store_true", help="Draw borders using faces-gui border color logic")
+
+    fade_group = parser.add_mutually_exclusive_group()
+    fade_group.add_argument("--fade", action="store_true", dest="fade", help="Fade stale cells like faces-gui")
+    fade_group.add_argument("--no-fade", action="store_false", dest="fade", help="Keep cells visible until replaced")
+    parser.set_defaults(fade=False)
+    parser.add_argument("--max-solid-ms", type=positive_int, default=2000, help="Fade start age in milliseconds. Default: 2000")
+    parser.add_argument("--max-visible-ms", type=positive_int, default=2500, help="Fade hidden age in milliseconds. Default: 2500")
+
+    parser.add_argument("--header", action="store_true", help="Show header with URL, mode, user, and hints")
+    parser.add_argument("--once", action="store_true", help="Render one full grid and exit")
+    parser.add_argument("--no-alt-screen", action="store_true", help="Render in the current terminal instead of an alternate screen")
+
+    start_group = parser.add_mutually_exclusive_group()
+    start_group.add_argument("--start-active", action="store_true", dest="start_active", default=env_bool("START_ACTIVE", True), help="Start requests immediately. Default: true")
+    start_group.add_argument("--start-paused", action="store_false", dest="start_active", help="Start paused until space is pressed")
+
+    parser.add_argument("--user", default=os.getenv("FACES_USER", "unknown"), help="Value sent in the Faces user header. Default: FACES_USER or unknown")
+    parser.add_argument("--user-header", default=os.getenv("USER_HEADER_NAME", "X-Faces-User"), help="Faces user header name. Default: USER_HEADER_NAME or X-Faces-User")
+    parser.add_argument("--user-agent", default="faces-tui/1.0", help="User-Agent header. Default: faces-tui/1.0")
+
+    return parser
+
+
+def validate_args(args) -> None:
+    if args.rows < 1:
+        raise SystemExit("--rows must be at least 1")
+    if args.cols < 1:
+        raise SystemExit("--cols must be at least 1")
+    if args.tile_width < 2:
+        raise SystemExit("--tile-width must be at least 2")
+    if args.tile_height < 1:
+        raise SystemExit("--tile-height must be at least 1")
+    if args.workers < 1:
+        raise SystemExit("--workers must be at least 1")
+
+
+def main() -> int:
+    parser = build_parser()
+    if len(sys.argv) == 1:
+        parser.print_help()
+        return 0
+
+    args = parser.parse_args()
+    if not args.url:
+        parser.print_help()
+        return 0
+
+    validate_args(args)
+
+    state = AppState(
+        active=args.start_active,
+        show_counters=args.show_counters,
+        show_pods=args.show_pods,
+        show_key=args.show_key,
+        mode=args.mode,
+    )
+
+    state.detected_mode = detect_mode(args, state)
+    cells = build_cells(args)
+    run_event_loop(args, state, cells)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
