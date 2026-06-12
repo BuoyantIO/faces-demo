@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Faces Admin — Sign In</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>😃</text></svg>">
+  <link rel="stylesheet" href="admin.css">
+  <style>
+    :root {
+      --bg:         #13131f;
+      --surface:    #1c1c2e;
+      --surface2:   #252540;
+      --text:       #e8e8f0;
+      --text-muted: #7070a0;
+      --border:     #2a2a45;
+      --red:        #f87171;
+      --accent2:    #53d8fb;
+      --font:       'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    [data-theme="light"] {
+      --bg:         #f4f6fa;
+      --surface:    #ffffff;
+      --surface2:   #edf0f7;
+      --text:       #1a1a2e;
+      --text-muted: #6b7280;
+      --border:     #e2e8f0;
+      --red:        #dc2626;
+      --accent2:    #0984e3;
+    }
+    body { background: var(--bg); color: var(--text); font-family: var(--font); }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0);    }
+      50%       { transform: translateY(-6px); }
+    }
+
+    body {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; height: auto; overflow: auto; margin: 0;
+    }
+
+    .login-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      max-width: 460px;
+    }
+
+    .login-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    .login-logo {
+      font-size: 72px;
+      line-height: 1;
+      animation: float 3s ease-in-out infinite;
+      display: inline-block;
+    }
+    .login-title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -.5px;
+    }
+    .login-tagline {
+      font-size: 15px;
+      color: var(--text-muted);
+      margin-top: -4px;
+    }
+
+
+    .login-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 40px 44px 36px;
+      width: 100%;
+      box-sizing: border-box;
+      box-shadow: 0 8px 40px rgba(0,0,0,.35);
+    }
+
+    .login-field { margin-bottom: 20px; }
+    .login-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--text-muted);
+      margin-bottom: 7px;
+    }
+    .login-input {
+      width: 100%;
+      box-sizing: border-box;
+      background: var(--surface2);
+      border: 1.5px solid rgba(255,255,255,0.18);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 16px;
+      padding: 11px 14px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    [data-theme="light"] .login-input { border-color: rgba(0,0,0,0.2); }
+    .login-input:focus { border-color: var(--accent2); }
+    .login-input::placeholder { color: var(--text-muted); }
+
+    .login-remember {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 26px;
+      font-size: 15px;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+    }
+    .login-remember input[type="checkbox"] { accent-color: var(--accent2); cursor: pointer; }
+
+    .login-btn {
+      width: 100%;
+      padding: 13px;
+      background: #2563eb;
+      color: #ffffff;
+      font-family: var(--font);
+      font-size: 16px;
+      font-weight: 700;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+    }
+    .login-btn:hover  { opacity: .88; }
+    .login-btn:active { transform: scale(.98); }
+    .login-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    .login-theme-toggle {
+      margin-top: 18px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: var(--font);
+      font-size: 13px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: color .15s, background .15s;
+    }
+    .login-theme-toggle:hover { color: var(--text); background: rgba(255,255,255,.06); }
+    [data-theme="light"] .login-theme-toggle:hover { background: rgba(0,0,0,.05); }
+
+    .login-error {
+      margin-top: 14px;
+      padding: 9px 12px;
+      background: rgba(248,113,113,.1);
+      border: 1px solid rgba(248,113,113,.35);
+      border-radius: 8px;
+      color: var(--red);
+      font-size: 13px;
+      display: none;
+    }
+    .login-error.visible { display: block; }
+  </style>
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-header">
+      <span class="login-logo">😃</span>
+      <span class="login-title">Faces Admin</span>
+      <span class="login-tagline">Keep 'em Smilin'</span>
+    </div>
+
+    <div class="login-card">
+    <form id="login-form" autocomplete="on">
+      <div class="login-field">
+        <label class="login-label" for="username">Username</label>
+        <input class="login-input" id="username" name="username" type="text"
+               autocomplete="username" required>
+      </div>
+      <div class="login-field">
+        <label class="login-label" for="password">Password</label>
+        <input class="login-input" id="password" name="password" type="password"
+               autocomplete="current-password" required>
+      </div>
+      <label class="login-remember">
+        <input type="checkbox" id="remember-me">
+        Keep me signed in for 7 days
+      </label>
+      <button class="login-btn" type="submit" id="submit-btn">Sign In</button>
+      <div class="login-error" id="login-error"></div>
+    </form>
+    </div>
+
+    <button class="login-theme-toggle" id="theme-toggle">
+      <span id="theme-toggle-icon">😎</span>
+      <span id="theme-toggle-label">Light mode</span>
+    </button>
+  </div>
+
+  <script>
+    // Apply saved theme before paint to avoid flash
+    const savedTheme = localStorage.getItem('faces-admin-theme');
+    if (savedTheme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+
+    function applyTheme(theme) {
+      document.documentElement.dataset.theme = theme;
+      const isLight = theme === 'light';
+      document.getElementById('theme-toggle-icon').textContent  = isLight ? '🤓' : '😎';
+      document.getElementById('theme-toggle-label').textContent = isLight ? '"Dork" mode' : 'Light mode';
+      localStorage.setItem('faces-admin-theme', theme);
+    }
+    applyTheme(savedTheme === 'light' ? 'light' : 'dark');
+
+    document.getElementById('theme-toggle').addEventListener('click', () => {
+      applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
+    });
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submit-btn');
+      const errorEl = document.getElementById('login-error');
+      btn.disabled = true;
+      btn.textContent = 'Signing in…';
+      errorEl.classList.remove('visible');
+
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username:   document.getElementById('username').value,
+            password:   document.getElementById('password').value,
+            rememberMe: document.getElementById('remember-me').checked,
+          }),
+        });
+        if (res.ok) {
+          window.location.href = '/';
+        } else {
+          const data = await res.json().catch(() => ({}));
+          errorEl.textContent = data.error === 'invalid credentials'
+            ? 'Incorrect username or password.'
+            : 'Sign in failed. Please try again.';
+          errorEl.classList.add('visible');
+          btn.disabled = false;
+          btn.textContent = 'Sign In';
+          document.getElementById('password').focus();
+        }
+      } catch {
+        errorEl.textContent = 'Could not reach the server. Please try again.';
+        errorEl.classList.add('visible');
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+      }
+    });
+  </script>
+</body>
+</html>

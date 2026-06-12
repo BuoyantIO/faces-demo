@@ -58,6 +58,12 @@ func (sm *SmileyMap) Lookup(name string) (string, bool) {
 		return name, true
 	}
 
+	// If the smiley looks like an HTML tag (e.g. <img src="data:...">),
+	// pass it through for rendering in the GUI via innerHTML.
+	if strings.HasPrefix(name, "<") {
+		return name, true
+	}
+
 	// If the smiley starts with 'U+', assume it's a unicode and
 	// convert it to HTML entity format.
 	if strings.HasPrefix(name, "U+") {

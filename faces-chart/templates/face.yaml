@@ -1,3 +1,5 @@
+{{- if not .Values.adminOnly }}
+{{- if ne (.Values.faceMode | default "classic") "pubsub" -}}
 {{- $name := "face" -}}
 {{- if .Values.ingress.enabled -}}
   {{- $name = "cell" -}}
@@ -207,3 +209,4 @@ spec:
         {{- include "partials.face-resources" . }}
 
 {{- end }}
+{{- end }}{{- end }}

@@ -182,7 +182,7 @@ type ProviderHook func(*BaseProvider, *ProviderRequest, *BaseRequestStatus) bool
 type BaseProvider struct {
 	Name               string // Name of this kind of provider
 	Key                string // Descriptive string for this provider instance
-	lock               sync.Mutex
+	lock               sync.RWMutex
 	logger             *slog.Logger
 	delayBuckets       []int
 	errorFraction      int
@@ -394,6 +394,14 @@ func (bprv *BaseProvider) Unlock() {
 	bprv.lock.Unlock()
 }
 
+func (bprv *BaseProvider) RLock() {
+	bprv.lock.RLock()
+}
+
+func (bprv *BaseProvider) RUnlock() {
+	bprv.lock.RUnlock()
+}
+
 func (bprv *BaseProvider) IsLatched() bool {
 	return bprv.latched
 }
@@ -412,6 +420,97 @@ func (bprv *BaseProvider) ErrorFraction() int {
 
 func (bprv *BaseProvider) SetErrorFraction(fraction int) {
 	bprv.errorFraction = fraction
+}
+
+// RegisterChaosRoutes mounts /chaos on the given server.
+// GET /chaos returns the current chaos parameters.
+// PUT /chaos updates any subset of them at runtime without a pod restart.
+func (bprv *BaseProvider) RegisterChaosRoutes(server *BaseHTTPServer) {
+	server.AddRoute("/chaos", bprv.handleChaos)
+}
+
+func (bprv *BaseProvider) handleChaos(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		bprv.lock.RLock()
+		buckets := make([]int, len(bprv.delayBuckets))
+		copy(buckets, bprv.delayBuckets)
+		resp := map[string]interface{}{
+			"errorFraction": bprv.errorFraction,
+			"latchFraction": bprv.latchFraction,
+			"maxRate":       bprv.maxRate,
+			"delayBuckets":  buckets,
+			"latched":       bprv.latched,
+		}
+		bprv.lock.RUnlock()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+
+	case http.MethodPut:
+		var body struct {
+			ErrorFraction *int     `json:"errorFraction"`
+			LatchFraction *int     `json:"latchFraction"`
+			MaxRate       *float64 `json:"maxRate"`
+			DelayBuckets  []int    `json:"delayBuckets"`
+			ForceUnlatch  bool     `json:"forceUnlatch"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+		bprv.lock.Lock()
+		if body.ErrorFraction != nil {
+			v := *body.ErrorFraction
+			if v < 0 {
+				v = 0
+			} else if v > 100 {
+				v = 100
+			}
+			bprv.errorFraction = v
+		}
+		if body.LatchFraction != nil {
+			v := *body.LatchFraction
+			if v < 0 {
+				v = 0
+			} else if v > 100 {
+				v = 100
+			}
+			bprv.latchFraction = v
+		}
+		if body.MaxRate != nil {
+			v := *body.MaxRate
+			if v < 0 {
+				v = 0
+			}
+			bprv.maxRate = v
+			if v >= 0.1 && bprv.rateCounter == nil {
+				bprv.rateCounter = utils.NewRateCounter(10)
+			} else if v < 0.1 {
+				bprv.rateCounter = nil
+			}
+		}
+		if body.DelayBuckets != nil {
+			bprv.delayBuckets = body.DelayBuckets
+		}
+		if body.ForceUnlatch {
+			bprv.latched = false
+		}
+		resp := map[string]interface{}{
+			"errorFraction": bprv.errorFraction,
+			"latchFraction": bprv.latchFraction,
+			"maxRate":       bprv.maxRate,
+			"delayBuckets":  bprv.delayBuckets,
+			"latched":       bprv.latched,
+		}
+		bprv.lock.Unlock()
+		bprv.Infof("chaos updated via /chaos endpoint: errorFraction=%d latchFraction=%d maxRate=%.1f delayBuckets=%v",
+			resp["errorFraction"], resp["latchFraction"], resp["maxRate"], resp["delayBuckets"])
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 // CheckUnlatch checks to see if we should unlatch the provider.
@@ -459,6 +558,16 @@ func (bprv *BaseProvider) CheckRequestStatus() *BaseRequestStatus {
 
 	start := time.Now()
 
+	// Snapshot chaos fields under a read lock so runtime updates via /chaos
+	// don't race with in-flight requests.
+	bprv.lock.RLock()
+	errorFraction := bprv.errorFraction
+	latchFraction := bprv.latchFraction
+	maxRate := bprv.maxRate
+	delayBuckets := bprv.delayBuckets
+	isLatched := bprv.latched
+	bprv.lock.RUnlock()
+
 	// Is a rate limiter active? We do this first because if the rate limiter
 	// trips, we want the service to be unable to do _any_ processing, including
 	// checking for other errors.
@@ -467,10 +576,10 @@ func (bprv *BaseProvider) CheckRequestStatus() *BaseRequestStatus {
 		bprv.rateCounter.Mark(start)
 		rate := bprv.rateCounter.CurrentRate()
 
-		if rate >= bprv.maxRate {
+		if rate >= maxRate {
 			// Bzzzt! Rate limited.
 			rstat.ratelimited = true
-			rstat.message = fmt.Sprintf("Rate limited (%.1f RPS > max %.1f RPS)", rate, bprv.maxRate)
+			rstat.message = fmt.Sprintf("Rate limited (%.1f RPS > max %.1f RPS)", rate, maxRate)
 		}
 	}
 
@@ -479,14 +588,14 @@ func (bprv *BaseProvider) CheckRequestStatus() *BaseRequestStatus {
 		// If we've gotten latched into an error state, we're definitely sending
 		// an error.
 
-		if bprv.IsLatched() {
+		if isLatched {
 			rstat.latched = true
 			rstat.errored = true
 			rstat.message = "Latched into error state"
 			rstat.statusCode = 599
-		} else if bprv.errorFraction > 0 {
+		} else if errorFraction > 0 {
 			// Not latched, but there's a chance of an error here too.
-			if rand.Intn(100) <= bprv.errorFraction {
+			if rand.Intn(100) <= errorFraction {
 				bprv.Debugf("error fraction triggered")
 
 				// Yup. Error.
@@ -495,8 +604,10 @@ func (bprv *BaseProvider) CheckRequestStatus() *BaseRequestStatus {
 				rstat.statusCode = 500
 
 				// We might get latched here, too.
-				if bprv.latchFraction > 0 && rand.Intn(100) <= bprv.latchFraction {
-					bprv.SetLatched(true)
+				if latchFraction > 0 && rand.Intn(100) <= latchFraction {
+					bprv.lock.Lock()
+					bprv.latched = true
+					bprv.lock.Unlock()
 
 					rstat.latched = true
 					rstat.message = "Latched into error state"
@@ -506,8 +617,8 @@ func (bprv *BaseProvider) CheckRequestStatus() *BaseRequestStatus {
 		}
 	}
 
-	if len(bprv.delayBuckets) > 0 {
-		delayMs := bprv.delayBuckets[rand.Intn(len(bprv.delayBuckets))]
+	if len(delayBuckets) > 0 {
+		delayMs := delayBuckets[rand.Intn(len(delayBuckets))]
 		rstat.delayMs = delayMs
 	}
 

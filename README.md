@@ -73,6 +73,157 @@ The Faces architecture is fairly simple:
   here is especially welcome, since the Faces authors have normal color
   vision...
 
+## Stateful Pub/Sub Mode
+
+In addition to the classic stateless architecture, Faces supports a **pub/sub
+mode** that replaces the `face` service with a durable
+publish/subscribe pipeline backed by **MySQL** and **Redis**. This mode is
+designed for demonstrating stateful workload patterns in Kubernetes — things
+like "what happens when you restart a database?" or "how does a queue behave
+when the publisher is down?"
+
+Classic mode remains the default. No new infrastructure is created unless
+`faceMode: pubsub` is set in the Helm values or on the command line.
+
+### Pub/Sub Architecture
+
+**face-publisher** continuously calls `smiley` and `color`, writes each
+assembled message to MySQL (`state=pending`), then pushes it into a Redis list.
+MySQL is the source of truth; Redis is a fast-access cache.
+
+**face-subscriber** serves `faces-gui` requests by atomically popping the
+oldest message from Redis (`RPOP`) and acknowledging the corresponding MySQL
+row. The Kubernetes Service named `face` routes to subscriber pods — `faces-gui`
+requires zero changes.
+
+On publisher restart, `WarmRedisFromDB()` re-hydrates Redis from all
+unacknowledged MySQL rows before the publish loop starts.
+
+### Enabling Pub/Sub Mode
+
+```bash
+helm upgrade --install faces ./faces-chart \
+  --namespace faces \
+  --set faceMode=pubsub \
+  --set facePublisher.image=ghcr.io/buoyantio/faces-face-publisher:<version> \
+  --set faceSubscriber.image=ghcr.io/buoyantio/faces-face-subscriber:<version>
+
+# Rolling back to classic
+helm upgrade faces ./faces-chart --namespace faces --set faceMode=classic
+```
+
+### Chaos Injection
+
+Error fraction, delay buckets, latching, and rate-limiting work differently
+across the two new services:
+
+| Setting | face-subscriber | face-publisher |
+|---------|-----------------|----------------|
+| `ERROR_FRACTION` | **Full effect** — subscriber is on the critical path for every GUI poll | Probe endpoint only — does NOT affect the background publish loop |
+| `DELAY_BUCKETS` | **Full effect** — delays visible in the GUI | Probe endpoint only |
+| `LATCH_FRACTION` | Full effect | Probe endpoint only |
+| `MAX_RATE` | Full effect | Probe endpoint only |
+
+To simulate GUI-visible failures in pubsub mode, set `faceSubscriber.errorFraction`
+(and optionally `faceSubscriber.delayBuckets`). Setting `facePublisher.errorFraction`
+only affects `curl`/probe requests to the publisher pod, not message production.
+
+```bash
+# 30% of GUI responses will be errors
+helm upgrade faces ./faces-chart --namespace faces \
+  --set faceMode=pubsub \
+  --set faceSubscriber.errorFraction=30
+
+# Add delay to subscriber responses
+helm upgrade faces ./faces-chart --namespace faces \
+  --set faceMode=pubsub \
+  --set faceSubscriber.delayBuckets="0,50,200,500"
+```
+
+### Argo Rollouts (pub/sub mode)
+
+When `rollouts.enabled=true`, the **face-subscriber** renders an Argo `Rollout`
+instead of a `Deployment`. The publisher always uses a standard Deployment —
+it is not in the GUI request path and does not need canary or blue/green logic.
+
+Both canary and blueGreen strategies are supported, controlled by
+`rollouts.strategy` (same as classic mode).
+
+**Canary:** a second Service named `face<suffix>` (default `face-canary`) is
+created alongside the stable `face` Service. Argo Rollouts manages pod
+selection for both.
+
+```bash
+helm upgrade faces ./faces-chart --namespace faces \
+  --set faceMode=pubsub \
+  --set rollouts.enabled=true \
+  --set rollouts.strategy=canary \
+  --set facePublisher.image=... \
+  --set faceSubscriber.image=...
+```
+
+**Blue/Green:** a second Service named `face<suffix>` (default `face-preview`)
+is created as the preview target.
+
+```bash
+helm upgrade faces ./faces-chart --namespace faces \
+  --set faceMode=pubsub \
+  --set rollouts.enabled=true \
+  --set rollouts.strategy=blueGreen \
+  --set facePublisher.image=... \
+  --set faceSubscriber.image=...
+```
+
+Canary steps for the subscriber are configured under
+`rollouts.canary.faceSubscriber.steps` in `values.yaml` (same structure as
+`rollouts.canary.face.steps` for classic mode).
+
+### Key Design Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| Write-ahead (MySQL before Redis) | Message is durable the moment it is inserted; Redis failure cannot lose it |
+| Redis List (not Redis Pub/Sub) | Pub/Sub is fire-and-forget; a List queues messages for slow/offline subscribers |
+| `emptyDir` MySQL by default | Demo shows the difference between ephemeral and persistent storage |
+| Service `face` preserved | GUI and service-mesh config require zero changes when switching modes |
+| Subscriber in chaos path, publisher not | Chaos on the subscriber produces visible GUI effects; publisher chaos would only affect probes |
+| Rollouts on subscriber only | The publisher is not in the GUI request path — canary/blueGreen on it has no meaningful traffic split |
+
+### Demo Scenarios
+
+**Scenario 1 — Redis restart (the warm-up story)**
+
+```bash
+# Kill Redis — GUI shows neutral faces (queue empty)
+kubectl delete pod -n faces -l faces.buoyant.io/component=redis
+
+# Restart publisher — WarmRedisFromDB fires, queue refills, GUI recovers
+kubectl rollout restart deployment/face-publisher -n faces
+kubectl logs -n faces -l faces.buoyant.io/component=face-publisher | grep warm-up
+```
+
+**Scenario 2 — Publisher failure (graceful drain)**
+
+```bash
+# Scale publisher to 0 — existing queue drains, then GUI shows neutral faces
+kubectl scale deployment/face-publisher -n faces --replicas=0
+watch -n1 "kubectl exec -n faces deploy/redis -- redis-cli LLEN faces:queue"
+
+# Restore publisher — queue refills, GUI recovers
+kubectl scale deployment/face-publisher -n faces --replicas=1
+```
+
+**Scenario 3 — Exactly-once delivery (scale subscriber)**
+
+```bash
+kubectl scale deployment/face-subscriber -n faces --replicas=3
+# Redis RPOP is atomic — no message is served twice regardless of replica count
+kubectl exec -n faces deploy/mysql -- \
+  mysql -ufaces -pfaces-password faces \
+  -e "SELECT COUNT(*) total, COUNT(DISTINCT id) unique_ids FROM face_queue WHERE state='acknowledged';"
+# total must equal unique_ids
+```
+
 [Introduction to Colour Schemes]: https://sronpersonalpages.nl/~pault
 
 [Linkerd]: https://linkerd.io

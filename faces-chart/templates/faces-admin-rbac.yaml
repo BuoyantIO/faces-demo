@@ -1,0 +1,54 @@
+{{- if or .Values.facesAdmin.enabled (eq (.Values.faceMode | default "classic") "pubsub") }}
+{{- if .Values.facesAdmin.rbac.enabled }}
+---
+# ServiceAccount for faces-admin.
+# Used to authenticate against the Kubernetes API for pod topology discovery.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: faces-admin
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: faces-admin
+---
+# ClusterRole grants read-only access to pods (namespaced) and nodes (cluster-scoped).
+# Nodes are cluster-scoped resources so a ClusterRole is required; the binding
+# below restricts pod access to the release namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: faces-admin-{{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: faces-admin
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get"]
+- apiGroups: ["workload.linkerd.io"]
+  resources: ["externalworkloads"]
+  verbs: ["get", "list"]
+---
+# ClusterRoleBinding — scopes pod access to the release namespace via the
+# ServiceAccount's namespace restriction; node access is inherently cluster-wide.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: faces-admin-{{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: faces-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: faces-admin-{{ .Release.Namespace }}
+subjects:
+- kind: ServiceAccount
+  name: faces-admin
+  namespace: {{ .Release.Namespace }}
+{{- end }}
+{{- end }}

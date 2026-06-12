@@ -36,10 +36,21 @@ func NewBaseHTTPServer(provider *BaseProvider) *BaseHTTPServer {
 
 	bsrv.mux = http.NewServeMux()
 	bsrv.mux.HandleFunc("/", bsrv.handleRequest)
+	bsrv.mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "ok")
+	})
 
 	provider.SetHTTPGetHandler(bsrv.defaultGetHandler)
 
 	return bsrv
+}
+
+// AddRoute registers an additional handler on the server's mux.
+// Call this before Start — used to register
+// admin/control endpoints beyond the default "/" and "/healthz" routes.
+func (bsrv *BaseHTTPServer) AddRoute(pattern string, handler http.HandlerFunc) {
+	bsrv.mux.HandleFunc(pattern, handler)
 }
 
 func (bsrv *BaseHTTPServer) Start(addr string) error {

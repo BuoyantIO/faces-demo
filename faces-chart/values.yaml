@@ -26,7 +26,7 @@ gui:
   imageTag: ""                  # If not set, uses the defaultImageTag
   imagePullPolicy: ""           # If not set, uses the default imagePullPolicy
   serviceType: ClusterIP        # Override with LoadBalancer or NodePort if desired
-  hideKey: false
+  hideKey: true
   numberRows: 4
   numberColumns: 4
 
@@ -35,7 +35,7 @@ face:
   imageName: ghcr.io/buoyantio/faces-face
   imageTag: ""                  # If not set, uses the defaultImageTag
   imagePullPolicy: ""           # If not set, uses the default imagePullPolicy
-  errorFraction: "20"
+  errorFraction: "0"
   delayBuckets: ""
   # smileyService: smiley         # Override if desired
   # colorService: color           # Override if desired
@@ -53,8 +53,9 @@ backend:
   imageName: ""
   imageTag: ""                  # If not set, uses the defaultImageTag
   imagePullPolicy: ""           # If not set, uses the default imagePullPolicy
-  errorFraction: "20"
-  delayBuckets: "0,5,10,15,20,50,200,500,1500"
+  # Best-day baseline: 0 errors, no delays. Add chaos at demo time via --set.
+  errorFraction: "0"
+  delayBuckets: ""
 
 smiley:
   enabled: True                   # If set to True, enables the second smiley workload
@@ -250,6 +251,25 @@ rollouts:
         - setWeight: 70
         - pause: { duration: 60 }
         - setWeight: 100
+    facePublisher:
+      steps:
+        - setWeight: 10
+        - pause: { duration: 10 }
+        - setWeight: 50
+        - pause: { duration: 20 }
+        - setWeight: 100
+    faceSubscriber:
+      steps:
+        - setWeight: 10
+        - pause: { duration: 10 }
+        - setWeight: 20
+        - pause: { duration: 10 }
+        - setWeight: 50
+        - pause: { duration: 20 }
+        - setWeight: 70
+        - pause: { duration: 60 }
+        - setWeight: 100
+
     # Service names (stable stays the original; canary gets a -canary suffix)
     serviceSuffix:
       canary: "-canary"
@@ -261,4 +281,146 @@ rollouts:
     # Service names (active stays the original; preview gets a -preview suffix)
     serviceSuffix:
       preview: "-preview"
+
+# --- Pub/Sub mode -------------------------------------------------------
+# Set faceMode: pubsub to replace the classic stateless face service with a
+# write-ahead publish/subscribe pipeline backed by MySQL and a message queue.
+# Classic mode is the default; all new resources below are only created when
+# faceMode is explicitly set to "pubsub".
+
+# faceMode controls which face implementation is deployed.
+# "classic"  (default) — the original stateless face Deployment and Service.
+# "pubsub"              — face-publisher + face-subscriber + MySQL + queue.
+# adminOnly: when true, only the faces-admin portal is deployed.
+# All faces pipeline services (face, smiley, color, gui, publisher, subscriber,
+# mysql, rabbitmq, redis) are skipped.  Use this to install or upgrade the admin
+# into a namespace where the pipeline is already running from a separate release.
+#
+# Usage:
+#   helm upgrade -i faces-admin oci://.../faces-chart \
+#     --version 0.0.7-dev \
+#     --namespace faces-pub-sub \
+#     --set adminOnly=true \
+#     --set facesAdmin.enabled=true \
+#     --set facesAdmin.image=harbor.mostonebarn.com/.../faces-admin:0.0.7-dev \
+#     --set faceMode=pubsub
+#
+# NOTE: secrets (MySQL/RabbitMQ credentials) are also skipped — they must
+# already exist in the namespace from the main chart install.
+adminOnly: false
+
+faceMode: classic
+
+# queueBackend selects the message queue implementation.
+# "rabbitmq" (default) — AMQP queue via RabbitMQ with management UI.
+# "redis"               — Redis list (LPUSH/RPOP) with LTRIM depth cap.
+queueBackend: rabbitmq
+
+rabbitmq:
+  enabled: true
+  image: rabbitmq:3-management   # includes the management UI on port 15672
+  host: rabbitmq
+  port: 5672
+  managementPort: 15672
+  vhost: "/"
+  user: faces
+  password: "faces-password"     # CHANGE for any non-demo deployment
+  queueName: faces.queue
+  maxQueueDepth: 5000            # x-max-length; drop-head when full
+  createSecret: true             # Creates faces-rabbitmq-secret from password above
+  passwordSecret: faces-rabbitmq-secret
+  serviceType: ClusterIP         # Change to NodePort/LoadBalancer to expose management UI
+  ephemeralStorageLimit: 512Mi   # caps emptyDir footprint on node ephemeral storage
+
+redis:
+  enabled: false                 # Set to true (and queueBackend: redis) to use Redis instead
+  image: redis:7-alpine
+  address: "redis:6379"
+  db: 0
+  queueKey: "faces:queue"
+  # How many messages Redis holds before LTRIM drops the oldest.
+  # At 8 req/sec (4x4 grid), 5000 = ~10 minutes of buffer if the publisher stops.
+  maxQueueDepth: 5000
+  password: ""              # Leave empty to disable Redis AUTH
+  createSecret: false       # Set true to create faces-redis-secret from this chart
+  passwordSecret: faces-redis-secret
+
+mysql:
+  enabled: true
+  image: mysql:8.0
+  host: mysql
+  port: 3306
+  database: faces
+  user: faces
+  maxOpen: 10
+  maxIdle: 5
+  retentionHours: 1    # rows older than this are deleted by janitor (any state)
+  createSecret: true        # Creates faces-mysql-secret from password/rootPassword below
+  passwordSecret: faces-mysql-secret
+  password: "faces-password"       # CHANGE for any non-demo deployment
+  rootPassword: "root-password"    # CHANGE for any non-demo deployment
+  usePVC: false             # true = persistent storage; false = emptyDir (demo default)
+  storageClass: standard
+  storageSize: 1Gi
+  ephemeralStorageLimit: 1Gi  # caps emptyDir footprint on node ephemeral storage
+
+facesAdmin:
+  enabled: false                # Set true to deploy the admin dashboard
+  image: ""
+  imageName: ghcr.io/buoyantio/faces-admin
+  imageTag: ""                  # If not set, uses Chart.AppVersion
+  imagePullPolicy: Always
+  serviceType: ClusterIP        # Change to NodePort/LoadBalancer to expose externally
+  smileyService: smiley
+  colorService: color
+  guiService: faces-gui
+  faceService: face
+  publisherService: face-publisher
+  subscriberService: face-subscriber
+  rbac:
+    enabled: true               # Create ServiceAccount + ClusterRole for K8s API access
+                                # Required for pod topology (name, zone, node) in the UI
+  auth:
+    createSecret: true          # Create faces-admin-auth-secret with username+password
+                                # Set false to manage the secret externally
+    username: faces-admin
+    password: welovetosmile
+
+facePublisher:
+  image: ""                 # If set, overrides imageName/imageTag
+  imageName: ghcr.io/buoyantio/face-publisher
+  imageTag: ""              # If not set, uses Chart.AppVersion
+  imagePullPolicy: Always   # Always pull to pick up new pushes of the same tag
+  replicas: 1
+  smileyService: smiley
+  colorService: color
+  # 50ms = 20 msg/s per goroutine — matches the Go code default.
+  # At 20 msg/s with 1 worker, a 4x4 GUI consuming 8 msg/s has 2.5x headroom.
+  publishIntervalMs: 50
+  # NOTE: errorFraction and delayBuckets apply ONLY to the publisher's HTTP
+  # probe endpoint — NOT to the background publish loop.  To inject chaos
+  # that affects faces-gui, set faceSubscriber.errorFraction instead.
+  errorFraction: "0"
+  delayBuckets: ""
+  janitorIntervalM: 5       # delete all rows older than retentionHours every 5 min
+  # Single goroutine at 50ms = ~20 msg/sec. Increase concurrency or lower
+  # publishIntervalMs at demo time if you want to show a higher publish rate.
+  publishConcurrency: 1
+  # Queue depth monitor — triggers WarmQueue when queue falls below fillThreshold.
+  # Recovers from manual purges and queue pod restarts without restarting the publisher.
+  queueFillThreshold: 0.75  # re-warm when queue depth < 75% of maxQueueDepth
+  queueMonitorIntervalS: 30 # how often to poll queue depth (seconds)
+
+faceSubscriber:
+  image: ""                 # If set, overrides imageName/imageTag
+  imageName: ghcr.io/buoyantio/face-subscriber
+  imageTag: ""              # If not set, uses Chart.AppVersion
+  imagePullPolicy: Always   # Always pull to pick up new pushes of the same tag
+  replicas: 1
+  waitOnEmpty: false
+  waitTimeoutS: 5
+  # Chaos injection — applies to every faces-gui request (subscriber is on the
+  # critical path, so these directly affect what the GUI sees).
+  errorFraction: "0"
+  delayBuckets: ""
 

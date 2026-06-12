@@ -1,0 +1,68 @@
+## Plain kubectl Redis manifest for environments not using Helm.
+##
+##   kubectl apply -n faces -f k8s/redis/redis.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: faces
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: redis
+spec:
+  type: ClusterIP
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: redis
+  ports:
+  - port: 6379
+    name: redis
+    targetPort: redis
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: faces
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      buoyant.io/application: faces
+      faces.buoyant.io/component: redis
+  template:
+    metadata:
+      labels:
+        buoyant.io/application: faces
+        faces.buoyant.io/component: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - name: redis
+          containerPort: 6379
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+      volumes:
+      - name: redis-data
+        emptyDir: {}

@@ -1,0 +1,384 @@
+{{- if not .Values.adminOnly }}
+{{- if eq (.Values.faceMode | default "classic") "pubsub" -}}
+{{- $rmq := .Values.rabbitmq | default dict -}}
+---
+# The Service is deliberately named "face" (not "face-subscriber") so that
+# faces-gui and any existing service-mesh config require zero changes.
+apiVersion: v1
+kind: Service
+metadata:
+  name: face
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: edge
+    faces.buoyant.io/component: face
+spec:
+  type: ClusterIP
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: face-subscriber
+  ports:
+  - port: 80
+    name: http
+    targetPort: http
+
+---
+# Headless service for pod-level discovery by faces-admin.
+apiVersion: v1
+kind: Service
+metadata:
+  name: face-subscriber-headless
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: face-subscriber
+spec:
+  clusterIP: None
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: face-subscriber
+  ports:
+  - port: 8000
+    name: http
+    targetPort: http
+---
+# Second service under the component's own name — used by faces-admin for
+# health checks and /control access.  The GUI still uses the "face" service.
+apiVersion: v1
+kind: Service
+metadata:
+  name: face-subscriber
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: face-subscriber
+spec:
+  type: ClusterIP
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: face-subscriber
+  ports:
+  - port: 80
+    name: http
+    targetPort: http
+
+{{- if .Values.rollouts.enabled }}
+  {{- $strategy := .Values.rollouts.strategy | default "canary" -}}
+  {{- if eq $strategy "canary" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ printf "face%s" (.Values.rollouts.canary.serviceSuffix.canary | default "-canary") }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: edge
+    faces.buoyant.io/component: face
+spec:
+  type: ClusterIP
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: face-subscriber
+  ports:
+  - port: 80
+    name: http
+    targetPort: http
+  {{- else if eq $strategy "blueGreen" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ printf "face%s" (.Values.rollouts.blueGreen.serviceSuffix.preview | default "-preview") }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: edge
+    faces.buoyant.io/component: face
+spec:
+  type: ClusterIP
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: face-subscriber
+  ports:
+  - port: 80
+    name: http
+    targetPort: http
+  {{- end }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: face-subscriber
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: edge
+    faces.buoyant.io/component: face-subscriber
+spec:
+  replicas: {{ .Values.faceSubscriber.replicas | default 1 }}
+  revisionHistoryLimit: {{ .Values.rollouts.revisionHistoryLimit | default 5 }}
+  progressDeadlineSeconds: {{ .Values.rollouts.progressDeadlineSeconds | default 600 }}
+  selector:
+    matchLabels:
+      buoyant.io/application: faces
+      faces.buoyant.io/component: face-subscriber
+  strategy:
+    {{- if eq $strategy "canary" }}
+    canary:
+      maxSurge: {{ .Values.rollouts.maxSurge | default 1 }}
+      maxUnavailable: {{ .Values.rollouts.maxUnavailable | default 0 }}
+      {{- $tr := .Values.rollouts.canary.trafficRouting | default dict -}}
+      {{- $provider := (hasKey $tr "provider") | ternary $tr.provider "" -}}
+      {{- if eq $provider "smi" }}
+      stableService: face
+      canaryService: {{ printf "face%s" (.Values.rollouts.canary.serviceSuffix.canary | default "-canary") }}
+      trafficRouting: { smi: {} }
+      {{- end }}
+      {{- if .Values.rollouts.canary.faceSubscriber.steps }}
+      steps:
+      {{ toYaml .Values.rollouts.canary.faceSubscriber.steps | nindent 8 }}
+      {{- end }}
+    {{- else }}
+    blueGreen:
+      activeService: face
+      previewService: {{ printf "face%s" (.Values.rollouts.blueGreen.serviceSuffix.preview | default "-preview") }}
+      autoPromotionEnabled: {{ .Values.rollouts.blueGreen.autoPromotionEnabled | default false }}
+      {{- if hasKey .Values.rollouts.blueGreen "autoPromotionSeconds" }}
+      autoPromotionSeconds: {{ .Values.rollouts.blueGreen.autoPromotionSeconds }}
+      {{- end }}
+    {{- end }}
+  template:
+    metadata:
+      labels:
+        buoyant.io/application: faces
+        faces.buoyant.io/component-type: edge
+        faces.buoyant.io/component: face-subscriber
+    spec:
+      initContainers:
+      - name: wait-for-mysql
+        image: busybox:1.36
+        command: ['sh', '-c', 'until nc -z {{ .Values.mysql.host | default "mysql" }} {{ .Values.mysql.port | default 3306 }}; do echo "waiting for mysql port..."; sleep 2; done']
+      {{- if eq (.Values.queueBackend | default "rabbitmq") "rabbitmq" }}
+      - name: wait-for-rabbitmq
+        image: busybox:1.36
+        command: ['sh', '-c', 'until nc -z {{ $rmq.host | default "rabbitmq" }} {{ $rmq.port | default 5672 }}; do echo "waiting for rabbitmq..."; sleep 2; done']
+      {{- else }}
+      - name: wait-for-redis
+        image: busybox:1.36
+        command: ['sh', '-c', 'until nc -z {{ (split ":" (.Values.redis.address | default "redis:6379"))._0 }} {{ (split ":" (.Values.redis.address | default "redis:6379"))._1 }}; do echo "waiting for redis..."; sleep 2; done']
+      {{- end }}
+      containers:
+      - name: face-subscriber
+        image: {{ if .Values.faceSubscriber.image }}{{ .Values.faceSubscriber.image }}{{ else }}{{ .Values.faceSubscriber.imageName }}:{{ .Values.faceSubscriber.imageTag | default .Chart.AppVersion }}{{ end }}
+        imagePullPolicy: {{ .Values.faceSubscriber.imagePullPolicy | default .Values.defaultImagePullPolicy }}
+        ports:
+        - name: http
+          containerPort: 8000
+        env:
+        - name: USER_HEADER_NAME
+          value: {{ .Values.authHeader | quote }}
+        - name: ERROR_FRACTION
+          value: {{ .Values.faceSubscriber.errorFraction | default "0" | quote }}
+        {{- if .Values.faceSubscriber.delayBuckets }}
+        - name: DELAY_BUCKETS
+          value: {{ .Values.faceSubscriber.delayBuckets | quote }}
+        {{- end }}
+        - name: WAIT_ON_EMPTY
+          value: {{ .Values.faceSubscriber.waitOnEmpty | default false | quote }}
+        - name: WAIT_TIMEOUT_S
+          value: {{ .Values.faceSubscriber.waitTimeoutS | default 5 | quote }}
+        - name: DB_HOST
+          value: {{ .Values.mysql.host | default "mysql" | quote }}
+        - name: DB_PORT
+          value: {{ .Values.mysql.port | default 3306 | quote }}
+        - name: DB_NAME
+          value: {{ .Values.mysql.database | default "faces" | quote }}
+        - name: DB_USER
+          value: {{ .Values.mysql.user | default "faces" | quote }}
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.mysql.passwordSecret | default "faces-mysql-secret" }}
+              key: password
+        - name: DB_MAX_OPEN
+          value: {{ .Values.mysql.maxOpen | default 10 | quote }}
+        - name: DB_MAX_IDLE
+          value: {{ .Values.mysql.maxIdle | default 5 | quote }}
+        - name: QUEUE_BACKEND
+          value: {{ .Values.queueBackend | default "rabbitmq" | quote }}
+        {{- if eq (.Values.queueBackend | default "rabbitmq") "rabbitmq" }}
+        - name: RABBITMQ_HOST
+          value: {{ $rmq.host | default "rabbitmq" | quote }}
+        - name: RABBITMQ_PORT
+          value: {{ $rmq.port | default 5672 | quote }}
+        - name: RABBITMQ_USER
+          value: {{ $rmq.user | default "faces" | quote }}
+        - name: RABBITMQ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ $rmq.passwordSecret | default "faces-rabbitmq-secret" }}
+              key: password
+        - name: RABBITMQ_VHOST
+          value: {{ $rmq.vhost | default "/" | quote }}
+        - name: RABBITMQ_QUEUE
+          value: {{ $rmq.queueName | default "faces.queue" | quote }}
+        - name: RABBITMQ_MAX_QUEUE_DEPTH
+          value: {{ $rmq.maxQueueDepth | default 5000 | quote }}
+        {{- else }}
+        - name: REDIS_ADDRESS
+          value: {{ .Values.redis.address | default "redis:6379" | quote }}
+        - name: REDIS_QUEUE_KEY
+          value: {{ .Values.redis.queueKey | default "faces:queue" | quote }}
+        - name: REDIS_DB
+          value: {{ .Values.redis.db | default 0 | quote }}
+        - name: REDIS_MAX_QUEUE_DEPTH
+          value: {{ .Values.redis.maxQueueDepth | default 5000 | quote }}
+        {{- if .Values.redis.password }}
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.redis.passwordSecret | default "faces-redis-secret" }}
+              key: password
+        {{- end }}
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+
+{{- else }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: face-subscriber
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: edge
+    faces.buoyant.io/component: face-subscriber
+spec:
+  replicas: {{ .Values.faceSubscriber.replicas | default 1 }}
+  selector:
+    matchLabels:
+      buoyant.io/application: faces
+      faces.buoyant.io/component: face-subscriber
+  template:
+    metadata:
+      labels:
+        buoyant.io/application: faces
+        faces.buoyant.io/component-type: edge
+        faces.buoyant.io/component: face-subscriber
+    spec:
+      initContainers:
+      - name: wait-for-mysql
+        image: busybox:1.36
+        command: ['sh', '-c', 'until nc -z {{ .Values.mysql.host | default "mysql" }} {{ .Values.mysql.port | default 3306 }}; do echo "waiting for mysql port..."; sleep 2; done']
+      {{- if eq (.Values.queueBackend | default "rabbitmq") "rabbitmq" }}
+      - name: wait-for-rabbitmq
+        image: busybox:1.36
+        command: ['sh', '-c', 'until nc -z {{ $rmq.host | default "rabbitmq" }} {{ $rmq.port | default 5672 }}; do echo "waiting for rabbitmq..."; sleep 2; done']
+      {{- else }}
+      - name: wait-for-redis
+        image: busybox:1.36
+        command: ['sh', '-c', 'until nc -z {{ (split ":" (.Values.redis.address | default "redis:6379"))._0 }} {{ (split ":" (.Values.redis.address | default "redis:6379"))._1 }}; do echo "waiting for redis..."; sleep 2; done']
+      {{- end }}
+      containers:
+      - name: face-subscriber
+        image: {{ if .Values.faceSubscriber.image }}{{ .Values.faceSubscriber.image }}{{ else }}{{ .Values.faceSubscriber.imageName }}:{{ .Values.faceSubscriber.imageTag | default .Chart.AppVersion }}{{ end }}
+        imagePullPolicy: {{ .Values.faceSubscriber.imagePullPolicy | default .Values.defaultImagePullPolicy }}
+        ports:
+        - name: http
+          containerPort: 8000
+        env:
+        - name: USER_HEADER_NAME
+          value: {{ .Values.authHeader | quote }}
+        - name: ERROR_FRACTION
+          value: {{ .Values.faceSubscriber.errorFraction | default "0" | quote }}
+        {{- if .Values.faceSubscriber.delayBuckets }}
+        - name: DELAY_BUCKETS
+          value: {{ .Values.faceSubscriber.delayBuckets | quote }}
+        {{- end }}
+        - name: WAIT_ON_EMPTY
+          value: {{ .Values.faceSubscriber.waitOnEmpty | default false | quote }}
+        - name: WAIT_TIMEOUT_S
+          value: {{ .Values.faceSubscriber.waitTimeoutS | default 5 | quote }}
+        - name: DB_HOST
+          value: {{ .Values.mysql.host | default "mysql" | quote }}
+        - name: DB_PORT
+          value: {{ .Values.mysql.port | default 3306 | quote }}
+        - name: DB_NAME
+          value: {{ .Values.mysql.database | default "faces" | quote }}
+        - name: DB_USER
+          value: {{ .Values.mysql.user | default "faces" | quote }}
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.mysql.passwordSecret | default "faces-mysql-secret" }}
+              key: password
+        - name: DB_MAX_OPEN
+          value: {{ .Values.mysql.maxOpen | default 10 | quote }}
+        - name: DB_MAX_IDLE
+          value: {{ .Values.mysql.maxIdle | default 5 | quote }}
+        - name: QUEUE_BACKEND
+          value: {{ .Values.queueBackend | default "rabbitmq" | quote }}
+        {{- if eq (.Values.queueBackend | default "rabbitmq") "rabbitmq" }}
+        - name: RABBITMQ_HOST
+          value: {{ $rmq.host | default "rabbitmq" | quote }}
+        - name: RABBITMQ_PORT
+          value: {{ $rmq.port | default 5672 | quote }}
+        - name: RABBITMQ_USER
+          value: {{ $rmq.user | default "faces" | quote }}
+        - name: RABBITMQ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ $rmq.passwordSecret | default "faces-rabbitmq-secret" }}
+              key: password
+        - name: RABBITMQ_VHOST
+          value: {{ $rmq.vhost | default "/" | quote }}
+        - name: RABBITMQ_QUEUE
+          value: {{ $rmq.queueName | default "faces.queue" | quote }}
+        - name: RABBITMQ_MAX_QUEUE_DEPTH
+          value: {{ $rmq.maxQueueDepth | default 5000 | quote }}
+        {{- else }}
+        - name: REDIS_ADDRESS
+          value: {{ .Values.redis.address | default "redis:6379" | quote }}
+        - name: REDIS_QUEUE_KEY
+          value: {{ .Values.redis.queueKey | default "faces:queue" | quote }}
+        - name: REDIS_DB
+          value: {{ .Values.redis.db | default 0 | quote }}
+        - name: REDIS_MAX_QUEUE_DEPTH
+          value: {{ .Values.redis.maxQueueDepth | default 5000 | quote }}
+        {{- if .Values.redis.password }}
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.redis.passwordSecret | default "faces-redis-secret" }}
+              key: password
+        {{- end }}
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+{{- end }}
+{{- end }}
+{{- end }}

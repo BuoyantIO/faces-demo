@@ -111,3 +111,45 @@ func (srv *colorServer) UpdateColor(ctx context.Context, req *color.ColorUpdate)
 		Color: newColor,
 	}, nil
 }
+
+// GetChaos returns the current chaos configuration via gRPC.
+// Replaces the HTTP sidecar on port 8001 — all color traffic now on port 8000.
+func (srv *colorServer) GetChaos(_ context.Context, _ *color.ChaosRequest) (*color.ChaosState, error) {
+	bp := &srv.provider.BaseProvider
+	bp.lock.RLock()
+	buckets := make([]int32, len(bp.delayBuckets))
+	for i, v := range bp.delayBuckets {
+		buckets[i] = int32(v)
+	}
+	state := &color.ChaosState{
+		ErrorFraction: int32(bp.errorFraction),
+		LatchFraction: int32(bp.latchFraction),
+		MaxRate:       float32(bp.maxRate),
+		DelayBuckets:  buckets,
+		Latched:       bp.latched,
+	}
+	bp.lock.RUnlock()
+	return state, nil
+}
+
+// UpdateChaos applies chaos parameters via gRPC and returns the updated state.
+func (srv *colorServer) UpdateChaos(_ context.Context, req *color.ChaosState) (*color.ChaosState, error) {
+	bp := &srv.provider.BaseProvider
+	bp.lock.Lock()
+	bp.errorFraction = int(req.ErrorFraction)
+	bp.latchFraction = int(req.LatchFraction)
+	bp.maxRate = float64(req.MaxRate)
+	// proto3 can't distinguish "not sent" from "sent empty" for repeated fields —
+	// nil and []int32{} both arrive as nil on the wire. Always apply the bucket
+	// list: if the caller sent an empty array to clear, this correctly zeros it.
+	buckets := make([]int, len(req.DelayBuckets))
+	for i, v := range req.DelayBuckets {
+		buckets[i] = int(v)
+	}
+	bp.delayBuckets = buckets
+	if req.ForceUnlatch {
+		bp.latched = false
+	}
+	bp.lock.Unlock()
+	return srv.GetChaos(nil, &color.ChaosRequest{})
+}

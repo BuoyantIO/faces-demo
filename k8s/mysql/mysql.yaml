@@ -1,0 +1,99 @@
+## Plain kubectl MySQL manifest for environments not using Helm.
+##
+## IMPORTANT: Replace the passwords below before use in any non-local environment.
+##
+##   kubectl apply -n faces -f k8s/mysql/mysql.yaml
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: faces-mysql-secret
+  namespace: faces
+type: Opaque
+stringData:
+  password: faces-password      # CHANGE THIS
+  rootPassword: root-password   # CHANGE THIS
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: faces
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: mysql
+spec:
+  type: ClusterIP
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: mysql
+  ports:
+  - port: 3306
+    name: mysql
+    targetPort: mysql
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: faces
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      buoyant.io/application: faces
+      faces.buoyant.io/component: mysql
+  template:
+    metadata:
+      labels:
+        buoyant.io/application: faces
+        faces.buoyant.io/component: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        ports:
+        - name: mysql
+          containerPort: 3306
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: faces-mysql-secret
+              key: rootPassword
+        - name: MYSQL_DATABASE
+          value: faces
+        - name: MYSQL_USER
+          value: faces
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: faces-mysql-secret
+              key: password
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - 'mysqladmin ping -uroot -p"${MYSQL_ROOT_PASSWORD}" --silent'
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - 'mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "SELECT 1"'
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+        volumeMounts:
+        - name: mysql-data
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-data
+        emptyDir: {}

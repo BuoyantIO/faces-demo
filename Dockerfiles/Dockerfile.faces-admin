@@ -1,0 +1,17 @@
+FROM golang:1.24-alpine AS builder
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags="-s -w" \
+    -o /bin/faces-admin \
+    ./cmd/generic/faces-admin
+
+FROM alpine:3.19
+RUN apk add --no-cache ca-certificates
+COPY --from=builder /bin/faces-admin /bin/faces-admin
+COPY assets/html/admin /app/data
+EXPOSE 8888
+ENV DATA_PATH=/app/data
+ENTRYPOINT ["/bin/faces-admin"]

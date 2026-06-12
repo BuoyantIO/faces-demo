@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Faces Admin</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>😃</text></svg>">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<!-- Slim header: poll indicator + health mini-bar (title lives in sidebar) -->
+<header>
+  <div class="poll-indicator">
+    <div class="poll-dot" id="poll-dot"></div>
+    <span class="poll-label">Polling</span>
+  </div>
+  <div class="header-health" id="header-health"><!-- injected by JS --></div>
+</header>
+
+<div class="app-body">
+
+  <!-- ══════════════════ SIDEBAR ══════════════════ -->
+  <aside class="sidebar" id="sidebar">
+
+    <!-- Brand: click to collapse/expand; smiley stays visible when collapsed -->
+    <div class="sidebar-brand" id="sidebar-brand">
+      <div class="brand-row">
+        <span class="sidebar-icon">😃</span>
+        <span class="sidebar-title">Faces Admin</span>
+      </div>
+      <span id="mode-badge" class="header-badge">loading…</span>
+    </div>
+
+    <nav class="sidebar-nav">
+
+      <a class="nav-item active" data-page="overview" href="#overview" title="Overview">
+        <span class="nav-icon">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/>
+            <rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/>
+          </svg>
+        </span>
+        <span class="nav-label">Overview</span>
+      </a>
+
+      <a class="nav-item" id="nav-pipeline" data-page="flow" href="#flow" title="Flow">
+        <span class="nav-icon">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <circle cx="2" cy="8" r="1.5" fill="currentColor" stroke="none"/>
+            <circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none"/>
+            <circle cx="14" cy="8" r="1.5" fill="currentColor" stroke="none"/>
+            <line x1="3.5" y1="8" x2="6.5" y2="8"/><line x1="9.5" y1="8" x2="12.5" y2="8"/>
+          </svg>
+        </span>
+        <span class="nav-label">Flow</span>
+      </a>
+
+      <a class="nav-item" data-page="liveview" href="#liveview" title="Live View">
+        <span class="nav-icon">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="8" cy="8" r="7"/>
+            <path d="M6.5 5.5L12 8L6.5 10.5Z" fill="currentColor" stroke="none"/>
+          </svg>
+        </span>
+        <span class="nav-label">Live View</span>
+      </a>
+
+      <a class="nav-item" data-page="controls" href="#controls" title="Controls">
+        <span class="nav-icon">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <line x1="1" y1="4" x2="15" y2="4"/>
+            <circle cx="10" cy="4" r="2" fill="var(--surface2)"/>
+            <line x1="1" y1="12" x2="15" y2="12"/>
+            <circle cx="5" cy="12" r="2" fill="var(--surface2)"/>
+          </svg>
+        </span>
+        <span class="nav-label">Controls</span>
+      </a>
+
+      <a class="nav-item" data-page="faultinjection" href="#faultinjection" title="Fault Injection">
+        <span class="nav-icon">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9,1 5,9 9,9 7,15 11,7 7,7"/>
+          </svg>
+        </span>
+        <span class="nav-label">Fault Injection</span>
+      </a>
+
+      <!-- Gear icon: proper cog with teeth -->
+      <a class="nav-item" data-page="settings" href="#settings" title="Settings">
+        <span class="nav-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </span>
+        <span class="nav-label">Settings</span>
+      </a>
+
+    </nav>
+
+    <!-- Bottom: theme toggle + sign out + collapse -->
+    <div class="sidebar-bottom">
+      <button class="sidebar-bottom-btn" id="theme-toggle" title="Toggle light/dark">
+        <span class="nav-icon" id="theme-icon">😎</span>
+        <span class="nav-label" id="theme-label">Light mode</span>
+      </button>
+      <button class="sidebar-bottom-btn" id="sign-out-btn" title="Sign out" onclick="signOut()" style="display:none">
+        <span class="nav-icon">🚪</span>
+        <span class="nav-label">Sign Out</span>
+      </button>
+      <button class="sidebar-toggle" id="sidebar-toggle" title="Collapse sidebar">
+        <span class="nav-icon">
+          <svg id="toggle-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <polyline points="10,3 5,8 10,13"/>
+          </svg>
+        </span>
+        <span class="nav-label">Collapse</span>
+      </button>
+    </div>
+
+  </aside>
+
+  <!-- ══════════════════ MAIN ══════════════════ -->
+  <main>
+
+    <!-- OVERVIEW -->
+    <div class="page active" id="page-overview">
+
+      <!-- Classic mode overview — shown when faceMode=classic -->
+      <div id="classic-overview-section" style="display:none">
+        <div class="page-section">
+          <h2>Service Health</h2>
+          <div class="services-grid" id="classic-services-grid"></div>
+        </div>
+        <div class="page-section">
+          <h2>Architecture</h2>
+          <div class="classic-chain" id="classic-chain-diagram"></div>
+          <p class="live-note" style="margin-top:8px">
+            <strong>GUI</strong> clients poll the <strong>face</strong> service, which calls
+            <strong>smiley</strong> (HTTP) and <strong>color</strong> (gRPC) in parallel
+            to compose the response.
+          </p>
+        </div>
+      </div>
+
+      <!-- Pub/Sub overview — shown when faceMode=pubsub -->
+      <div id="overview-pipeline-section" style="display:none">
+        <div class="page-section">
+          <h2>Architecture</h2>
+          <div class="pubsub-arch" id="pubsub-arch-diagram"></div>
+          <p class="live-note" style="margin-top:8px">
+            The publisher fetches a face from <strong>smiley</strong> (HTTP) and
+            <strong>color</strong> (gRPC), writes it to <strong>MySQL</strong>, and pushes
+            to the queue. The subscriber pops messages and serves them to the
+            <strong>GUI</strong> clients.
+          </p>
+        </div>
+        <div class="page-section">
+          <h2>Message Flow</h2>
+          <div class="pipeline-row" id="overview-pipeline-diagram"></div>
+        </div>
+        <div class="page-section">
+          <h2>Live Metrics</h2>
+          <div class="metrics-row" id="overview-metrics"></div>
+        </div>
+        <div class="page-section">
+          <h2>Queue Depth</h2>
+          <canvas id="overview-chart-depth" class="sparkline" width="1000" height="80"></canvas>
+          <div class="chart-legend" style="margin-top:6px">
+            <div class="legend-item"><div class="legend-swatch" style="background:#53d8fb"></div>Queue depth</div>
+            <div class="legend-item"><div class="legend-swatch" style="background:#fbbf24"></div>DB pending</div>
+          </div>
+        </div>
+        <div class="page-section">
+          <h2>Acknowledged (Cumulative)</h2>
+          <canvas id="overview-chart-acked" class="sparkline" width="1000" height="80"></canvas>
+          <div class="chart-legend" style="margin-top:6px">
+            <div class="legend-item"><div class="legend-swatch" style="background:#4ade80"></div>Total acknowledged</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Infrastructure view — shown for both modes; requires Kubernetes RBAC -->
+      <div class="page-section" id="infra-section" style="display:none">
+        <h2>Infrastructure</h2>
+        <div id="infra-content"></div>
+      </div>
+
+    </div>
+
+    <!-- PIPELINE -->
+    <div class="page" id="page-flow">
+      <div class="page-section" id="flow-controls-section" style="display:none">
+        <h2>Flow Controls</h2>
+        <div class="flow-controls">
+          <div class="control-cards" id="control-cards"></div>
+          <div class="scenario-bar">
+            <span class="scenario-label">Scenarios</span>
+            <button class="scenario-btn" data-scenario="drain"  title="Pause publisher — let subscriber drain the queue to zero">▼ Drain Queue</button>
+            <button class="scenario-btn" data-scenario="fill"   title="Pause subscriber — let publisher fill the queue">▲ Fill Queue</button>
+            <button class="scenario-btn" data-scenario="freeze" title="Pause both — freeze all message flow">⏸ Freeze All</button>
+            <button class="scenario-btn" data-scenario="resume" title="Resume both publisher and subscriber">▶ Resume All</button>
+          </div>
+        </div>
+      </div>
+      <div class="dropped-warning" id="dropped-warning">
+        <span>&#x26A0;&#xFE0F; <strong>Messages dropped from queue.</strong>
+        <span id="dropped-count"></span> rows are <code>queued</code> in MySQL but not in the queue backend — evicted by the depth cap.</span>
+        <button class="rewarm-btn" id="rewarm-btn" title="Re-push MySQL queued rows back into the queue without restarting the publisher">&#x21BA; Re-warm Queue</button>
+      </div>
+      <div class="page-section">
+        <h2>Message Flow</h2>
+        <div class="pipeline-row" id="pipeline-diagram"></div>
+      </div>
+      <div class="page-section">
+        <h2>Live Metrics</h2>
+        <div class="metrics-row" id="pipeline-metrics"></div>
+      </div>
+      <div class="page-section">
+        <h2>Queue Depth</h2>
+        <canvas id="chart-depth" class="sparkline" width="1000" height="80"></canvas>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-swatch" style="background:#53d8fb"></div>Queue depth</div>
+          <div class="legend-item"><div class="legend-swatch" style="background:#fbbf24"></div>DB pending</div>
+        </div>
+      </div>
+      <div class="page-section">
+        <h2>Acknowledged (Cumulative)</h2>
+        <canvas id="chart-acked" class="sparkline" width="1000" height="80"></canvas>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-swatch" style="background:#4ade80"></div>Total acknowledged</div>
+        </div>
+      </div>
+      <div id="pipeline-unavailable" class="error-text mt16" style="display:none">
+        Pipeline stats unavailable — requires pub/sub mode with a DB connection.
+      </div>
+    </div>
+
+    <!-- LIVE VIEW -->
+    <div class="page" id="page-liveview">
+
+      <!-- Mode selector -->
+      <div class="lv-mode-bar">
+        <button class="lv-mode-btn active" data-lv-mode="grid">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <rect x=".5" y=".5" width="5" height="5" rx=".8"/><rect x="7.5" y=".5" width="5" height="5" rx=".8"/>
+            <rect x=".5" y="7.5" width="5" height="5" rx=".8"/><rect x="7.5" y="7.5" width="5" height="5" rx=".8"/>
+          </svg>
+          Grid View
+        </button>
+        <button class="lv-mode-btn" data-lv-mode="drain">
+          ⚡ Drain Mode
+        </button>
+      </div>
+
+      <!-- ── GRID VIEW ── -->
+      <div id="lv-grid-view" class="lv-section lv-section-active">
+        <div class="live-toolbar">
+          <div class="live-size-controls">
+            <!-- Visual grid-size picker replaces the old rows/cols inputs -->
+            <div class="grid-picker-wrap">
+              <button class="grid-picker-btn" id="grid-picker-btn" title="Select grid size">
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x=".5" y=".5" width="5" height="5" rx=".7"/><rect x="7.5" y=".5" width="5" height="5" rx=".7"/>
+                  <rect x=".5" y="7.5" width="5" height="5" rx=".7"/><rect x="7.5" y="7.5" width="5" height="5" rx=".7"/>
+                </svg>
+                <span id="grid-size-label">8 × 8</span>
+              </button>
+              <div class="grid-picker-popup" id="grid-picker-popup" hidden>
+                <div class="grid-picker-grid" id="grid-picker-grid"></div>
+                <div class="grid-picker-info" id="grid-picker-info">8 × 8</div>
+              </div>
+            </div>
+            <label class="live-label">Interval
+              <select id="live-interval" class="live-select">
+                <option value="1000">1 s</option>
+                <option value="2000" selected>2 s</option>
+                <option value="3000">3 s</option>
+                <option value="5000">5 s</option>
+              </select>
+            </label>
+          </div>
+          <div class="live-actions">
+            <div class="live-legend-wrap">
+              <button class="live-legend-btn" id="live-legend-btn">&#x25A6; Legend</button>
+              <div class="live-legend-popup" id="live-legend-popup" hidden>
+                <div>
+                  <div class="legend-section-title">Background Color</div>
+                  <div class="legend-rows">
+                    <div class="legend-row"><span class="legend-swatch" style="background:#66CCEE"></span><span class="legend-desc">Success</span></div>
+                    <div class="legend-row"><span class="legend-swatch" style="background:#BBBBBB"></span><span class="legend-desc">Color service error</span></div>
+                    <div class="legend-row"><span class="legend-swatch" style="background:#AA3377"></span><span class="legend-desc">Color service unreachable</span></div>
+                    <div class="legend-row"><span class="legend-swatch" style="background:#EE6677"></span><span class="legend-desc">Request timeout (504)</span></div>
+                    <div class="legend-row"><span class="legend-swatch" style="background:#CCBB44"></span><span class="legend-desc">Rate limited / latched</span></div>
+                  </div>
+                </div>
+                <div>
+                  <div class="legend-section-title">Face Expression</div>
+                  <div class="legend-rows">
+                    <div class="legend-row"><span class="legend-emoji">😃</span><span class="legend-desc">Success</span></div>
+                    <div class="legend-row"><span class="legend-emoji">🤬</span><span class="legend-desc">Error / queue empty (503)</span></div>
+                    <div class="legend-row"><span class="legend-emoji">😴</span><span class="legend-desc">Timeout (504)</span></div>
+                    <div class="legend-row"><span class="legend-emoji">🤯</span><span class="legend-desc">Rate limited (429)</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button class="live-toggle-btn start" id="live-toggle">&#x25B6; Start</button>
+            <span class="live-status" id="live-status">stopped</span>
+            <div class="live-rate-stat" id="live-rate-stat" style="display:none">
+              <span class="live-rate-val" id="live-rate-val">–</span>
+              <span class="live-rate-lbl">msg/s</span>
+            </div>
+            <div class="live-rate-stat" id="live-consumed-stat" style="display:none">
+              <span class="live-rate-val" id="live-consumed-val">0</span>
+              <span class="live-rate-lbl">consumed</span>
+            </div>
+          </div>
+        </div>
+        <div class="live-grid-wrap">
+          <div id="live-grid" class="live-grid"></div>
+        </div>
+        <p class="live-note" id="live-note"></p>
+      </div>
+
+      <!-- ── DRAIN MODE ── -->
+      <div id="lv-drain-view" class="lv-section">
+        <div class="drain-panel">
+          <div class="drain-status-row" id="drain-status-row">
+            <span class="drain-badge" id="drain-badge">Stopped</span>
+            <span class="drain-workers-active" id="drain-workers-active"></span>
+          </div>
+
+          <div class="drain-stats" id="drain-stats" style="grid-template-columns:repeat(4,1fr)">
+            <div class="drain-stat">
+              <div class="drain-stat-val" id="drain-consumed">0</div>
+              <div class="drain-stat-lbl">consumed</div>
+            </div>
+            <div class="drain-stat">
+              <div class="drain-stat-val" id="drain-rate">–</div>
+              <div class="drain-stat-lbl">msg / sec</div>
+            </div>
+            <div class="drain-stat">
+              <div class="drain-stat-val" id="drain-queue">–</div>
+              <div class="drain-stat-lbl">queue depth</div>
+            </div>
+            <div class="drain-stat">
+              <div class="drain-stat-val" id="drain-eta">–</div>
+              <div class="drain-stat-lbl">est. to empty</div>
+            </div>
+          </div>
+          <div class="drain-stats" style="grid-template-columns:repeat(4,1fr)">
+            <div class="drain-stat">
+              <div class="drain-stat-val" id="drain-success" style="color:var(--green)">0</div>
+              <div class="drain-stat-lbl">success (200)</div>
+            </div>
+            <div class="drain-stat">
+              <div class="drain-stat-val" id="drain-empty" style="color:var(--yellow)">0</div>
+              <div class="drain-stat-lbl">empty (503)</div>
+            </div>
+            <div class="drain-stat">
+              <div class="drain-stat-val" id="drain-failed" style="color:var(--red)">0</div>
+              <div class="drain-stat-lbl">failed</div>
+            </div>
+            <div class="drain-stat">
+              <div class="drain-stat-val" id="drain-success-rate">–</div>
+              <div class="drain-stat-lbl">success rate</div>
+            </div>
+          </div>
+
+          <div class="drain-workers-section">
+            <div class="drain-workers-header">
+              <span class="drain-workers-label">Concurrent workers</span>
+              <span id="drain-workers-val" class="drain-workers-count">4</span>
+            </div>
+            <input type="range" id="drain-workers-slider" class="ctrl-rate-slider"
+                   min="1" max="32" step="1" value="4" style="--fill:9%">
+            <div class="drain-workers-ticks">
+              <span>1</span><span>4</span><span>8</span><span>16</span><span>32</span>
+            </div>
+          </div>
+
+          <button class="drain-toggle-btn start" id="drain-toggle">&#x26A1; Start Drain</button>
+          <p class="drain-note">Fires N concurrent requests per batch with no delay between batches — maximum throughput. Each successful response acknowledges a message from the queue. Use this to quickly drain the queue without starting a full GUI session.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- FAULT INJECTION -->
+    <div class="page" id="page-faultinjection">
+
+      <!-- Status & Targeting: infra-style topology, click a group to scope faults -->
+      <div class="page-section">
+        <h2>Status &amp; Targeting</h2>
+<div class="fi-topology" id="fi-topology"><!-- injected by renderFITopology() --></div>
+      </div>
+
+      <!-- Apply panel: choose services + params, applied to the selected scope -->
+      <div class="page-section">
+        <h2>Apply Fault</h2>
+        <div class="fi-global-panel" id="fi-global-panel"><!-- injected by buildFIGlobalPanel() --></div>
+      </div>
+
+      <!-- Per-service editable cards -->
+      <div class="page-section">
+        <h2>Per-Service Control</h2>
+        <div class="fi-cards-grid" id="fi-cards"></div>
+      </div>
+
+      <!-- Scenarios (bottom): quick-apply presets + dynamic zone/node rows -->
+      <div class="page-section">
+        <h2>Scenarios</h2>
+        <div class="fi-scenario-panel">
+          <div class="fi-scenario-row" id="fi-scenario-bar">
+            <span class="scenario-label">Quick Faults</span>
+            <!-- buttons injected by renderFIScenarioBar() -->
+          </div>
+          <!-- Dynamic zone/node outage + latency rows (hidden until topology loads) -->
+          <div id="fi-outage-section" style="display:none">
+            <!-- rows injected by renderFIOutageButtons() -->
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CONTROLS -->
+    <div class="page" id="page-controls">
+
+      <!-- Preview bar: large face preview → apply-to selector → apply button, stacked vertically -->
+      <div class="ctrl-preview-bar">
+        <div class="face-preview-cell" id="face-preview-cell">
+          <span id="preview-emoji">+</span>
+        </div>
+        <div class="face-preview-hint" id="face-preview-hint">Select an emoji or color</div>
+        <div class="apply-to-section">
+          <span class="apply-to-label">Apply to</span>
+          <div class="target-toggle" id="apply-target-toggle">
+            <button class="toggle-btn active" data-target="all">All</button>
+            <button class="toggle-btn" data-target="center">Center</button>
+            <button class="toggle-btn" data-target="edge">Edge</button>
+          </div>
+        </div>
+        <div class="ctrl-btn-row">
+          <button class="apply-btn-secondary" id="clear-controls">Clear</button>
+          <button class="apply-btn-main" id="apply-controls" disabled>Apply</button>
+        </div>
+      </div>
+
+      <!-- Pickers row: emoji (wider) + divider + color (narrower) -->
+      <div class="ctrl-pickers-row">
+        <div class="picker-section">
+          <div class="picker-section-label">Emoji</div>
+          <input type="text" id="emoji-search-input" class="emoji-search-input"
+                 placeholder="Search emoji… (smile, fire, heart…)" autocomplete="off">
+          <div class="emoji-cat-tabs" id="emoji-cat-tabs"></div>
+          <div class="emoji-picker-grid" id="emoji-picker-grid"></div>
+          <input type="text" id="custom-emoji-input" class="custom-emoji-input"
+                 placeholder="😄 paste, or press Win+.  /  Cmd+Ctrl+Space" maxlength="8">
+        </div>
+        <div class="picker-divider-v"></div>
+        <div class="picker-section ctrl-color-section">
+          <div class="picker-section-label">Color</div>
+          <div class="color-swatches-compact" id="color-swatches"></div>
+          <div class="color-hex-row">
+            <span class="color-hex-hash">#</span>
+            <input type="text" id="color-hex-input" class="color-hex-input"
+                   placeholder="RRGGBB" maxlength="6" spellcheck="false" autocomplete="off">
+            <div class="color-hex-preview" id="color-hex-preview"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pod selectors row -->
+      <div class="ctrl-pods-bar">
+        <div class="pod-sel-section" id="pod-sel-smiley-section">
+          <span class="apply-to-label">Emoji Pods</span>
+          <div class="pod-sel-row" id="pod-sel-smiley-row"><!-- injected by JS --></div>
+        </div>
+        <div class="pod-sel-section" id="pod-sel-color-section">
+          <span class="apply-to-label">Color Pods</span>
+          <div class="pod-sel-row" id="pod-sel-color-row"><!-- injected by JS --></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="page" id="page-settings">
+
+      <!-- Emojivoto Integration -->
+      <div class="page-section" id="settings-emojivoto">
+        <h2>Emojivoto Integration</h2>
+        <div class="card">
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px">
+            Connect to an emojivoto deployment. When enabled, the top-voted emoji is automatically
+            broadcast to selected smiley pods whenever the leader changes.
+          </p>
+          <!-- Endpoint + toggles row -->
+          <div class="ev-config-row">
+            <div class="ev-endpoint-group">
+              <span class="apply-to-label">Leaderboard URL</span>
+              <input type="text" id="ev-endpoint-input" class="ev-endpoint-input"
+                     placeholder="http://web-svc.emojivoto:80" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="ev-enable-group">
+              <span class="apply-to-label">Connect</span>
+              <label class="ev-switch">
+                <input type="checkbox" id="ev-enabled-check">
+                <span class="ev-switch-track"></span>
+              </label>
+            </div>
+            <div class="ev-enable-group">
+              <span class="apply-to-label">Update Smileys</span>
+              <label class="ev-switch">
+                <input type="checkbox" id="ev-update-smileys-check">
+                <span class="ev-switch-track"></span>
+              </label>
+            </div>
+            <button class="maint-btn primary" id="ev-save-btn">Save</button>
+            <span id="ev-save-status" class="ev-save-status"></span>
+          </div>
+          <!-- Status + current leader -->
+          <div class="ev-status-row" id="ev-status-row">
+            <span class="ev-status-chip" id="ev-status-chip" data-status="unconfigured">Not configured</span>
+            <span class="ev-leader-wrap" id="ev-leader-wrap" style="display:none">
+              Leader: <span class="ev-leader-emoji" id="ev-leader-emoji"></span>
+            </span>
+          </div>
+          <!-- Leaderboard top 10 -->
+          <div id="ev-leaderboard-wrap" style="display:none">
+            <div class="ev-section-label">Top 10 Emojis</div>
+            <table class="config-table ev-leaderboard-table">
+              <thead>
+                <tr><th>#</th><th>Emoji</th><th style="text-align:right">Votes</th></tr>
+              </thead>
+              <tbody id="ev-leaderboard-tbody"></tbody>
+            </table>
+          </div>
+          <!-- Apply-to target — consistent with Controls page -->
+          <div id="ev-target-section" style="display:none">
+            <div class="ev-section-label">Apply To</div>
+            <div class="target-toggle" id="ev-apply-target-toggle">
+              <button class="toggle-btn active" data-ev-target="all">All</button>
+              <button class="toggle-btn" data-ev-target="center">Center</button>
+              <button class="toggle-btn" data-ev-target="edge">Edge</button>
+            </div>
+          </div>
+          <!-- Pod selector — same style as Controls page -->
+          <div id="ev-pods-section" style="display:none">
+            <div class="ev-section-label">Smiley Pods to Update</div>
+            <p class="ev-pods-note">Select specific pods to follow the emojivoto leader — leave all deselected to update every smiley pod.</p>
+            <div class="pod-sel-section" id="ev-pod-sel-section">
+              <div class="pod-sel-row" id="ev-pod-sel-row"><!-- injected by JS --></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Editable service endpoints -->
+      <div class="page-section">
+        <h2>Service Endpoints</h2>
+        <div class="card">
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px">
+            Override the service DNS names the admin uses at runtime.
+            Changes take effect immediately but are lost on pod restart — use Helm values for permanent changes.
+          </p>
+          <div class="endpoint-grid" id="endpoint-grid">
+            <!-- injected by JS -->
+          </div>
+          <div style="display:flex;gap:8px;margin-top:14px;align-items:center">
+            <button class="maint-btn primary" id="endpoints-save">Save Changes</button>
+            <button class="maint-btn secondary" id="endpoints-reset">Reset to Defaults</button>
+            <span id="endpoints-status" style="font-size:12px;color:var(--text-muted)"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Maintenance (pub/sub only) — below Service Endpoints, above Active Configuration -->
+      <div class="page-section" id="settings-maintenance" style="display:none">
+        <h2>Maintenance</h2>
+        <div class="maint-grid">
+          <div class="maint-card">
+            <div class="maint-header">
+              <span class="maint-title">🗄️ MySQL</span>
+              <span class="maint-badge" id="maint-db-badge">–</span>
+            </div>
+            <div class="maint-stats" id="maint-db-stats"></div>
+            <div class="maint-actions">
+              <button class="maint-btn primary"   id="maint-db-migrate"
+                data-tooltip="Migration is idempotent — recreates face_queue if missing and ensures the 3-state ENUM is current. Safe to run at any time.\n\nIf MySQL restarted, run this first to verify the schema, then restart the publisher pod to reconnect.">Run Migration</button>
+              <button class="maint-btn secondary" id="maint-db-test"
+                data-tooltip="Tests MySQL connectivity and returns connection status.">Test Connection</button>
+              <button class="maint-btn danger"    id="maint-db-purge"
+                data-tooltip="Deletes all rows from face_queue. Use to reset counters for a clean demo start.\n\nThe queue backend and publisher/subscriber are unaffected — publishing resumes immediately.">Purge DB</button>
+            </div>
+            <div class="maint-result" id="maint-db-result"></div>
+          </div>
+          <div class="maint-card">
+            <div class="maint-header">
+              <span class="maint-title" id="maint-queue-title">🐰 Queue</span>
+              <span class="maint-badge" id="maint-queue-badge">–</span>
+            </div>
+            <div class="maint-stats" id="maint-queue-stats"></div>
+            <div class="maint-actions">
+              <button class="maint-btn primary" id="maint-queue-rewarm"
+                data-tooltip="Rebuilds the queue from pending and queued MySQL rows.">↺ Re-warm Queue</button>
+              <button class="maint-btn danger"  id="maint-queue-purge"
+                data-tooltip="Removes all messages from the queue immediately. Rows in MySQL remain as queued and will be re-pushed when the publisher restarts.">Purge Queue</button>
+            </div>
+            <div class="maint-cmd-wrap" id="maint-rmq-cmd-wrap" style="display:none">
+              <span class="maint-cmd-label">Port-forward management UI</span>
+              <code class="maint-cmd">kubectl port-forward svc/rabbitmq 15672:15672 -n faces-pub-sub</code>
+              <div class="maint-creds">
+                <span class="maint-creds-label">Credentials</span>
+                <span class="maint-creds-val"><code>faces</code> / <code>faces-password</code></span>
+              </div>
+              <a class="maint-link" href="http://localhost:15672" target="_blank" rel="noopener">Open management UI ↗</a>
+            </div>
+            <div class="maint-result" id="maint-queue-result"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active configuration (read-only summary + mode toggle) -->
+      <div class="page-section">
+        <h2>Active Configuration</h2>
+        <div class="card">
+          <!-- Mode toggle: changes admin display mode at runtime -->
+          <div class="mode-toggle-row">
+            <span class="apply-to-label">Admin Mode</span>
+            <div class="target-toggle" id="settings-mode-toggle">
+              <button class="toggle-btn" data-mode="classic">Classic</button>
+              <button class="toggle-btn" data-mode="pubsub">Pub·Sub</button>
+            </div>
+          </div>
+          <table class="config-table" style="margin-top:14px">
+            <thead><tr><th>Setting</th><th>Value</th></tr></thead>
+            <tbody id="config-tbody">
+              <tr><td colspan="2" style="color:var(--text-muted)">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="admin.js"></script>
+</body>
+</html>
