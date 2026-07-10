@@ -2800,6 +2800,10 @@ async function pollInfra() {
     renderFITopology(infra, state.lastChaos || {}, state.mode);
     // Refresh dynamic outage buttons (zone/node list may have changed)
     renderFIOutageButtons(state.mode);
+    // Refresh FI pod-pill glyphs — smiley/color/face pills render once at card
+    // creation, usually BEFORE the first (slow) infra poll lands, so their
+    // emoji/swatch would otherwise never appear.
+    refreshFIPillGlyphs();
   } catch (e) {
     console.warn('infra poll error', e);
   }
@@ -4468,6 +4472,24 @@ function fiPodServingHTML(baseSvc, ip) {
     }
   }
   return '';
+}
+
+// Re-render FI pod-selector pills when their serving glyphs first arrive or change.
+// The smiley/color/face pills otherwise render only once (at card creation), which is
+// usually before the first /api/infrastructure poll completes — so without this their
+// emoji/swatch never shows. Signature-guarded so unchanged pills aren't repainted
+// (repainting would kill open tooltips). Selection state survives re-render because
+// renderFIPodSelector re-reads fiSelectedPods.
+function refreshFIPillGlyphs() {
+  for (const [svc, pods] of Object.entries(fiPodCache)) {
+    if (!pods || !pods.length) continue;
+    const card = document.querySelector(`.fi-card[data-svc="${svc}"]`);
+    if (!card) continue;
+    const sig = pods.map(p => fiPodServingHTML(svc, p.ip || p.IP || '')).join('|');
+    if (card.dataset.pillSig === sig) continue;
+    card.dataset.pillSig = sig;
+    renderFIPodSelector(card, svc, pods);
+  }
 }
 
 function renderFIPodSelector(card, svc, pods) {
