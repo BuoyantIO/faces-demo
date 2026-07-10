@@ -302,7 +302,6 @@ rollouts:
 #     --namespace faces-pub-sub \
 #     --set adminOnly=true \
 #     --set facesAdmin.enabled=true \
-#     --set facesAdmin.image=harbor.mostonebarn.com/.../faces-admin:0.0.7-dev \
 #     --set faceMode=pubsub
 #
 # NOTE: secrets (MySQL/RabbitMQ credentials) are also skipped — they must

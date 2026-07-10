@@ -125,7 +125,8 @@ Log paths use the `-LogRoot` parameter (default `C:\temp\faces-demo`):
 | `-SourceRoot` | `C:\src` | Where the repo is cloned |
 | `-AppRoot` | `C:\faces-demo` | Parent directory for binaries and config |
 | `-LogRoot` | `C:\temp\faces-demo` | Parent directory for log files |
-| `-UpdateRepo` | off | Pull latest source before building |
+| `-Branch` | repo default (`main`) | Git branch to build from. The faces-admin linky images require workloads built from `faces-demo-3.0` until it merges to `main` — use `-Branch faces-demo-3.0` (with `-UpdateRepo` to switch an existing clone) |
+| `-UpdateRepo` | off | Pull latest source before building (also switches to `-Branch` if set) |
 | `-SkipBuild` | off | Skip Go compile during `Install` |
 | `-ResetConfig` | off | Wipe and regenerate env files before `Configure` / `Install` |
 | `-Force` | off | `Uninstall`: also delete files |

@@ -111,7 +111,7 @@ func (fs *FaceStore) migrate() error {
 	// Create table on fresh installs.
 	if _, err := fs.db.Exec(`CREATE TABLE IF NOT EXISTS face_queue (
 		id               VARCHAR(36)  NOT NULL,
-		smiley           TEXT         NOT NULL,
+		smiley           MEDIUMTEXT   NOT NULL,
 		color            TEXT         NOT NULL,
 		errors           TEXT         NULL,
 		state            ENUM('pending','queued','acknowledged') NOT NULL DEFAULT 'pending',
@@ -127,6 +127,11 @@ func (fs *FaceStore) migrate() error {
 	// This ALTER is idempotent: MySQL accepts it silently if 'queued' already exists.
 	_, _ = fs.db.Exec(`ALTER TABLE face_queue
 		MODIFY COLUMN state ENUM('pending','queued','acknowledged') NOT NULL DEFAULT 'pending'`)
+
+	// Widen smiley on existing installs: custom-image (linky) smileys are inline
+	// data URIs — an animated GIF easily exceeds TEXT's 64KB cap, which would
+	// silently truncate the value. MEDIUMTEXT (16MB) leaves ample headroom.
+	_, _ = fs.db.Exec(`ALTER TABLE face_queue MODIFY COLUMN smiley MEDIUMTEXT NOT NULL`)
 
 	return nil
 }

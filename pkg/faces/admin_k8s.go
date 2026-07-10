@@ -319,10 +319,10 @@ func (c *k8sClient) listExternalWorkloads() []PodTopology {
 	}
 
 	if err := c.get(ewURL, &ewList); err != nil {
-		// 403 = RBAC missing the ext.linkerd.io rule; 404 = CRD not installed.
+		// 403 = RBAC missing the workload.linkerd.io rule; 404 = CRD not installed.
 		// Both are logged at Warn so operators can diagnose without enabling debug logging.
 		if strings.Contains(err.Error(), "HTTP 403") {
-			c.logger.Warn("k8s: RBAC missing ext.linkerd.io/externalworkloads permission — "+
+			c.logger.Warn("k8s: RBAC missing workload.linkerd.io/externalworkloads permission — "+
 				"ExternalWorkloads will appear as On-Premise. "+
 				"Run: helm upgrade with the updated faces-admin-rbac.yaml to grant access.")
 		} else {

@@ -858,6 +858,12 @@ main.lv-active #page-liveview.active {
 .live-cell.loading { opacity: .3; }
 .live-cell.empty   { opacity: .5; }
 .live-cell.error   { border: 2px solid var(--red); }
+/* Custom-image (linky) faces render as a constrained thumbnail inside the cell */
+.live-cell-img {
+  width: 78%; height: 78%;
+  object-fit: contain;
+  border-radius: 3px;
+}
 .live-note { padding: 4px 0; font-size: 11px; color: var(--text-muted); font-style: italic; flex-shrink: 0; }
 
 /* ── Grid size picker ────────────────────────────────────────────────────── */
@@ -1739,6 +1745,7 @@ main.lv-active #page-liveview.active {
   border: 1px solid rgba(128,128,128,.35);
 }
 .pod-pill-state .infra-state-emoji { font-size: 12px; line-height: 1; }
+.pod-pill-state .infra-state-img   { width: 12px; height: 12px; }
 
 /* ── Classic mode request-chain fork diagram ─────────────────────────────── */
 .classic-chain {
@@ -1945,6 +1952,13 @@ main.lv-active #page-liveview.active {
   line-height: 1;
   flex-shrink: 0;
 }
+/* Mini thumbnail for custom-image (linky) smiley values */
+.pod-serving-img {
+  width: 14px; height: 14px;
+  object-fit: contain;
+  border-radius: 2px;
+  display: block;
+}
 /* Small colour swatch circle */
 .pod-serving-color {
   width: 10px; height: 10px;
@@ -2109,6 +2123,14 @@ main.lv-active #page-liveview.active {
   line-height: 1;
   flex-shrink: 0;
 }
+/* Mini thumbnail for custom-image (linky) smiley values */
+.infra-state-img {
+  width: 14px; height: 14px;
+  object-fit: contain;
+  border-radius: 2px;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
 
 /* Color swatch (color pods) */
 .infra-state-color {
@@ -2121,7 +2143,10 @@ main.lv-active #page-liveview.active {
 
 /* Center + edge shown side by side when they differ — small gap between the two */
 .infra-state-emoji + .infra-state-emoji,
-.infra-state-color + .infra-state-color { margin-left: 3px; }
+.infra-state-color + .infra-state-color,
+.infra-state-emoji + .infra-state-img,
+.infra-state-img + .infra-state-emoji,
+.infra-state-img + .infra-state-img { margin-left: 3px; }
 .pod-serving-row .pod-serving-emoji + .pod-serving-emoji,
 .pod-serving-row .pod-serving-color + .pod-serving-color { margin-left: 3px; }
 

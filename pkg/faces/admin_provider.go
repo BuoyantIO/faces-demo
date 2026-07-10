@@ -94,6 +94,7 @@ type AdminProvider struct {
 	emojivotoEndpoint      string
 	emojivotoEnabled       bool
 	emojivotoUpdateSmileys bool
+	emojivotoWhich         string // "all" | "center" | "edge" — target for leader broadcasts
 	emojivotoLeader        string
 	emojivotoLeaderboard   []emojivotoEntry
 	emojivotoStatus        string // "unconfigured" | "ok" | "error"
@@ -216,6 +217,7 @@ type emojivotoConfigResponse struct {
 	Endpoint      string           `json:"endpoint"`
 	Enabled       bool             `json:"enabled"`
 	UpdateSmileys bool             `json:"updateSmileys"`
+	Which         string           `json:"which"` // "all" | "center" | "edge"
 	Status        string           `json:"status"` // "unconfigured" | "ok" | "error"
 	Error         string           `json:"error,omitempty"`
 	Leader        string           `json:"leader,omitempty"`
@@ -272,6 +274,7 @@ func NewAdminProviderFromEnvironment() *AdminProvider {
 
 	a.cfgOverrides = make(map[string]string)
 	a.emojivotoStatus = "unconfigured"
+	a.emojivotoWhich = "all"
 	a.emojivotoSelectedPods = []string{}
 
 	// Try in-cluster K8s API — only works inside a pod with a service account
@@ -782,7 +785,10 @@ func (a *AdminProvider) handleSmiley(w http.ResponseWriter, r *http.Request) {
 			Smiley string   `json:"smiley"`
 			Pods   []string `json:"pods,omitempty"`
 		}
-		json.Unmarshal(body, &req)
+		if err := json.Unmarshal(body, &req); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
 
 		// Build target URLs — specific pods or all via headless DNS.
 		// ExternalWorkloads are reached directly on their declared port (not podPort).
@@ -808,7 +814,11 @@ func (a *AdminProvider) handleSmiley(w http.ResponseWriter, r *http.Request) {
 		// Strip "pods" from forwarded body
 		fwdBody, _ := json.Marshal(map[string]string{"which": req.Which, "smiley": req.Smiley})
 
-		type podRes struct{ ok bool }
+		type podRes struct {
+			ok      bool
+			status  int
+			errBody string
+		}
 		results := make([]podRes, len(targets))
 		var wg sync.WaitGroup
 		for i, target := range targets {
@@ -823,20 +833,38 @@ func (a *AdminProvider) handleSmiley(w http.ResponseWriter, r *http.Request) {
 				c := &http.Client{Timeout: 5 * time.Second}
 				resp, err2 := c.Do(fwdReq)
 				if err2 == nil {
-					results[i] = podRes{ok: resp.StatusCode < 300}
+					pr := podRes{ok: resp.StatusCode < 300, status: resp.StatusCode}
+					if !pr.ok {
+						if b, rErr := io.ReadAll(io.LimitReader(resp.Body, 512)); rErr == nil {
+							pr.errBody = strings.TrimSpace(string(b))
+						}
+					}
 					resp.Body.Close()
+					results[i] = pr
 				}
 			}(i, target)
 		}
 		wg.Wait()
 
 		succeeded := 0
+		firstReject := "" // error text from the first pod that answered with a 4xx
 		for _, res := range results {
 			if res.ok {
 				succeeded++
+			} else if firstReject == "" && res.status >= 400 && res.status < 500 && res.errBody != "" {
+				firstReject = res.errBody
 			}
 		}
 		if succeeded == 0 && len(targets) > 0 {
+			// Distinguish "pods reachable but rejected the value" (e.g. an older
+			// smiley build that predates <img>/entity passthrough) from "nothing
+			// reachable" — a 502 here would mislead operators into chasing the network.
+			if firstReject != "" {
+				a.logger.Warn("smiley apply rejected by pods",
+					"emoji", req.Smiley, "reason", firstReject, "pods_attempted", len(targets))
+				http.Error(w, "smiley rejected: "+firstReject, http.StatusBadRequest)
+				return
+			}
 			a.logger.Warn("smiley apply failed — service unreachable",
 				"emoji", req.Smiley, "pods_attempted", len(targets))
 			http.Error(w, "smiley service unreachable", http.StatusBadGateway)
@@ -845,7 +873,9 @@ func (a *AdminProvider) handleSmiley(w http.ResponseWriter, r *http.Request) {
 		a.logger.Info("smiley applied",
 			"emoji", req.Smiley, "which", req.Which,
 			"pods", len(targets), "succeeded", succeeded)
-		a.writeJSON(w, map[string]interface{}{"pods": len(targets), "succeeded": succeeded})
+		a.writeJSON(w, map[string]interface{}{
+			"pods": len(targets), "succeeded": succeeded, "failed": len(targets) - succeeded,
+		})
 
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -862,6 +892,7 @@ func (a *AdminProvider) handleEmojivoto(w http.ResponseWriter, r *http.Request) 
 			Endpoint:      a.emojivotoEndpoint,
 			Enabled:       a.emojivotoEnabled,
 			UpdateSmileys: a.emojivotoUpdateSmileys,
+			Which:         a.emojivotoWhich,
 			Status:        a.emojivotoStatus,
 			Error:         a.emojivotoError,
 			Leader:        a.emojivotoLeader,
@@ -870,6 +901,9 @@ func (a *AdminProvider) handleEmojivoto(w http.ResponseWriter, r *http.Request) 
 		}
 		if resp.Status == "" {
 			resp.Status = "unconfigured"
+		}
+		if resp.Which == "" {
+			resp.Which = "all"
 		}
 		if resp.SelectedPods == nil {
 			resp.SelectedPods = []string{}
@@ -882,17 +916,22 @@ func (a *AdminProvider) handleEmojivoto(w http.ResponseWriter, r *http.Request) 
 			Endpoint      string   `json:"endpoint"`
 			Enabled       bool     `json:"enabled"`
 			UpdateSmileys bool     `json:"updateSmileys"`
+			Which         string   `json:"which"`
 			SelectedPods  []string `json:"selectedPods"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "invalid JSON", http.StatusBadRequest)
 			return
 		}
+		if req.Which != "center" && req.Which != "edge" {
+			req.Which = "all"
+		}
 
 		a.emojivotoMu.Lock()
 		a.emojivotoEndpoint = req.Endpoint
 		a.emojivotoEnabled = req.Enabled
 		a.emojivotoUpdateSmileys = req.UpdateSmileys
+		a.emojivotoWhich = req.Which
 		if req.SelectedPods != nil {
 			a.emojivotoSelectedPods = req.SelectedPods
 		} else {
@@ -912,13 +951,14 @@ func (a *AdminProvider) handleEmojivoto(w http.ResponseWriter, r *http.Request) 
 		// When updateSmileys is turned on (or pods are changed while it's on),
 		// push the current leader immediately — don't wait for the next leader change.
 		if req.UpdateSmileys && currentLeader != "" {
-			go a.broadcastEmojivotoLeader(currentLeader, currentSelected)
+			go a.broadcastEmojivotoLeader(currentLeader, req.Which, currentSelected)
 		}
 
 		a.logger.Info("emojivoto config updated",
 			"endpoint", req.Endpoint,
 			"enabled", req.Enabled,
 			"update_smileys", req.UpdateSmileys,
+			"which", req.Which,
 			"selected_pods", len(req.SelectedPods))
 		a.writeJSON(w, map[string]string{"message": "emojivoto config updated"})
 
@@ -1015,6 +1055,7 @@ func (a *AdminProvider) pollEmojivoto(endpoint string) {
 	a.emojivotoStatus = "ok"
 	a.emojivotoError = ""
 	updateSmileys := a.emojivotoUpdateSmileys
+	which := a.emojivotoWhich
 	selectedPods := append([]string{}, a.emojivotoSelectedPods...)
 	a.emojivotoMu.Unlock()
 
@@ -1022,11 +1063,14 @@ func (a *AdminProvider) pollEmojivoto(endpoint string) {
 		a.logger.Info("emojivoto leader changed", "leader", leader, "prev", prevLeader)
 	}
 	if updateSmileys && leader != "" {
-		a.broadcastEmojivotoLeader(leader, selectedPods)
+		a.broadcastEmojivotoLeader(leader, which, selectedPods)
 	}
 }
 
-func (a *AdminProvider) broadcastEmojivotoLeader(emoji string, selectedPods []string) {
+func (a *AdminProvider) broadcastEmojivotoLeader(emoji, which string, selectedPods []string) {
+	if which == "" {
+		which = "all"
+	}
 	ewPorts := a.ewPortIndex()
 	var targets []string
 	if len(selectedPods) > 0 {
@@ -1051,7 +1095,7 @@ func (a *AdminProvider) broadcastEmojivotoLeader(emoji string, selectedPods []st
 		return
 	}
 
-	fwdBody, _ := json.Marshal(map[string]string{"which": "all", "smiley": emoji})
+	fwdBody, _ := json.Marshal(map[string]string{"which": which, "smiley": emoji})
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -1081,6 +1125,7 @@ func (a *AdminProvider) broadcastEmojivotoLeader(emoji string, selectedPods []st
 
 	a.logger.Info("emojivoto leader broadcast complete",
 		"emoji", emoji,
+		"which", which,
 		"pods", len(targets),
 		"succeeded", succeeded)
 }
@@ -1248,13 +1293,17 @@ func (a *AdminProvider) queryAllPodsForComponent(headless, fallbackURL, componen
 	}
 
 	cs := controlState{PodCount: len(podStates), Pods: podStates}
+	primarySet := false
 	for _, p := range podStates {
 		if p.Available {
 			cs.Available = true
-			// Primary (first available) pod drives the top-level values used by the UI slider
-			if cs.PublishIntervalMs == 0 && p.PublishIntervalMs > 0 {
+			// Primary (first available) pod drives the top-level values used by the
+			// UI slider. Flood mode reports PublishIntervalMs == 0, so an is-zero
+			// check can't tell "unset" from "flood" — track it explicitly.
+			if !primarySet {
 				cs.PublishIntervalMs = p.PublishIntervalMs
 				cs.PublishConcurrency = p.PublishConcurrency
+				primarySet = true
 			}
 			// Use the first available pod's DB counters as aggregate
 			// (all pods share the same MySQL view, so values should be identical)
@@ -1681,10 +1730,15 @@ func (a *AdminProvider) handleChaosProxy(headless *string, serviceURL func() str
 			}
 
 			// Optional pods field: specific IPs to target instead of broadcasting to all.
+			// Reject malformed JSON here — otherwise a bad body silently broadcasts
+			// to ALL pods instead of the requested subset.
 			var podFilter struct {
 				Pods []string `json:"pods,omitempty"`
 			}
-			json.Unmarshal(body, &podFilter)
+			if err := json.Unmarshal(body, &podFilter); err != nil {
+				http.Error(w, "invalid JSON", http.StatusBadRequest)
+				return
+			}
 
 			var podURLs []string
 			if len(podFilter.Pods) > 0 {
@@ -2177,7 +2231,7 @@ func (a *AdminProvider) handleDBMigrate(w http.ResponseWriter, r *http.Request) 
 func (a *AdminProvider) ensureFaceQueueSchema(ctx context.Context) error {
 	if _, err := a.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS face_queue (
 		id               VARCHAR(36)  NOT NULL,
-		smiley           TEXT         NOT NULL,
+		smiley           MEDIUMTEXT   NOT NULL,
 		color            TEXT         NOT NULL,
 		errors           TEXT         NULL,
 		state            ENUM('pending','queued','acknowledged') NOT NULL DEFAULT 'pending',
@@ -2191,6 +2245,9 @@ func (a *AdminProvider) ensureFaceQueueSchema(ctx context.Context) error {
 	// Ensure 3-state ENUM on existing installs — idempotent
 	_, _ = a.db.ExecContext(ctx, `ALTER TABLE face_queue
 		MODIFY COLUMN state ENUM('pending','queued','acknowledged') NOT NULL DEFAULT 'pending'`)
+	// Widen smiley on existing installs — custom-image (linky) data URIs can
+	// exceed TEXT's 64KB cap; MEDIUMTEXT matches face_store.go's schema.
+	_, _ = a.db.ExecContext(ctx, `ALTER TABLE face_queue MODIFY COLUMN smiley MEDIUMTEXT NOT NULL`)
 	return nil
 }
 
@@ -2575,6 +2632,8 @@ func contentType(path string) string {
 		return "image/svg+xml"
 	case ".png":
 		return "image/png"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
 	case ".gif":
 		return "image/gif"
 	case ".webp":

@@ -83,6 +83,9 @@ func (a *AdminProvider) handleInfrastructure(w http.ResponseWriter, r *http.Requ
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
 
+	// Respect any runtime faceMode override set via PUT /api/config
+	mode := a.effectiveFaceMode()
+
 	type svcResult struct {
 		service string
 		pods    []InfraPod
@@ -115,7 +118,7 @@ func (a *AdminProvider) handleInfrastructure(w http.ResponseWriter, r *http.Requ
 	}
 	ctrlCh := make(chan svcResult, len(controlSvcs)+2)
 
-	if a.faceMode == "pubsub" {
+	if mode == "pubsub" {
 		for _, c := range controlSvcs {
 			c := c
 			go func() {
@@ -246,7 +249,7 @@ func (a *AdminProvider) handleInfrastructure(w http.ResponseWriter, r *http.Requ
 	}
 
 	a.writeJSON(w, InfraResponse{
-		Mode:        a.faceMode,
+		Mode:        mode,
 		HasTopology: hasTopology,
 		Zones:       zones,
 	})

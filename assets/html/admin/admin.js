@@ -430,6 +430,7 @@ function renderEmojiSearchResults(emojis) {
       btn.classList.add('selected');
       document.getElementById('custom-emoji-input').value = '';
       state.selectedSmiley = emoji;
+      state.selectedSmileyLabel = null;
       updateControlsPreview();
     });
     grid.appendChild(btn);
@@ -472,6 +473,7 @@ const state = {
   lastConfig:     null,   // cached config for the poll indicator tooltip
   history:        [],
   selectedSmiley: null,
+  selectedSmileyLabel: null, // friendly name for custom-image values (e.g. "Party Linky")
   selectedColor:  null,
   selectedColorHex: null,
   applyTarget:    'all',
@@ -1522,7 +1524,16 @@ async function checkDBStatus() {
   try {
     const r = await fetch('/api/maintenance/db/status');
     const d = await r.json();
-    if (d.connected) {
+    if (d.connected && d.schemaError) {
+      // Connected but the face_queue table is missing/broken — surface it
+      // instead of rendering "schema OK" with zeroed stats.
+      setMaintBadge('maint-db-badge', 'error');
+      const stats = document.getElementById('maint-db-stats');
+      if (stats) stats.classList.remove('visible');
+      setMaintResult('maint-db-result',
+        `Connected (${d.latencyMs}ms) — schema error: ${d.schemaError}. Run Migration to create the face_queue table.`,
+        'error');
+    } else if (d.connected) {
       setMaintBadge('maint-db-badge', 'ok');
       const stats = document.getElementById('maint-db-stats');
       if (stats) {
@@ -1748,6 +1759,7 @@ async function initSmileyPicker() {
     const raw = ci.value.trim(); if (!raw) return;
     clearEmojiGridSelection();
     state.selectedSmiley = raw;
+    state.selectedSmileyLabel = null;
     updateControlsPreview();
   });
 }
@@ -1784,6 +1796,7 @@ function renderEmojiGrid(catIdx, cats) {
         try {
           const smileyValue = await linkyToSmileyValue(filename);
           state.selectedSmiley = smileyValue;
+          state.selectedSmileyLabel = btn.title; // filename-derived, e.g. "Party Linky"
           // Restore the img after encoding
           btn.textContent = '';
           btn.appendChild(img);
@@ -1809,6 +1822,7 @@ function renderEmojiGrid(catIdx, cats) {
         btn.classList.add('selected');
         document.getElementById('custom-emoji-input').value = '';
         state.selectedSmiley = emoji;
+        state.selectedSmileyLabel = null;
         updateControlsPreview();
       });
       grid.appendChild(btn);
@@ -1827,6 +1841,7 @@ async function linkyToSmileyValue(filename) {
   if (isGif) {
     // Fetch raw bytes to preserve animation
     const resp = await fetch(url);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const blob = await resp.blob();
     dataUri = await new Promise((res, rej) => {
       const fr = new FileReader();
@@ -1871,6 +1886,7 @@ let selectedSmileyPods    = [];
 let selectedColorPods     = [];
 let selectedEmojivotoPods = [];
 let evApplyTarget         = 'all'; // 'all' | 'center' | 'edge'
+let evApplyDirty          = false; // toggle changed but not yet saved
 
 function initApplyControls() {
   document.querySelectorAll('#apply-target-toggle .toggle-btn').forEach(btn => {
@@ -1939,6 +1955,19 @@ function decodeEntity(html) {
   return tmp.textContent || tmp.innerText || '';
 }
 
+// Extract the data: URI from an "<img …>" smiley value (custom/linky images) so
+// display sites can render a size-constrained thumbnail instead of '?'.
+// Returns null when the value isn't an image tag with an inline data URI.
+// (template.content is inert — nothing loads or executes during parsing.)
+function smileyImgSrc(value) {
+  if (!value || !value.startsWith('<')) return null;
+  const t = document.createElement('template');
+  t.innerHTML = value;
+  const img = t.content.querySelector('img');
+  const src = img && img.getAttribute('src');
+  return src && src.startsWith('data:image/') ? src : null;
+}
+
 // Build a small serving-status row to embed in each pod card
 function servingStatusEl(serving, service) {
   const el = document.createElement('div');
@@ -1950,10 +1979,20 @@ function servingStatusEl(serving, service) {
   if ((service === 'smiley' || service === 'emojivoto') && serving.smiley) {
     // Show center + edge side by side when they differ (label which is which on hover).
     const mkEmoji = (entity, label) => {
-      const glyph = entity.startsWith('<') ? '' : decodeEntity(entity);
       const s = document.createElement('span');
       s.className = 'pod-serving-emoji';
-      s.textContent = glyph || '?';
+      const imgSrc = smileyImgSrc(entity);
+      if (imgSrc) {
+        // Custom image value (e.g. a linky) — render a mini thumbnail
+        const img = document.createElement('img');
+        img.src = imgSrc;
+        img.alt = '';
+        img.className = 'pod-serving-img';
+        s.appendChild(img);
+      } else {
+        const glyph = entity.startsWith('<') ? '' : decodeEntity(entity);
+        s.textContent = glyph || '?';
+      }
       if (label) s.setAttribute('data-tooltip', label);
       return s;
     };
@@ -2215,9 +2254,13 @@ function updateControlsPreview() {
     emoji.textContent = hasColor ? '' : '+';
   }
 
-  // Hint text
+  // Hint text — custom image values are giant <img> markup; show their name instead
   const parts = [];
-  if (hasEmoji) parts.push(state.selectedSmiley);
+  if (hasEmoji) {
+    parts.push(state.selectedSmiley.startsWith('<')
+      ? (state.selectedSmileyLabel || 'custom image')
+      : state.selectedSmiley);
+  }
   if (hasColor) parts.push(state.selectedColorHex);
   hint.textContent = parts.length ? parts.join(' on ') : 'Select an emoji or color';
 
@@ -2225,18 +2268,19 @@ function updateControlsPreview() {
 }
 
 function clearControls() {
-  state.selectedSmiley    = null;
-  state.selectedColor     = null;
-  state.selectedColorHex  = null;
+  state.selectedSmiley      = null;
+  state.selectedSmileyLabel = null;
+  state.selectedColor       = null;
+  state.selectedColorHex    = null;
   // Deselect any highlighted emoji/color swatch buttons
-  document.querySelectorAll('.emoji-btn.selected').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('.emoji-pick-btn.selected').forEach(b => b.classList.remove('selected'));
   document.querySelectorAll('.color-swatch-btn.selected').forEach(b => b.classList.remove('selected'));
   updateControlsPreview();
 }
 
 async function applyChanges() {
   const hasEmoji = !!state.selectedSmiley;
-  const hasColor = !!state.selectedColor;
+  const hasColor = !!state.selectedColorHex;
   if (!hasEmoji && !hasColor) return;
 
   const btn = document.getElementById('apply-controls');
@@ -2260,17 +2304,41 @@ async function applyChanges() {
         ...(selectedColorPods.length > 0 ? { pods: selectedColorPods } : {}),
       }),
     }));
+    const labels  = [hasEmoji && 'emoji', hasColor && 'color'].filter(Boolean);
     const results = await Promise.all(tasks);
-    if (results.every(r => r.ok)) {
-      const what    = [hasEmoji && 'emoji', hasColor && 'color'].filter(Boolean).join(' + ');
+
+    // Collect per-request outcomes: hard failures carry the server's error text
+    // (e.g. "smiley rejected: unknown smiley" from an older workload build);
+    // OK responses may still report per-pod partial failure via succeeded/pods.
+    const errors = [];
+    let partial = null;
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      if (!r.ok) {
+        const text = (await r.text().catch(() => '')).trim();
+        errors.push(`${labels[i]}: ${text || r.statusText}`);
+        continue;
+      }
+      const d = await r.json().catch(() => null);
+      if (d && d.pods > 0 && d.succeeded < d.pods && !partial) {
+        partial = { label: labels[i], succeeded: d.succeeded, pods: d.pods };
+      }
+    }
+
+    if (errors.length > 0) {
+      showToast('Apply failed — ' + errors.join('; '), 'error');
+    } else if (partial) {
+      const rejected = partial.pods - partial.succeeded;
+      showToast(`⚠ ${partial.label} applied to ${partial.succeeded}/${partial.pods} pods — ` +
+                `${rejected} workload${rejected !== 1 ? 's' : ''} rejected it (older faces build?)`, 'warn');
+      refreshPodSelector();
+    } else {
       const podNote = (selectedSmileyPods.length > 0 || selectedColorPods.length > 0)
         ? ` (targeted pods)`
         : '';
-      showToast(`✓ Applied ${what} → ${state.applyTarget}${podNote}`, 'success');
+      showToast(`✓ Applied ${labels.join(' + ')} → ${state.applyTarget}${podNote}`, 'success');
       // Immediately re-fetch serving state so pod pills reflect the new value
       refreshPodSelector();
-    } else {
-      showToast('Some changes failed', 'error');
     }
   } catch (e) {
     showToast('Apply failed: ' + e.message, 'error');
@@ -2534,8 +2602,18 @@ async function tickLiveView() {
     const d = result.value;
     const el = document.getElementById(d.cellId); if (!el) continue;
     el.classList.remove('loading', 'empty', 'error');
-    const tmp = document.createElement('span'); tmp.innerHTML = d.smiley || '&#x1F92C;';
-    el.textContent = tmp.textContent || '?';
+    const imgSrc = smileyImgSrc(d.smiley || '');
+    if (imgSrc) {
+      el.textContent = '';
+      const img = document.createElement('img');
+      img.src = imgSrc;
+      img.alt = '';
+      img.className = 'live-cell-img';
+      el.appendChild(img);
+    } else {
+      const tmp = document.createElement('span'); tmp.innerHTML = d.smiley || '&#x1F92C;';
+      el.textContent = tmp.textContent || '?';
+    }
     const color = d.color || '#BBBBBB';
     el.style.backgroundColor = color;
     el.style.color = isLightColor(color) ? '#222' : '#f0f0f0';
@@ -2992,11 +3070,15 @@ function renderInfraZoneCard(zone, svcOrder, cardMod) {
 function infraPodStateEl(pod, svc) {
   if (svc === 'smiley') {
     if (pod.smiley) {
-      const center = `<span class="infra-state-emoji">${decodeEntity(pod.smiley)}</span>`;
+      const glyph = v => {
+        const src = smileyImgSrc(v);
+        return src
+          ? `<img class="infra-state-img" src="${esc(src)}" alt="">`
+          : `<span class="infra-state-emoji">${decodeEntity(v)}</span>`;
+      };
+      const center = glyph(pod.smiley);
       // Edge differs → show both, side by side (tooltip says which is which)
-      return pod.smileyEdge
-        ? center + `<span class="infra-state-emoji">${decodeEntity(pod.smileyEdge)}</span>`
-        : center;
+      return pod.smileyEdge ? center + glyph(pod.smileyEdge) : center;
     }
   }
   if (svc === 'color') {
@@ -3031,11 +3113,12 @@ function infraPodTip(pod, svc) {
   // differ, both are shown labeled. Color shows ONLY swatch(es) — injected by the tooltip
   // renderer from data-pod-color / data-pod-color-edge; the hex value is omitted.
   if (svc === 'smiley' && pod.smiley) {
+    const tipGlyph = v => smileyImgSrc(v) ? 'custom image' : decodeEntity(v);
     if (pod.smileyEdge) {
-      lines.push(`Center: ${decodeEntity(pod.smiley)}`);
-      lines.push(`Edge: ${decodeEntity(pod.smileyEdge)}`);
+      lines.push(`Center: ${tipGlyph(pod.smiley)}`);
+      lines.push(`Edge: ${tipGlyph(pod.smileyEdge)}`);
     } else {
-      lines.push(decodeEntity(pod.smiley));
+      lines.push(tipGlyph(pod.smiley));
     }
   }
   if (pod.name && pod.name !== pod.ip) lines.push(`Pod: ${pod.name}`);
@@ -3117,6 +3200,7 @@ function initEmojivoto() {
       document.querySelectorAll('#ev-apply-target-toggle .toggle-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       evApplyTarget = btn.dataset.evTarget;
+      evApplyDirty = true; // don't let the settings poll clobber this before Save
     });
   });
 }
@@ -3153,6 +3237,16 @@ function renderEmojivotoStatus(data) {
   if (endpointInput && !endpointInput.matches(':focus')) endpointInput.value = data.endpoint || '';
   if (enabledCheck) enabledCheck.checked = data.enabled || false;
   if (updateSmileyCheck) updateSmileyCheck.checked = data.updateSmileys || false;
+
+  // Restore the Apply-To toggle from the persisted server state — unless the
+  // user has an unsaved selection pending.
+  const which = data.which || 'all';
+  if (!evApplyDirty && which !== evApplyTarget) {
+    evApplyTarget = which;
+    document.querySelectorAll('#ev-apply-target-toggle .toggle-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.evTarget === which);
+    });
+  }
 
   if (chip) {
     chip.dataset.status = data.status;
@@ -3214,6 +3308,7 @@ async function saveEmojivotoConfig() {
       body: JSON.stringify({ endpoint, enabled, updateSmileys, which: evApplyTarget, selectedPods: selectedEmojivotoPods }),
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    evApplyDirty = false;
     if (statusEl) { statusEl.textContent = 'Saved'; setTimeout(() => { statusEl.textContent = ''; }, 2000); }
     await pollEmojivotoSettings();
   } catch (e) {
@@ -3475,6 +3570,9 @@ async function forceUnlatch(card, svc) {
     if (r.ok) {
       statusEl.textContent = '✓ Unlatched';
       setTimeout(() => { statusEl.textContent = ''; }, 3000);
+    } else {
+      const d = await r.json().catch(() => ({}));
+      statusEl.textContent = '✗ ' + (d.error || r.statusText);
     }
   } catch (e) {
     statusEl.textContent = '✗ ' + e.message;
@@ -4597,5 +4695,6 @@ async function unlatchFIChaos(card, svc) {
   try {
     const r = await fetch(`/api/chaos/${svc}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
     if (r.ok) { statusEl.textContent = '✓ Unlatched'; setTimeout(() => { statusEl.textContent = ''; }, 3000); }
+    else { const d = await r.json().catch(() => ({})); statusEl.textContent = '✗ ' + (d.error || r.statusText); }
   } catch (e) { statusEl.textContent = '✗ ' + e.message; }
 }
