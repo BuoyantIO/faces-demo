@@ -803,7 +803,10 @@ func (a *AdminProvider) handleSmiley(w http.ResponseWriter, r *http.Request) {
 				targets = append(targets, fmt.Sprintf("http://%s:%s/", ip, port))
 			}
 		} else {
-			for _, u := range a.discoverPodURLs(a.smileyHeadless, a.smileyURL) {
+			// ALL pods: K8s API discovery — headless DNS alone misses secondary
+			// instances (smiley2/3) and ExternalWorkloads entirely.
+			urls, _ := a.discoverAllServicePods("smiley", a.smileyHeadless, a.svcURL("smiley", a.smileyURL))
+			for _, u := range urls {
 				if !strings.HasSuffix(u, "/") {
 					u += "/"
 				}
@@ -1082,7 +1085,10 @@ func (a *AdminProvider) broadcastEmojivotoLeader(emoji, which string, selectedPo
 			targets = append(targets, fmt.Sprintf("http://%s:%s/", ip, port))
 		}
 	} else {
-		for _, u := range a.discoverPodURLs(a.smileyHeadless, a.smileyURL) {
+		// ALL pods: K8s API discovery — headless DNS alone misses secondary
+		// instances (smiley2/3) and ExternalWorkloads entirely.
+		urls, _ := a.discoverAllServicePods("smiley", a.smileyHeadless, a.svcURL("smiley", a.smileyURL))
+		for _, u := range urls {
 			if !strings.HasSuffix(u, "/") {
 				u += "/"
 			}
@@ -1213,6 +1219,62 @@ func (a *AdminProvider) checkRabbitMQHealth() *serviceStatus {
 		return &serviceStatus{Healthy: false, Error: err.Error()}
 	}
 	return &serviceStatus{Healthy: true, LatencyMs: latency}
+}
+
+// discoverAllServicePods returns a base URL (http://ip:port) for EVERY pod of a
+// service across ALL instances (svc, svc2, svc3 …) plus ExternalWorkloads, and
+// an IP→topology index for the pods found via the Kubernetes API.
+//
+// The K8s API is authoritative here: the headless Service's selector only
+// matches the PRIMARY instance (component=svc), so DNS never sees smiley2/3-
+// style instances, and ExternalWorkloads are never Service endpoints at all.
+// Headless DNS (then the service VIP) is only a fallback for non-K8s runs.
+// ExternalWorkloads are addressed on their declared port, not podPort.
+func (a *AdminProvider) discoverAllServicePods(svcPrefix, headless, fallbackURL string) ([]string, map[string]PodTopology) {
+	ipIndex := make(map[string]PodTopology)
+	var urls []string
+
+	if a.k8s != nil {
+		if byComp, err := a.k8s.ListAllBackendComponents(); err == nil {
+			for comp, pods := range byComp {
+				if comp == svcPrefix || strings.HasPrefix(comp, svcPrefix) {
+					for _, p := range pods {
+						if p.IP == "" {
+							continue
+						}
+						if _, seen := ipIndex[p.IP]; seen {
+							continue
+						}
+						ipIndex[p.IP] = p
+						urls = append(urls, fmt.Sprintf("http://%s:%s", p.IP, a.podPort))
+					}
+				}
+			}
+		}
+		for comp, ewPods := range a.k8s.ListExternalWorkloadComponents() {
+			if comp == svcPrefix || strings.HasPrefix(comp, svcPrefix) {
+				for _, p := range ewPods {
+					if p.IP == "" {
+						continue
+					}
+					if _, seen := ipIndex[p.IP]; seen {
+						continue
+					}
+					ipIndex[p.IP] = p
+					port := a.podPort
+					if p.Port != "" {
+						port = p.Port
+					}
+					urls = append(urls, fmt.Sprintf("http://%s:%s", p.IP, port))
+				}
+			}
+		}
+	}
+
+	if len(urls) == 0 {
+		urls = a.discoverPodURLs(headless, fallbackURL)
+	}
+	return urls, ipIndex
 }
 
 // discoverPodURLs resolves the headless service DNS to get all pod IPs.
@@ -2053,8 +2115,11 @@ func (a *AdminProvider) handleColor(w http.ResponseWriter, r *http.Request) {
 				grpcTargets = append(grpcTargets, ip+":"+port)
 			}
 		} else {
-			for _, u := range a.discoverPodURLs(a.colorHeadless, a.colorGRPCAddr) {
-				// discoverPodURLs returns http://ip:port style; strip scheme for gRPC
+			// ALL pods: K8s API discovery — headless DNS alone misses secondary
+			// instances (color2/3) and ExternalWorkloads entirely.
+			urls, _ := a.discoverAllServicePods("color", a.colorHeadless, a.colorGRPCAddr)
+			for _, u := range urls {
+				// discovery returns http://ip:port style; strip scheme for gRPC
 				addr := strings.TrimPrefix(u, "http://")
 				grpcTargets = append(grpcTargets, addr)
 			}
@@ -2364,42 +2429,8 @@ func (a *AdminProvider) handleSmileyState(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Prefer K8s API — discovers all smiley* instances (smiley, smiley2, smiley3 …)
-	ipIndex := make(map[string]PodTopology)
-	var urls []string
-	if a.k8s != nil {
-		if byComp, err := a.k8s.ListAllBackendComponents(); err == nil {
-			for comp, pods := range byComp {
-				if comp == "smiley" || strings.HasPrefix(comp, "smiley") {
-					for _, p := range pods {
-						if _, seen := ipIndex[p.IP]; !seen {
-							ipIndex[p.IP] = p
-							urls = append(urls, fmt.Sprintf("http://%s:%s", p.IP, a.podPort))
-						}
-					}
-				}
-			}
-		}
-		// Also include ExternalWorkloads for any smiley* component
-		for comp, ewPods := range a.k8s.ListExternalWorkloadComponents() {
-			if comp == "smiley" || strings.HasPrefix(comp, "smiley") {
-				for _, p := range ewPods {
-					if _, seen := ipIndex[p.IP]; !seen {
-						ipIndex[p.IP] = p
-						port := a.podPort
-						if p.Port != "" {
-							port = p.Port
-						}
-						urls = append(urls, fmt.Sprintf("http://%s:%s", p.IP, port))
-					}
-				}
-			}
-		}
-	}
-	// Fallback to headless DNS when K8s returned nothing
-	if len(urls) == 0 {
-		urls = a.discoverPodURLs(a.smileyHeadless, a.svcURL("smiley", a.smileyURL))
-	}
+	// K8s API discovers all smiley* instances + ExternalWorkloads; DNS fallback.
+	urls, ipIndex := a.discoverAllServicePods("smiley", a.smileyHeadless, a.svcURL("smiley", a.smileyURL))
 
 	states := make([]podServing, len(urls))
 	client := &http.Client{Timeout: 2 * time.Second}
@@ -2458,40 +2489,8 @@ func (a *AdminProvider) handleColorState(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Prefer K8s API — discovers all color* instances (color, color2, color3 …)
-	ipIndex := make(map[string]PodTopology)
-	var urls []string
-	if a.k8s != nil {
-		if byComp, err := a.k8s.ListAllBackendComponents(); err == nil {
-			for comp, pods := range byComp {
-				if comp == "color" || strings.HasPrefix(comp, "color") {
-					for _, p := range pods {
-						if _, seen := ipIndex[p.IP]; !seen {
-							ipIndex[p.IP] = p
-							urls = append(urls, fmt.Sprintf("http://%s:%s", p.IP, a.podPort))
-						}
-					}
-				}
-			}
-		}
-		for comp, ewPods := range a.k8s.ListExternalWorkloadComponents() {
-			if comp == "color" || strings.HasPrefix(comp, "color") {
-				for _, p := range ewPods {
-					if _, seen := ipIndex[p.IP]; !seen {
-						ipIndex[p.IP] = p
-						port := a.podPort
-						if p.Port != "" {
-							port = p.Port
-						}
-						urls = append(urls, fmt.Sprintf("http://%s:%s", p.IP, port))
-					}
-				}
-			}
-		}
-	}
-	if len(urls) == 0 {
-		urls = a.discoverPodURLs(a.colorHeadless, a.colorGRPCAddr)
-	}
+	// K8s API discovers all color* instances + ExternalWorkloads; DNS fallback.
+	urls, ipIndex := a.discoverAllServicePods("color", a.colorHeadless, a.colorGRPCAddr)
 
 	states := make([]podServing, len(urls))
 	var wg sync.WaitGroup
