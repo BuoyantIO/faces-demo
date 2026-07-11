@@ -183,14 +183,22 @@ func (fprv *FacePublisherProvider) RunPublishLoop() {
 			continue
 		}
 
+		start := time.Now()
 		msg := fprv.buildFaceMessage(prvReq)
 
 		if err := fprv.writeAndPublish(ctx, msg); err != nil {
 			fprv.Warnf("FacePublisher: publish loop: %v", err)
 		}
 
+		// Pace against the interval END-TO-END: the admin slider's msg/s target
+		// assumes one message per interval, so the time already spent calling
+		// smiley/color and writing to MySQL + the queue counts toward it.
+		// If the work exceeds the interval the loop is saturated — no sleep,
+		// it simply runs at its natural maximum.
 		if ms := fprv.publishIntervalMs.Load(); ms > 0 {
-			time.Sleep(time.Duration(ms) * time.Millisecond)
+			if remaining := time.Duration(ms)*time.Millisecond - time.Since(start); remaining > 0 {
+				time.Sleep(remaining)
+			}
 		}
 	}
 }
