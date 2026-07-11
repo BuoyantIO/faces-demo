@@ -2400,21 +2400,24 @@ let liveConsumedTotal = 0;
 const RATE_WINDOW_MS  = 5000;
 const liveRateWindow  = []; // [{ts, count}]
 
+// Rate (per second) over the trailing windowMs of {ts, count} samples.
+// Counts after the window-start sample over the elapsed time since it.
+// Mutates win in place to drop expired samples.
+function windowedRate(win, now, windowMs) {
+  while (win.length > 0 && win[0].ts < now - windowMs) win.shift();
+  if (win.length < 2) return 0;
+  const total = win.slice(1).reduce((s, e) => s + e.count, 0);
+  const elapsed = (win.at(-1).ts - win[0].ts) / 1000;
+  return elapsed > 0 ? total / elapsed : 0;
+}
+
 function trackLiveConsumed(count) {
-  if (count === 0) return;
+  // Zero-count ticks are recorded too — otherwise the rate display would
+  // freeze at its last non-zero value when consumption stops (empty queue).
   const now = Date.now();
   liveConsumedTotal += count;
   liveRateWindow.push({ ts: now, count });
-  // Drop entries older than the window
-  while (liveRateWindow.length > 0 && liveRateWindow[0].ts < now - RATE_WINDOW_MS) {
-    liveRateWindow.shift();
-  }
-  // Compute rate over the window
-  const windowTotal = liveRateWindow.slice(1).reduce((s, e) => s + e.count, 0);
-  const elapsed = liveRateWindow.length > 1
-    ? (liveRateWindow.at(-1).ts - liveRateWindow[0].ts) / 1000
-    : 0;
-  const rate = elapsed > 0 ? windowTotal / elapsed : 0;
+  const rate = windowedRate(liveRateWindow, now, RATE_WINDOW_MS);
 
   const rateEl = document.getElementById('live-rate-val');
   const consEl = document.getElementById('live-consumed-val');
@@ -2590,6 +2593,9 @@ function setLiveNote() {
   note.textContent = state.mode === 'pubsub'
     ? `Each cell is a live consumer — in pub/sub mode this reads from the queue. Outer cells → edge endpoint, inner cells → center endpoint. ${liveRows * liveCols} polls per tick.`
     : `Outer cells → edge endpoint, inner cells → center endpoint. ${liveRows * liveCols} concurrent polls per tick.`;
+  // "consumed" only makes sense against a queue; classic mode just serves requests
+  const lbl = document.getElementById('live-consumed-lbl');
+  if (lbl) lbl.textContent = state.mode === 'pubsub' ? 'consumed' : 'served';
 }
 
 function startLive() {
@@ -2663,8 +2669,8 @@ async function tickLiveView() {
     el.style.borderColor = 'transparent';
     if (d.status === 503) el.classList.add('empty');
     else if (d.errors?.length) el.classList.add('error');
-    // Every response (200 or 503) represents a consumed message slot
-    if (d.status === 200 || d.status === 503) tickConsumed++;
+    // Only a 200 delivered a message — a 503 means "queue empty", nothing consumed
+    if (d.status === 200) tickConsumed++;
   }
   trackLiveConsumed(tickConsumed);
 }
@@ -2672,11 +2678,11 @@ async function tickLiveView() {
 // ── Drain mode ─────────────────────────────────────────────────────────────
 let drainRunning = false;
 let drainWorkers = 4;
-let drainConsumed = 0;
-let drainSuccess  = 0;
-let drainEmpty    = 0;
+let drainSuccess  = 0; // 200s — messages actually consumed from the queue
+let drainEmpty    = 0; // 503s — queue was empty, nothing consumed
 let drainFailed   = 0;
 let drainStartMs = null;
+const drainWindow = []; // [{ts, count}] for the rolling msg/s rate
 
 function initDrainMode() {
   const slider = document.getElementById('drain-workers-slider');
@@ -2697,10 +2703,10 @@ function initDrainMode() {
 function startDrain() {
   if (drainRunning) return;
   drainRunning = true;
-  drainConsumed = 0;
   drainSuccess  = 0;
   drainEmpty    = 0;
   drainFailed   = 0;
+  drainWindow.length = 0;
   drainStartMs  = Date.now();
   updateDrainUI();
   drainLoop();
@@ -2713,18 +2719,25 @@ function stopDrain() {
 
 async function drainLoop() {
   while (drainRunning) {
+    let batchConsumed = 0;
     const batch = Array.from({ length: drainWorkers }, (_, i) => {
       const row = Math.floor(i / 8), col = i % 8;
       return fetch(`/face/center?row=${row}&col=${col}`)
         .then(r => {
-          if (r.status === 200)      { drainSuccess++; drainConsumed++; }
-          else if (r.status === 503) { drainEmpty++;   drainConsumed++; }
+          if (r.status === 200)      { drainSuccess++; batchConsumed++; }
+          else if (r.status === 503) { drainEmpty++; } // queue empty — nothing consumed
           else                       { drainFailed++; }
         })
         .catch(() => { drainFailed++; });
     });
     await Promise.allSettled(batch);
+    drainWindow.push({ ts: Date.now(), count: batchConsumed });
     updateDrainUI();
+    // Idle pacing: an all-empty batch means the queue is dry — poll gently
+    // instead of hammering 503s. Full speed resumes on the next delivery.
+    if (drainRunning && batchConsumed === 0) {
+      await new Promise(r => setTimeout(r, 500));
+    }
   }
 }
 
@@ -2744,16 +2757,18 @@ function updateDrainUI() {
     active.textContent = '';
   }
 
-  // Stats
-  document.getElementById('drain-consumed').textContent = fmt(drainConsumed);
-  document.getElementById('drain-success').textContent  = fmt(drainSuccess);
+  // Stats — "consumed" is real deliveries (200s) only; 503s are just empty polls
+  document.getElementById('drain-consumed').textContent = fmt(drainSuccess);
   document.getElementById('drain-empty').textContent    = fmt(drainEmpty);
   document.getElementById('drain-failed').textContent   = fmt(drainFailed);
-  const totalAttempts = drainSuccess + drainEmpty + drainFailed;
-  const successRate   = totalAttempts > 0 ? (drainSuccess / totalAttempts * 100).toFixed(1) + '%' : '–';
-  document.getElementById('drain-success-rate').textContent = successRate;
-  const elapsed = drainStartMs ? (Date.now() - drainStartMs) / 1000 : 0;
-  const rate    = elapsed > 0.5 ? drainConsumed / elapsed : 0;
+  document.getElementById('drain-attempts').textContent = fmt(drainSuccess + drainEmpty + drainFailed);
+  const elapsed = drainStartMs ? Math.floor((Date.now() - drainStartMs) / 1000) : 0;
+  document.getElementById('drain-elapsed').textContent = drainStartMs
+    ? `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`
+    : '–';
+  // Rolling window so the rate reflects NOW, not a since-start average —
+  // it decays to zero once the queue is dry instead of tapering slowly.
+  const rate = windowedRate(drainWindow, Date.now(), RATE_WINDOW_MS);
   document.getElementById('drain-rate').textContent = rate > 0 ? rate.toFixed(1) : '–';
 
   const qDepth = state.lastPipeline?.queue?.depth ?? null;

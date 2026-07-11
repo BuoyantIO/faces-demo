@@ -335,7 +335,7 @@
             </div>
             <div class="live-rate-stat" id="live-consumed-stat" style="display:none">
               <span class="live-rate-val" id="live-consumed-val">0</span>
-              <span class="live-rate-lbl">consumed</span>
+              <span class="live-rate-lbl" id="live-consumed-lbl">consumed</span>
             </div>
           </div>
         </div>
@@ -355,8 +355,8 @@
 
           <div class="drain-stats" id="drain-stats" style="grid-template-columns:repeat(4,1fr)">
             <div class="drain-stat">
-              <div class="drain-stat-val" id="drain-consumed">0</div>
-              <div class="drain-stat-lbl">consumed</div>
+              <div class="drain-stat-val" id="drain-consumed" style="color:var(--green)">0</div>
+              <div class="drain-stat-lbl">consumed (200)</div>
             </div>
             <div class="drain-stat">
               <div class="drain-stat-val" id="drain-rate">–</div>
@@ -373,20 +373,20 @@
           </div>
           <div class="drain-stats" style="grid-template-columns:repeat(4,1fr)">
             <div class="drain-stat">
-              <div class="drain-stat-val" id="drain-success" style="color:var(--green)">0</div>
-              <div class="drain-stat-lbl">success (200)</div>
-            </div>
-            <div class="drain-stat">
               <div class="drain-stat-val" id="drain-empty" style="color:var(--yellow)">0</div>
-              <div class="drain-stat-lbl">empty (503)</div>
+              <div class="drain-stat-lbl">empty polls (503)</div>
             </div>
             <div class="drain-stat">
               <div class="drain-stat-val" id="drain-failed" style="color:var(--red)">0</div>
               <div class="drain-stat-lbl">failed</div>
             </div>
             <div class="drain-stat">
-              <div class="drain-stat-val" id="drain-success-rate">–</div>
-              <div class="drain-stat-lbl">success rate</div>
+              <div class="drain-stat-val" id="drain-attempts">0</div>
+              <div class="drain-stat-lbl">total polls</div>
+            </div>
+            <div class="drain-stat">
+              <div class="drain-stat-val" id="drain-elapsed">–</div>
+              <div class="drain-stat-lbl">elapsed</div>
             </div>
           </div>
 
