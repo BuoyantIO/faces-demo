@@ -614,7 +614,9 @@ async function poll() {
       fetchJSON('/api/pipeline'),
       fetchJSON('/api/config'),
     ]);
+    const prevMode = state.mode;
     state.mode        = status.mode;
+    if (prevMode !== status.mode) updateLiveViewModeUI();
     state.queueBackend = status.queueBackend;
     state.lastPipeline = pipeline;
 
@@ -1136,7 +1138,7 @@ function buildPodList(pods, concurrencyPerPod) {
     const totalRow = document.createElement('div');
     totalRow.className = 'ctrl-total-rate';
     totalRow.innerHTML = `
-      <span>Total across ${publisherPods.length} pod${publisherPods.length !== 1 ? 's' : ''}</span>
+      <span data-tooltip="Theoretical target (interval × loops × pods). Actual throughput also spends time per message calling smiley/color and writing to MySQL + the queue — the Pub Rate card shows the measured rate.">Target across ${publisherPods.length} pod${publisherPods.length !== 1 ? 's' : ''}</span>
       <strong>~${Math.round(totalMsgPerSec)} msg/s</strong>
     `;
     wrap.appendChild(totalRow);
@@ -2529,6 +2531,7 @@ function initLiveView() {
 
   // Drain controls
   initDrainMode();
+  updateLiveViewModeUI();
 }
 
 // Default cell size (px) — matches the faces-gui app's cell size.
@@ -2700,6 +2703,9 @@ function initDrainMode() {
   });
 }
 
+const DRAIN_MAX_WORKERS = 32;
+let drainGen = 0; // generation token — invalidates workers from a previous run
+
 function startDrain() {
   if (drainRunning) return;
   drainRunning = true;
@@ -2709,7 +2715,12 @@ function startDrain() {
   drainWindow.length = 0;
   drainStartMs  = Date.now();
   updateDrainUI();
-  drainLoop();
+  // Independent continuous workers — each fires its next request the moment
+  // the previous one completes. No batch barrier, so one slow (chaos-delayed)
+  // response no longer stalls the rest. Workers above the slider value park
+  // until the slider is raised, which keeps live adjustment working mid-run.
+  const gen = ++drainGen;
+  for (let i = 0; i < DRAIN_MAX_WORKERS; i++) drainWorkerLoop(i, gen);
 }
 
 function stopDrain() {
@@ -2717,27 +2728,36 @@ function stopDrain() {
   updateDrainUI();
 }
 
-async function drainLoop() {
-  while (drainRunning) {
-    let batchConsumed = 0;
-    const batch = Array.from({ length: drainWorkers }, (_, i) => {
-      const row = Math.floor(i / 8), col = i % 8;
-      return fetch(`/face/center?row=${row}&col=${col}`)
-        .then(r => {
-          if (r.status === 200)      { drainSuccess++; batchConsumed++; }
-          else if (r.status === 503) { drainEmpty++; } // queue empty — nothing consumed
-          else                       { drainFailed++; }
-        })
-        .catch(() => { drainFailed++; });
-    });
-    await Promise.allSettled(batch);
-    drainWindow.push({ ts: Date.now(), count: batchConsumed });
-    updateDrainUI();
-    // Idle pacing: an all-empty batch means the queue is dry — poll gently
-    // instead of hammering 503s. Full speed resumes on the next delivery.
-    if (drainRunning && batchConsumed === 0) {
-      await new Promise(r => setTimeout(r, 500));
+async function drainWorkerLoop(idx, gen) {
+  while (drainRunning && gen === drainGen) {
+    if (idx >= drainWorkers) {
+      await new Promise(r => setTimeout(r, 200)); // parked — slider is below our index
+      continue;
     }
+    const row = Math.floor(idx / 8), col = idx % 8;
+    let got200 = false, got503 = false;
+    try {
+      const r = await fetch(`/face/center?row=${row}&col=${col}`);
+      if (r.status === 200)      { drainSuccess++; got200 = true; }
+      else if (r.status === 503) { drainEmpty++; got503 = true; } // queue empty / unavailable
+      else                       { drainFailed++; }
+    } catch (_) { drainFailed++; }
+    drainWindow.push({ ts: Date.now(), count: got200 ? 1 : 0 });
+    scheduleDrainUI();
+    // Idle pacing per worker: on an empty queue poll gently instead of
+    // hammering 503s; delivery resumes at full speed on the next message.
+    if (drainRunning && got503) await new Promise(r => setTimeout(r, 500));
+  }
+}
+
+// Repaint at most 4×/s — with continuous workers the per-request updates
+// would otherwise thrash the DOM at hundreds of updates per second.
+let drainUiLast = 0;
+function scheduleDrainUI() {
+  const now = Date.now();
+  if (now - drainUiLast >= 250) {
+    drainUiLast = now;
+    updateDrainUI();
   }
 }
 
@@ -2747,12 +2767,13 @@ function updateDrainUI() {
   const active = document.getElementById('drain-workers-active');
   if (!btn) return;
 
+  const isPubsub = state.mode === 'pubsub';
   if (drainRunning) {
-    btn.textContent = '■ Stop Drain'; btn.className = 'drain-toggle-btn stop';
-    badge.textContent = 'Draining'; badge.className = 'drain-badge running';
+    btn.textContent = isPubsub ? '■ Stop Drain' : '■ Stop Load'; btn.className = 'drain-toggle-btn stop';
+    badge.textContent = isPubsub ? 'Draining' : 'Running'; badge.className = 'drain-badge running';
     active.textContent = `${drainWorkers} workers`;
   } else {
-    btn.textContent = '⚡ Start Drain'; btn.className = 'drain-toggle-btn start';
+    btn.textContent = isPubsub ? '⚡ Start Drain' : '⚡ Start Load'; btn.className = 'drain-toggle-btn start';
     badge.textContent = 'Stopped'; badge.className = 'drain-badge';
     active.textContent = '';
   }
@@ -2781,6 +2802,38 @@ function updateDrainUI() {
   } else {
     document.getElementById('drain-eta').textContent = qDepth === 0 ? '✓ Empty' : '–';
   }
+}
+
+// Classic mode has no queue, so the drain engine doubles as a plain load
+// generator — all queue-flavored wording and stats flip with the mode.
+function updateLiveViewModeUI() {
+  const isPubsub = state.mode === 'pubsub';
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+
+  const modeBtn = document.querySelector('.lv-mode-btn[data-lv-mode="drain"]');
+  if (modeBtn) modeBtn.textContent = isPubsub ? '⚡ Drain Mode' : '🔥 Load Mode';
+
+  set('drain-consumed-lbl', isPubsub ? 'consumed (200)' : 'success (200)');
+  set('drain-rate-lbl',     isPubsub ? 'msg / sec' : 'req / sec');
+  set('drain-empty-lbl',    isPubsub ? 'empty polls (503)' : 'unavailable (503)');
+
+  // Queue depth and drain ETA only exist against a queue
+  const queueCell = document.getElementById('drain-stat-queue');
+  const etaCell   = document.getElementById('drain-stat-eta');
+  if (queueCell) queueCell.style.display = isPubsub ? '' : 'none';
+  if (etaCell)   etaCell.style.display   = isPubsub ? '' : 'none';
+  const row1 = document.getElementById('drain-stats');
+  if (row1) row1.style.gridTemplateColumns = isPubsub ? 'repeat(4,1fr)' : 'repeat(2,1fr)';
+
+  const note = document.getElementById('drain-note');
+  if (note) {
+    note.textContent = isPubsub
+      ? 'Concurrent workers each pull the next message as soon as their previous request completes. Every 200 acknowledges one message from the queue — use this to drain the queue quickly without a full GUI session.'
+      : 'Concurrent workers hammer the face endpoint as fast as it responds — a lightweight load generator for driving high request rates without building a full load test.';
+  }
+
+  updateDrainUI(); // refresh badge / button wording
+  setLiveNote();
 }
 
 function isLightColor(hex) {

@@ -356,17 +356,17 @@
           <div class="drain-stats" id="drain-stats" style="grid-template-columns:repeat(4,1fr)">
             <div class="drain-stat">
               <div class="drain-stat-val" id="drain-consumed" style="color:var(--green)">0</div>
-              <div class="drain-stat-lbl">consumed (200)</div>
+              <div class="drain-stat-lbl" id="drain-consumed-lbl">consumed (200)</div>
             </div>
             <div class="drain-stat">
               <div class="drain-stat-val" id="drain-rate">–</div>
-              <div class="drain-stat-lbl">msg / sec</div>
+              <div class="drain-stat-lbl" id="drain-rate-lbl">msg / sec</div>
             </div>
-            <div class="drain-stat">
+            <div class="drain-stat" id="drain-stat-queue">
               <div class="drain-stat-val" id="drain-queue">–</div>
               <div class="drain-stat-lbl">queue depth</div>
             </div>
-            <div class="drain-stat">
+            <div class="drain-stat" id="drain-stat-eta">
               <div class="drain-stat-val" id="drain-eta">–</div>
               <div class="drain-stat-lbl">est. to empty</div>
             </div>
@@ -374,7 +374,7 @@
           <div class="drain-stats" style="grid-template-columns:repeat(4,1fr)">
             <div class="drain-stat">
               <div class="drain-stat-val" id="drain-empty" style="color:var(--yellow)">0</div>
-              <div class="drain-stat-lbl">empty polls (503)</div>
+              <div class="drain-stat-lbl" id="drain-empty-lbl">empty polls (503)</div>
             </div>
             <div class="drain-stat">
               <div class="drain-stat-val" id="drain-failed" style="color:var(--red)">0</div>
@@ -392,7 +392,7 @@
 
           <div class="drain-workers-section">
             <div class="drain-workers-header">
-              <span class="drain-workers-label">Concurrent workers</span>
+              <span class="drain-workers-label" data-tooltip="Browsers cap concurrent connections per origin (~6 on HTTP/1.1) — workers beyond that mostly queue inside the browser. Higher values help when the admin is served over HTTP/2.">Concurrent workers</span>
               <span id="drain-workers-val" class="drain-workers-count">4</span>
             </div>
             <input type="range" id="drain-workers-slider" class="ctrl-rate-slider"
@@ -403,7 +403,7 @@
           </div>
 
           <button class="drain-toggle-btn start" id="drain-toggle">&#x26A1; Start Drain</button>
-          <p class="drain-note">Fires N concurrent requests per batch with no delay between batches — maximum throughput. Each successful response acknowledges a message from the queue. Use this to quickly drain the queue without starting a full GUI session.</p>
+          <p class="drain-note" id="drain-note">Concurrent workers each pull the next message as soon as their previous request completes. Every 200 acknowledges one message from the queue — use this to drain the queue quickly without a full GUI session.</p>
         </div>
       </div>
 
