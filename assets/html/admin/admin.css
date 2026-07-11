@@ -1746,6 +1746,10 @@ main.lv-active #page-liveview.active {
 }
 .pod-pill-state .infra-state-emoji { font-size: 12px; line-height: 1; }
 .pod-pill-state .infra-state-img   { width: 12px; height: 12px; }
+/* Selected pills flip their text to var(--bg) for contrast — the rate label's
+   own accent color would be invisible on the accent background, so inherit. */
+.pod-pill.active .infra-state-rate,
+.pod-pill.active .infra-state-rate.infra-paused { color: inherit; }
 
 /* ── Classic mode request-chain fork diagram ─────────────────────────────── */
 .classic-chain {
