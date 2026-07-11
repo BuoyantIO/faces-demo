@@ -1289,21 +1289,46 @@ function drawCharts() {
     { data: h.map(p => p.queueDepth),   color: '#53d8fb' },
     { data: h.map(p => p.queued ?? p.pending), color: '#fbbf24' },
   ];
-  const ackedSeries = [
-    { data: h.map(p => p.acknowledged), color: '#4ade80' },
-  ];
+
+  // Delivery rate (msgs/s) — derivative of the cumulative acknowledged counter.
+  // The raw counter only ever creeps upward, which reads as a meaningless ramp;
+  // the per-second rate actually shows consumption starting, stopping, and
+  // draining. Negative deltas (DB purge/reset) clamp to 0, and a light
+  // 3-sample average smooths per-poll jitter.
+  const raw = [];
+  for (let i = 1; i < h.length; i++) {
+    const dt = (h[i].ts - h[i - 1].ts) / 1000;
+    const d  = h[i].acknowledged - h[i - 1].acknowledged;
+    raw.push(dt > 0 && d >= 0 ? d / dt : 0);
+  }
+  const rateData = [null]; // first history point has no delta
+  for (let i = 0; i < raw.length; i++) {
+    const win = raw.slice(Math.max(0, i - 2), i + 1);
+    rateData.push(win.reduce((s, v) => s + v, 0) / win.length);
+  }
+  const rateSeries = [{ data: rateData, color: '#4ade80' }];
+
   // Draw to both the Pipeline page and the Overview page canvases
   drawSparkline('chart-depth',          depthSeries);
-  drawSparkline('chart-acked',          ackedSeries);
+  drawSparkline('chart-acked',          rateSeries);
   drawSparkline('overview-chart-depth', depthSeries);
-  drawSparkline('overview-chart-acked', ackedSeries);
+  drawSparkline('overview-chart-acked', rateSeries);
+
+  // Live current values in the chart-card headers
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const depthNow = fmt(h.at(-1).queueDepth ?? 0);
+  const rateNow  = `${(rateData.at(-1) ?? 0).toFixed(1)}/s`;
+  setVal('depth-now', depthNow);
+  setVal('overview-depth-now', depthNow);
+  setVal('rate-now', rateNow);
+  setVal('overview-rate-now', rateNow);
 }
 
 function drawSparkline(id, series) {
   const canvas = document.getElementById(id);
   if (!canvas) return;
   const dpr = window.devicePixelRatio || 1;
-  const W = canvas.offsetWidth || 800, H = 80;
+  const W = canvas.offsetWidth || 800, H = canvas.offsetHeight || 80;
   canvas.width = W * dpr; canvas.height = H * dpr;
   const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);

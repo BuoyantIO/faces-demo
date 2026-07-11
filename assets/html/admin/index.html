@@ -166,18 +166,28 @@
           <div class="metrics-row" id="overview-metrics"></div>
         </div>
         <div class="page-section">
-          <h2>Queue Depth</h2>
-          <canvas id="overview-chart-depth" class="sparkline" width="1000" height="80"></canvas>
-          <div class="chart-legend" style="margin-top:6px">
-            <div class="legend-item"><div class="legend-swatch" style="background:#53d8fb"></div>Queue depth</div>
-            <div class="legend-item"><div class="legend-swatch" style="background:#fbbf24"></div>DB pending</div>
-          </div>
-        </div>
-        <div class="page-section">
-          <h2>Acknowledged (Cumulative)</h2>
-          <canvas id="overview-chart-acked" class="sparkline" width="1000" height="80"></canvas>
-          <div class="chart-legend" style="margin-top:6px">
-            <div class="legend-item"><div class="legend-swatch" style="background:#4ade80"></div>Total acknowledged</div>
+          <div class="chart-grid">
+            <div class="chart-card">
+              <div class="chart-card-head">
+                <span class="chart-card-title">Queue Depth</span>
+                <span class="chart-card-value" id="overview-depth-now">–</span>
+              </div>
+              <canvas id="overview-chart-depth" class="sparkline"></canvas>
+              <div class="chart-legend">
+                <div class="legend-item"><div class="legend-swatch" style="background:#53d8fb"></div>Queue depth</div>
+                <div class="legend-item"><div class="legend-swatch" style="background:#fbbf24"></div>DB queued</div>
+              </div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-card-head">
+                <span class="chart-card-title">Delivery Rate</span>
+                <span class="chart-card-value" id="overview-rate-now">–</span>
+              </div>
+              <canvas id="overview-chart-acked" class="sparkline"></canvas>
+              <div class="chart-legend">
+                <div class="legend-item"><div class="legend-swatch" style="background:#4ade80"></div>Messages delivered to the GUI per second</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -219,18 +229,28 @@
         <div class="metrics-row" id="pipeline-metrics"></div>
       </div>
       <div class="page-section">
-        <h2>Queue Depth</h2>
-        <canvas id="chart-depth" class="sparkline" width="1000" height="80"></canvas>
-        <div class="chart-legend">
-          <div class="legend-item"><div class="legend-swatch" style="background:#53d8fb"></div>Queue depth</div>
-          <div class="legend-item"><div class="legend-swatch" style="background:#fbbf24"></div>DB pending</div>
-        </div>
-      </div>
-      <div class="page-section">
-        <h2>Acknowledged (Cumulative)</h2>
-        <canvas id="chart-acked" class="sparkline" width="1000" height="80"></canvas>
-        <div class="chart-legend">
-          <div class="legend-item"><div class="legend-swatch" style="background:#4ade80"></div>Total acknowledged</div>
+        <div class="chart-grid">
+          <div class="chart-card">
+            <div class="chart-card-head">
+              <span class="chart-card-title">Queue Depth</span>
+              <span class="chart-card-value" id="depth-now">–</span>
+            </div>
+            <canvas id="chart-depth" class="sparkline"></canvas>
+            <div class="chart-legend">
+              <div class="legend-item"><div class="legend-swatch" style="background:#53d8fb"></div>Queue depth</div>
+              <div class="legend-item"><div class="legend-swatch" style="background:#fbbf24"></div>DB queued</div>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-head">
+              <span class="chart-card-title">Delivery Rate</span>
+              <span class="chart-card-value" id="rate-now">–</span>
+            </div>
+            <canvas id="chart-acked" class="sparkline"></canvas>
+            <div class="chart-legend">
+              <div class="legend-item"><div class="legend-swatch" style="background:#4ade80"></div>Messages delivered to the GUI per second</div>
+            </div>
+          </div>
         </div>
       </div>
       <div id="pipeline-unavailable" class="error-text mt16" style="display:none">

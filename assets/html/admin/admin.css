@@ -455,6 +455,40 @@ main {
 .legend-item  { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-muted); }
 .legend-swatch { width: 12px; height: 3px; border-radius: 2px; }
 
+/* Trend chart cards — compact side-by-side graphs matching the metric-card look */
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+}
+.chart-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px 8px;
+}
+.chart-card-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 6px;
+}
+.chart-card-title {
+  font-size: 11px; font-weight: 600;
+  letter-spacing: .5px; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.chart-card-value {
+  font-size: 18px; font-weight: 700; line-height: 1;
+  color: var(--accent2);
+  font-variant-numeric: tabular-nums;
+  font-family: monospace;
+}
+.chart-card .sparkline {
+  height: 56px;
+  border: none; border-radius: 0;
+  background: transparent;
+  margin-bottom: 6px;
+}
+
 /* ── Flow controls ───────────────────────────────────────────────────────── */
 .flow-controls { display: flex; flex-direction: column; gap: 12px; }
 
