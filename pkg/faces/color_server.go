@@ -146,7 +146,7 @@ func (srv *colorServer) UpdateChaos(_ context.Context, req *color.ChaosState) (*
 	for i, v := range req.DelayBuckets {
 		buckets[i] = int(v)
 	}
-	bp.delayBuckets = buckets
+	bp.delayBuckets = sanitizeDelayBuckets(buckets)
 	if req.ForceUnlatch {
 		bp.latched = false
 	}

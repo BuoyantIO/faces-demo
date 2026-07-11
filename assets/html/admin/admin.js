@@ -430,7 +430,6 @@ function renderEmojiSearchResults(emojis) {
       btn.classList.add('selected');
       document.getElementById('custom-emoji-input').value = '';
       state.selectedSmiley = emoji;
-      state.selectedSmileyLabel = null;
       updateControlsPreview();
     });
     grid.appendChild(btn);
@@ -473,7 +472,6 @@ const state = {
   lastConfig:     null,   // cached config for the poll indicator tooltip
   history:        [],
   selectedSmiley: null,
-  selectedSmileyLabel: null, // friendly name for custom-image values (e.g. "Party Linky")
   selectedColor:  null,
   selectedColorHex: null,
   applyTarget:    'all',
@@ -1365,12 +1363,15 @@ function renderConfig(cfg) {
   updateModeToggleButtons(cfg.faceMode);
 
   const rows = [
-    ['Face Mode', cfg.faceMode], ['Queue Backend', cfg.queueBackend],
-    ['Max Queue Depth', cfg.maxDepth], ['Smiley Service', cfg.smileyURL],
+    ['Face Mode', cfg.faceMode], ['Smiley Service', cfg.smileyURL],
     ['Color Service', cfg.colorURL], ['GUI Service', cfg.guiURL], ['Face Service', cfg.faceURL],
   ];
   if (cfg.faceMode === 'pubsub') {
-    rows.push(['Publisher', cfg.publisherURL], ['Subscriber', cfg.subscriberURL]);
+    // Queue/publisher/subscriber rows only exist in the pub/sub pipeline
+    rows.push(
+      ['Queue Backend', cfg.queueBackend], ['Max Queue Depth', cfg.maxDepth],
+      ['Publisher', cfg.publisherURL], ['Subscriber', cfg.subscriberURL],
+    );
   }
   document.getElementById('config-tbody').innerHTML = rows
     .map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(String(v ?? '–'))}</td></tr>`)
@@ -1759,7 +1760,6 @@ async function initSmileyPicker() {
     const raw = ci.value.trim(); if (!raw) return;
     clearEmojiGridSelection();
     state.selectedSmiley = raw;
-    state.selectedSmileyLabel = null;
     updateControlsPreview();
   });
 }
@@ -1782,7 +1782,7 @@ function renderEmojiGrid(catIdx, cats) {
     for (const filename of cat.linkyFiles) {
       const btn = document.createElement('button');
       btn.className = 'emoji-pick-btn linky-pick-btn';
-      btn.title = filename.replace(/\.[^.]+$/, '').replace(/_/g, ' ');
+      btn.title = linkyLabel(filename);
       const img = document.createElement('img');
       img.src = '/linkys/' + filename;
       img.alt = btn.title;
@@ -1796,7 +1796,6 @@ function renderEmojiGrid(catIdx, cats) {
         try {
           const smileyValue = await linkyToSmileyValue(filename);
           state.selectedSmiley = smileyValue;
-          state.selectedSmileyLabel = btn.title; // filename-derived, e.g. "Party Linky"
           // Restore the img after encoding
           btn.textContent = '';
           btn.appendChild(img);
@@ -1822,7 +1821,6 @@ function renderEmojiGrid(catIdx, cats) {
         btn.classList.add('selected');
         document.getElementById('custom-emoji-input').value = '';
         state.selectedSmiley = emoji;
-        state.selectedSmileyLabel = null;
         updateControlsPreview();
       });
       grid.appendChild(btn);
@@ -1830,9 +1828,16 @@ function renderEmojiGrid(catIdx, cats) {
   }
 }
 
+// Friendly display name for a linky file: "Party_Linky.gif" → "Party Linky"
+function linkyLabel(filename) {
+  return filename.replace(/\.[^.]+$/, '').replace(/_/g, ' ');
+}
+
 // Convert a Linky image file to an <img src="data:..."> smiley value.
 // PNGs are canvas-resized to 96×96 to keep payload small.
 // GIFs are encoded raw (preserves animation).
+// The friendly name rides along in alt/title so every consumer — admin pill
+// tooltips, the faces GUI — can show which linky this is after the round trip.
 async function linkyToSmileyValue(filename) {
   const url = '/linkys/' + filename;
   const isGif = filename.toLowerCase().endsWith('.gif');
@@ -1873,7 +1878,8 @@ async function linkyToSmileyValue(filename) {
   // Use explicit pixel dimensions — the faces-gui cell-smiley is an inline <span>
   // and percentage sizing (width:100%;height:100%) resolves to 0×0 on inline elements.
   // 90px fits comfortably inside the 120px cell without overflow.
-  return `<img src="${dataUri}" width="90" height="90" alt="" style="vertical-align:middle;border-radius:4px">`;
+  const label = esc(linkyLabel(filename));
+  return `<img src="${dataUri}" width="90" height="90" alt="${label}" title="${label}" style="vertical-align:middle;border-radius:4px">`;
 }
 
 function clearEmojiGridSelection() {
@@ -1968,6 +1974,16 @@ function smileyImgSrc(value) {
   return src && src.startsWith('data:image/') ? src : null;
 }
 
+// Friendly name embedded in an "<img …>" smiley value's alt attribute
+// (written by linkyToSmileyValue). Null when absent or not an image value.
+function smileyImgLabel(value) {
+  if (!value || !value.startsWith('<')) return null;
+  const t = document.createElement('template');
+  t.innerHTML = value;
+  const img = t.content.querySelector('img');
+  return (img && img.getAttribute('alt')) || null;
+}
+
 // Build a small serving-status row to embed in each pod card
 function servingStatusEl(serving, service) {
   const el = document.createElement('div');
@@ -1989,6 +2005,9 @@ function servingStatusEl(serving, service) {
         img.alt = '';
         img.className = 'pod-serving-img';
         s.appendChild(img);
+        // Tooltip carries the linky's name (from the value's alt attribute)
+        const name = smileyImgLabel(entity);
+        if (name) label = label ? `${name} (${label})` : name;
       } else {
         const glyph = entity.startsWith('<') ? '' : decodeEntity(entity);
         s.textContent = glyph || '?';
@@ -2258,7 +2277,7 @@ function updateControlsPreview() {
   const parts = [];
   if (hasEmoji) {
     parts.push(state.selectedSmiley.startsWith('<')
-      ? (state.selectedSmileyLabel || 'custom image')
+      ? (smileyImgLabel(state.selectedSmiley) || 'custom image')
       : state.selectedSmiley);
   }
   if (hasColor) parts.push(state.selectedColorHex);
@@ -2268,10 +2287,9 @@ function updateControlsPreview() {
 }
 
 function clearControls() {
-  state.selectedSmiley      = null;
-  state.selectedSmileyLabel = null;
-  state.selectedColor       = null;
-  state.selectedColorHex    = null;
+  state.selectedSmiley    = null;
+  state.selectedColor     = null;
+  state.selectedColorHex  = null;
   // Deselect any highlighted emoji/color swatch buttons
   document.querySelectorAll('.emoji-pick-btn.selected').forEach(b => b.classList.remove('selected'));
   document.querySelectorAll('.color-swatch-btn.selected').forEach(b => b.classList.remove('selected'));
@@ -3113,7 +3131,7 @@ function infraPodTip(pod, svc) {
   // differ, both are shown labeled. Color shows ONLY swatch(es) — injected by the tooltip
   // renderer from data-pod-color / data-pod-color-edge; the hex value is omitted.
   if (svc === 'smiley' && pod.smiley) {
-    const tipGlyph = v => smileyImgSrc(v) ? 'custom image' : decodeEntity(v);
+    const tipGlyph = v => smileyImgSrc(v) ? (smileyImgLabel(v) || 'custom image') : decodeEntity(v);
     if (pod.smileyEdge) {
       lines.push(`Center: ${tipGlyph(pod.smiley)}`);
       lines.push(`Edge: ${tipGlyph(pod.smileyEdge)}`);
@@ -3144,7 +3162,8 @@ function infraPodTip(pod, svc) {
   if (cs) {
     const faults = [];
     if (cs.errorFraction > 0) faults.push(`  • Errors: ${cs.errorFraction}%`);
-    if (cs.delayBuckets && cs.delayBuckets.length) faults.push(`  • Delay: ${cs.delayBuckets.join(', ')} ms`);
+    const tipDelays = (cs.delayBuckets || []).filter(ms => ms > 0);
+    if (tipDelays.length) faults.push(`  • Delay: ${tipDelays.join(', ')} ms`);
     if (cs.maxRate > 0) faults.push(`  • Max rate: ${cs.maxRate} RPS`);
     if (cs.latchFraction > 0) faults.push(`  • Latch chance: ${cs.latchFraction}%`);
     if (cs.latched) faults.push(`  • Latched into 599 (active)`);
@@ -3504,7 +3523,11 @@ async function applyChaos(card, svc) {
   const db = card.querySelector('[data-field="delayBuckets"]');
   if (db) {
     const raw = db.value.trim();
-    body.delayBuckets = raw ? raw.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n)) : [];
+    // Zeros are only meaningful alongside real delays ("0,500" = half the
+    // requests undelayed); a zeros-only list is just "no delay" and would
+    // paint a phantom ⏱ badge, so it's sent as empty.
+    const nums = raw ? raw.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n >= 0) : [];
+    body.delayBuckets = nums.some(n => n > 0) ? nums : [];
   }
   const mr = card.querySelector('[data-field="maxRate"]');
   if (mr && mr.value !== '') body.maxRate = parseFloat(mr.value);
@@ -4028,7 +4051,9 @@ function fiPodFaultBadges(baseSvc, chaos, pod) {
   }
   const badges = [];
   if (cs.errorFraction > 0) badges.push(`<span class="fi-fault-badge err" title="${cs.errorFraction}% errors">E ${cs.errorFraction}%</span>`);
-  if (cs.delayBuckets && cs.delayBuckets.length) badges.push(`<span class="fi-fault-badge delay" title="delays: ${cs.delayBuckets.join(', ')}ms">⏱</span>`);
+  // Only real delays — a stored 0ms bucket is a no-op, not a fault
+  const delays = (cs.delayBuckets || []).filter(ms => ms > 0);
+  if (delays.length) badges.push(`<span class="fi-fault-badge delay" title="delays: ${delays.join(', ')}ms">⏱</span>`);
   if (cs.maxRate > 0) badges.push(`<span class="fi-fault-badge rate" title="max ${cs.maxRate} RPS">🚦${cs.maxRate}</span>`);
   if (cs.latched)     badges.push(`<span class="fi-fault-badge latch" title="latched into 599">🔒</span>`);
   // No active faults — show the actual serving value (emoji or colour swatch) from infra data.
@@ -4391,7 +4416,9 @@ function renderFaultInjection(chaos, mode) {
 
   svcs.forEach(svc => {
     let card = container.querySelector(`.fi-card[data-svc="${svc}"]`);
-    const st = chaos[svc] || { available: false };
+    // Sliders mirror the selected pod's actual state when pods are selected;
+    // null = selected pod unknown (infra poll hasn't caught up) → don't clobber.
+    const st = fiCardSourceState(svc, chaos) || { ...(chaos[svc] || { available: false }), _noSliderSync: true };
 
     if (!card) {
       card = document.createElement('div');
@@ -4496,15 +4523,22 @@ function buildFICardHTML(svc, mode) {
 }
 
 function wireFICard(card, svc) {
-  // Sliders
+  // Sliders — any user edit marks the card dirty so the poll doesn't clobber
+  // the composed values before Apply (cleared on Apply/Reset success).
   card.querySelectorAll('.fi-slider').forEach(slider => {
     const field = slider.dataset.field;
-    slider.addEventListener('input', () => updateFISliderVal(card, svc, field, slider.value));
+    slider.addEventListener('input', () => {
+      card.dataset.fiDirty = '1';
+      updateFISliderVal(card, svc, field, slider.value);
+    });
   });
 
   // Delay bubbles — toggle selection
   card.querySelectorAll('.fi-delay-bubble').forEach(btn => {
-    btn.addEventListener('click', () => btn.classList.toggle('active'));
+    btn.addEventListener('click', () => {
+      card.dataset.fiDirty = '1';
+      btn.classList.toggle('active');
+    });
   });
 
   // Buttons
@@ -4532,8 +4566,10 @@ function updateFICard(card, svc, state) {
     card.querySelector('.fi-card-status').textContent = '⚠ ' + state.error;
   }
 
+  // Never clobber the sliders while the user has unapplied edits (dirty), while
+  // a control is focused, or when the source state is unknown (_noSliderSync).
   const focused = card.querySelector(':focus');
-  if (!focused) {
+  if (!focused && card.dataset.fiDirty !== '1' && !state._noSliderSync) {
     const setSliderFI = (field, val) => {
       const s = card.querySelector(`[data-field="${field}"]`);
       if (s && document.activeElement !== s) {
@@ -4557,19 +4593,38 @@ function updateFICard(card, svc, state) {
   card.querySelector('.fi-unlatch-btn').style.display      = isLatched ? '' : 'none';
 }
 
-// Serving-state indicator (emoji / colour swatch) for a pod IP, looked up from the
-// cached infra payload — lets the FI pod selector show which pod is which at a glance.
-function fiPodServingHTML(baseSvc, ip) {
+// Find a pod by IP anywhere in the cached infra payload (any zone, any service).
+function fiFindInfraPod(ip) {
   const infra = state.lastInfra;
-  if (!infra || !infra.zones) return '';
+  if (!infra || !infra.zones) return null;
   for (const z of infra.zones) {
     for (const pods of Object.values(z.pods || {})) {
       for (const p of pods) {
-        if ((p.ip || p.IP) === ip) return infraPodStateEl(p, baseSvc);
+        if ((p.ip || p.IP) === ip) return p;
       }
     }
   }
-  return '';
+  return null;
+}
+
+// Serving-state indicator (emoji / colour swatch) for a pod IP, looked up from the
+// cached infra payload — lets the FI pod selector show which pod is which at a glance.
+function fiPodServingHTML(baseSvc, ip) {
+  const p = fiFindInfraPod(ip);
+  return p ? infraPodStateEl(p, baseSvc) : '';
+}
+
+// The chaos state an FI card should display: the FIRST selected pod's per-pod
+// chaos when pods are selected (the service VIP aggregate would show some other
+// pod's state), else the service aggregate. Returns null when the selected
+// pod's state is unknown — callers must then leave the sliders alone.
+function fiCardSourceState(svc, chaos) {
+  const sel = fiSelectedPods[svc] || [];
+  if (sel.length > 0) {
+    const pod = fiFindInfraPod(sel[0]);
+    return (pod && pod.chaos) ? { ...pod.chaos, available: true } : null;
+  }
+  return chaos[svc] || { available: false };
 }
 
 // Re-render FI pod-selector pills when their serving glyphs first arrive or change.
@@ -4625,6 +4680,14 @@ function renderFIPodSelector(card, svc, pods) {
       if (idx === -1) fiSelectedPods[svc].push(ip);
       else            fiSelectedPods[svc].splice(idx, 1);
       btn.classList.toggle('active', fiSelectedPods[svc].includes(ip));
+      // Selection changed — immediately show the (now) targeted pod's actual
+      // chaos state instead of waiting for the next poll. Fresh context, so any
+      // unapplied edits are discarded on purpose.
+      const st = fiCardSourceState(svc, state.lastChaos || {});
+      if (st) {
+        delete card.dataset.fiDirty;
+        updateFICard(card, svc, st);
+      }
     });
   });
 }
@@ -4652,6 +4715,8 @@ async function applyFIChaos(card, svc) {
     const r = await fetch(`/api/chaos/${svc}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const d = await r.json();
     if (r.ok) {
+      fiCacheAppliedChaos(svc, sel, body); // sliders survive polls until infra refetch lands
+      delete card.dataset.fiDirty;
       refreshFITopologyBadges();  // refetch infra so per-pod badges reflect this card apply
       const ps = chaosPodStatus(d);
       statusEl.textContent = ps.text;
@@ -4668,6 +4733,31 @@ async function applyFIChaos(card, svc) {
   finally { btn.disabled = false; }
 }
 
+// Optimistically fold a just-applied chaos body into the cached per-pod state
+// (state.lastInfra) and the service aggregate (state.lastChaos). Without this,
+// poll ticks that land between the apply and the infra refetch would repaint
+// the card's sliders with the pre-apply values.
+function fiCacheAppliedChaos(svc, selectedIPs, body) {
+  // Mirror the services' bucket sanitization: zeros survive only in mixed lists
+  const buckets = (body.delayBuckets || []).filter(ms => ms >= 0);
+  const applied = {
+    errorFraction: body.errorFraction ?? 0,
+    latchFraction: body.latchFraction ?? 0,
+    maxRate:       body.maxRate ?? 0,
+    delayBuckets:  buckets.some(ms => ms > 0) ? buckets : [],
+    available:     true,
+  };
+  if (body.forceUnlatch) applied.latched = false;
+  const ips = selectedIPs.length ? selectedIPs : (fiPodCache[svc] || []).map(p => p.ip || p.IP || '');
+  ips.forEach(ip => {
+    const p = fiFindInfraPod(ip);
+    if (p) p.chaos = { ...(p.chaos || {}), ...applied };
+  });
+  if (!selectedIPs.length && state.lastChaos && state.lastChaos[svc]) {
+    state.lastChaos[svc] = { ...state.lastChaos[svc], ...applied };
+  }
+}
+
 async function resetFIChaos(card, svc) {
   const body = { errorFraction: 0, latchFraction: 0, delayBuckets: [], maxRate: 0, forceUnlatch: true };
   const sel = fiSelectedPods[svc] || [];
@@ -4678,6 +4768,8 @@ async function resetFIChaos(card, svc) {
     const r = await fetch(`/api/chaos/${svc}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const d = await r.json();
     if (r.ok) {
+      fiCacheAppliedChaos(svc, sel, body);
+      delete card.dataset.fiDirty;
       refreshFITopologyBadges();  // refetch infra so per-pod badges reflect this card reset
       const ps = chaosPodStatus(d);
       statusEl.textContent = ps.text.replace('Applied', 'Reset');

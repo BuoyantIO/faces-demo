@@ -259,17 +259,13 @@ func (bprv *BaseProvider) SetupFromEnvironment() {
 	delayBucketsStr := utils.StringFromEnv("DELAY_BUCKETS", "")
 
 	if delayBucketsStr != "" {
-		delayBuckets := strings.Split(delayBucketsStr, ",")
-		for _, bucketStr := range delayBuckets {
+		for _, bucketStr := range strings.Split(delayBucketsStr, ",") {
 			bucket, err := strconv.Atoi(bucketStr)
 			if err == nil {
-				if bucket < 0 {
-					bucket = 0
-				}
-
 				bprv.delayBuckets = append(bprv.delayBuckets, bucket)
 			}
 		}
+		bprv.delayBuckets = sanitizeDelayBuckets(bprv.delayBuckets)
 	}
 
 	bprv.errorFraction = utils.PercentageFromEnv("ERROR_FRACTION", 0)
@@ -422,6 +418,29 @@ func (bprv *BaseProvider) SetErrorFraction(fraction int) {
 	bprv.errorFraction = fraction
 }
 
+// sanitizeDelayBuckets drops negative entries and clears lists that contain no
+// positive delay. Zero entries are KEPT when mixed with real delays — a list
+// like "0,50,500" means a third of requests skip the delay, which is documented
+// behavior. A list of ONLY zeros is functionally "no delay" and would just make
+// the admin UI paint a phantom delay badge on a healthy pod, so it becomes empty.
+func sanitizeDelayBuckets(buckets []int) []int {
+	out := make([]int, 0, len(buckets))
+	hasPositive := false
+	for _, b := range buckets {
+		if b < 0 {
+			continue
+		}
+		if b > 0 {
+			hasPositive = true
+		}
+		out = append(out, b)
+	}
+	if !hasPositive {
+		return []int{}
+	}
+	return out
+}
+
 // RegisterChaosRoutes mounts /chaos on the given server.
 // GET /chaos returns the current chaos parameters.
 // PUT /chaos updates any subset of them at runtime without a pod restart.
@@ -490,7 +509,7 @@ func (bprv *BaseProvider) handleChaos(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if body.DelayBuckets != nil {
-			bprv.delayBuckets = body.DelayBuckets
+			bprv.delayBuckets = sanitizeDelayBuckets(body.DelayBuckets)
 		}
 		if body.ForceUnlatch {
 			bprv.latched = false
