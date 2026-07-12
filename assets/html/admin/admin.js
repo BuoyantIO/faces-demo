@@ -2456,20 +2456,29 @@ function initGridPicker() {
     info.textContent = `${cols} × ${rows}`;
   }
 
+  // Resolve the hovered cell from the cursor position. The 1px gaps between
+  // cells are dead zones for e.target.closest() — landing on one would freeze
+  // the highlight mid-sweep — so compute row/col geometrically instead.
+  const STRIDE = PICKER_CELL + 1; // cell + 1px gap
+  function cellAt(clientX, clientY) {
+    const r = gpGrid.getBoundingClientRect();
+    const col = Math.min(PICKER_MAX, Math.max(1, Math.ceil((clientX - r.left) / STRIDE)));
+    const row = Math.min(PICKER_MAX, Math.max(1, Math.ceil((clientY - r.top) / STRIDE)));
+    return { row, col };
+  }
+
   gpGrid.addEventListener('mousemove', e => {
-    const cell = e.target.closest('.gp-cell');
-    if (cell) highlight(Number(cell.dataset.row), Number(cell.dataset.col));
+    const { row, col } = cellAt(e.clientX, e.clientY);
+    highlight(row, col);
   });
 
   gpGrid.addEventListener('mouseleave', () => highlight(liveRows, liveCols));
 
   gpGrid.addEventListener('click', e => {
-    const cell = e.target.closest('.gp-cell');
-    if (!cell) return;
-    const newRows = Number(cell.dataset.row);
-    const newCols = Number(cell.dataset.col);
+    // Geometry-based like mousemove, so clicking a gap still selects a size.
+    const { row, col } = cellAt(e.clientX, e.clientY);
     const was = liveRunning; if (was) stopLive();
-    buildLiveGrid(newRows, newCols);
+    buildLiveGrid(row, col);
     if (was) startLive();
     popup.hidden = true;
   });

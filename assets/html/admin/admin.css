@@ -783,7 +783,15 @@ main {
 .lv-section-active { display: flex; }
 
 /* When live view page is active, main doesn't scroll and the page fills it */
-main.lv-active { overflow: hidden; }
+/* Live view fills the viewport instead of scrolling the page. main must be a
+   flex column here — otherwise #page-liveview's flex:1 has no flex parent to
+   resolve against, it grows to content height, and the grid (sized to that
+   runaway height) never shrinks to fit the screen. */
+main.lv-active {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
 main.lv-active #page-liveview.active {
   display: flex;
   flex-direction: column;
@@ -792,14 +800,18 @@ main.lv-active #page-liveview.active {
   overflow: hidden;
 }
 
-/* Wrapper that fills remaining height after toolbar and centres the grid */
+/* Wrapper that fills remaining height after toolbar and centres the grid.
+   overflow:auto + safe centring: the grid is normally sized to fit, but on a
+   viewport too short even for min-size cells it scrolls instead of clipping.
+   "safe" keeps centring until content overflows, then pins to start so the
+   top-left stays reachable (plain centre would cut it off with no scroll). */
 .live-grid-wrap {
   flex: 1;
   min-height: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
+  align-items: safe center;
+  justify-content: safe center;
+  overflow: auto;
 }
 
 .live-toolbar {
