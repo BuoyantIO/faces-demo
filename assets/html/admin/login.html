@@ -307,8 +307,32 @@
       repaintMasked(caret);
     });
 
-    // When shown, the field is normal cleartext — mirror it straight into realPw.
-    pwInput.addEventListener('input', () => { if (pwShown) realPw = pwInput.value; });
+    // Reconcile any value change that did NOT come through our beforeinput
+    // handler — password managers ignore autocomplete="off" and force-fill the
+    // field directly (firing only `input`). Without this, autofilled cleartext
+    // would sit visible while the toggle claims "hidden", and realPw would go
+    // stale. Map each 🙈 glyph back to its original character (in order),
+    // treat everything else as literal new input, then re-mask immediately.
+    function reconcileForeignValue() {
+      const val = pwInput.value;
+      if (val === MASK.repeat(realPw.length)) return; // consistent — nothing foreign
+      const oldChars = [...realPw];
+      let rebuilt = '', mi = 0;
+      for (const glyph of val) {
+        if (glyph === MASK) { rebuilt += oldChars[mi] ?? ''; mi++; }
+        else rebuilt += glyph;
+      }
+      realPw = rebuilt;
+      repaintMasked(realPw.length);
+    }
+
+    // When shown, the field is normal cleartext — mirror it straight into
+    // realPw. When hidden, any input event that reaches us bypassed
+    // beforeinput (autofill/extension), so reconcile and re-mask.
+    pwInput.addEventListener('input', () => {
+      if (pwShown) { realPw = pwInput.value; return; }
+      reconcileForeignValue();
+    });
 
     function setPwShown(show) {
       pwShown = show;
@@ -328,6 +352,8 @@
     let failCount = 0;
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
+      // Catch autofills that set the value without firing any event
+      if (!pwShown) reconcileForeignValue();
       const btn = document.getElementById('submit-btn');
       const errorEl = document.getElementById('login-error');
       btn.disabled = true;
