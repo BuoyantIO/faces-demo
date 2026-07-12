@@ -109,6 +109,36 @@
     .login-input:focus { border-color: var(--accent2); }
     .login-input::placeholder { color: var(--text-muted); }
 
+    /* Password field: reveal toggle sits inside the input */
+    .login-input-wrap { position: relative; }
+    .login-input.has-toggle { padding-right: 46px; }
+    .login-pw-toggle {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 20px;
+      line-height: 1;
+      padding: 5px 6px;
+      border-radius: 7px;
+      transition: background .15s, transform .1s;
+    }
+    .login-pw-toggle:hover  { background: rgba(255,255,255,.07); }
+    [data-theme="light"] .login-pw-toggle:hover { background: rgba(0,0,0,.05); }
+    .login-pw-toggle:active { transform: translateY(-50%) scale(.9); }
+
+    /* Gentle hint shown after repeated wrong passwords */
+    .login-hint {
+      margin-top: 8px;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      display: none;
+    }
+    .login-hint.visible { display: block; }
+
     .login-remember {
       display: flex;
       align-items: center;
@@ -186,8 +216,13 @@
       </div>
       <div class="login-field">
         <label class="login-label" for="password">Password</label>
-        <input class="login-input" id="password" name="password" type="password"
-               autocomplete="current-password" required>
+        <div class="login-input-wrap">
+          <input class="login-input has-toggle" id="password" name="password" type="text"
+                 autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+          <button class="login-pw-toggle" type="button" id="pw-toggle"
+                  aria-label="Show password" aria-pressed="false" title="Show password">🙈</button>
+        </div>
+        <div class="login-hint" id="pw-hint">👀 Revealed so you can double-check it.</div>
       </div>
       <label class="login-remember">
         <input type="checkbox" id="remember-me">
@@ -222,6 +257,75 @@
       applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
     });
 
+    // ── Faces-themed password field ──────────────────────────────────────────
+    // The real value lives in `realPw`; when hidden the field displays 🙈 per
+    // character (the native dot can't be an emoji). When shown it's cleartext.
+    const pwInput  = document.getElementById('password');
+    const pwToggle = document.getElementById('pw-toggle');
+    const pwHint   = document.getElementById('pw-hint');
+    const MASK = '🙈'; // 2 UTF-16 units — every caret offset in the masked field is even
+    let realPw = '';
+    let pwShown = false;
+
+    function repaintMasked(caretChars) {
+      pwInput.value = MASK.repeat(realPw.length);
+      const off = caretChars * 2;
+      pwInput.setSelectionRange(off, off);
+    }
+
+    // While hidden we own the model: intercept edits before they land, update
+    // realPw using the caret (charIndex = offset / 2), then repaint the mask.
+    pwInput.addEventListener('beforeinput', (e) => {
+      if (pwShown) return; // shown = plain text field; the input handler syncs realPw
+      const start = Math.round(pwInput.selectionStart / 2);
+      const end   = Math.round(pwInput.selectionEnd   / 2);
+      const t = e.inputType;
+      let caret = start;
+      if (t === 'insertText' || t === 'insertReplacementText' || t === 'insertCompositionText') {
+        const ins = e.data || '';
+        realPw = realPw.slice(0, start) + ins + realPw.slice(end);
+        caret = start + ins.length;
+      } else if (t === 'insertFromPaste' || t === 'insertFromDrop') {
+        const ins = (e.dataTransfer && e.dataTransfer.getData('text')) || e.data || '';
+        realPw = realPw.slice(0, start) + ins + realPw.slice(end);
+        caret = start + ins.length;
+      } else if (t.startsWith('delete')) {
+        if (start !== end) {                       // a selection was highlighted
+          realPw = realPw.slice(0, start) + realPw.slice(end);
+          caret = start;
+        } else if (t.includes('Forward')) {        // Delete key
+          realPw = realPw.slice(0, start) + realPw.slice(start + 1);
+          caret = start;
+        } else if (start > 0) {                     // Backspace
+          realPw = realPw.slice(0, start - 1) + realPw.slice(start);
+          caret = start - 1;
+        }
+      } else {
+        return; // unknown edit type — let the browser handle it
+      }
+      e.preventDefault();
+      repaintMasked(caret);
+    });
+
+    // When shown, the field is normal cleartext — mirror it straight into realPw.
+    pwInput.addEventListener('input', () => { if (pwShown) realPw = pwInput.value; });
+
+    function setPwShown(show) {
+      pwShown = show;
+      pwInput.value = show ? realPw : MASK.repeat(realPw.length);
+      pwToggle.textContent = show ? '🐵' : '🙈';
+      pwToggle.setAttribute('aria-pressed', String(show));
+      const lbl = show ? 'Hide password' : 'Show password';
+      pwToggle.setAttribute('aria-label', lbl);
+      pwToggle.title = lbl;
+      pwInput.focus();
+      const off = show ? realPw.length : realPw.length * 2;
+      pwInput.setSelectionRange(off, off);
+    }
+
+    pwToggle.addEventListener('click', () => setPwShown(!pwShown));
+
+    let failCount = 0;
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = document.getElementById('submit-btn');
@@ -236,7 +340,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             username:   document.getElementById('username').value,
-            password:   document.getElementById('password').value,
+            password:   realPw,
             rememberMe: document.getElementById('remember-me').checked,
           }),
         });
@@ -250,7 +354,15 @@
           errorEl.classList.add('visible');
           btn.disabled = false;
           btn.textContent = 'Sign In';
-          document.getElementById('password').focus();
+          // After repeated wrong passwords, uncover the monkey's eyes so the
+          // user can see exactly what they're typing.
+          failCount++;
+          if (failCount >= 2 && !pwShown) {
+            setPwShown(true);
+            pwHint.classList.add('visible');
+          } else {
+            pwInput.focus();
+          }
         }
       } catch {
         errorEl.textContent = 'Could not reach the server. Please try again.';
