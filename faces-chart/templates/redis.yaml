@@ -1,0 +1,76 @@
+{{- if not .Values.adminOnly }}
+{{- if and (eq (.Values.faceMode | default "classic") "pubsub") (eq (.Values.queueBackend | default "rabbitmq") "redis") -}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: redis
+spec:
+  type: ClusterIP
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: redis
+  ports:
+  - port: 6379
+    name: redis
+    targetPort: redis
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      buoyant.io/application: faces
+      faces.buoyant.io/component: redis
+  template:
+    metadata:
+      labels:
+        buoyant.io/application: faces
+        faces.buoyant.io/component: redis
+    spec:
+      containers:
+      - name: redis
+        image: {{ .Values.redis.image | default "redis:7-alpine" }}
+        imagePullPolicy: {{ .Values.defaultImagePullPolicy }}
+        ports:
+        - name: redis
+          containerPort: 6379
+        {{- if .Values.redis.password }}
+        args:
+        - redis-server
+        - --requirepass
+        - $(REDIS_PASSWORD)
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.redis.passwordSecret | default "faces-redis-secret" }}
+              key: password
+        {{- end }}
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+{{- end }}
+{{- end }}

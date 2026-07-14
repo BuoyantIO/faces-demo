@@ -22,7 +22,6 @@ import (
 	"os"
 
 	"flag"
-	"fmt"
 
 	"github.com/BuoyantIO/faces-demo/v2/pkg/faces"
 	"github.com/BuoyantIO/faces-demo/v2/pkg/utils"
@@ -59,10 +58,14 @@ func main() {
 		faces.StartPrometheusServer()
 	}
 
+	// Chaos is now a gRPC method (GetChaos/UpdateChaos) on the same port as the
+	// color service — no separate HTTP sidecar needed. The HTTP sidecar on port 8001
+	// has been removed; all color traffic stays on the single gRPC port.
+
 	err := server.Start(*port)
 
 	if err != nil {
-		slog.Error(fmt.Sprintf("Unable to serve gRPC: %v", err))
+		slog.Error("Unable to serve gRPC", "error", err)
 		os.Exit(1)
 	}
 }

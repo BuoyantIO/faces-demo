@@ -1,0 +1,83 @@
+{{- if not .Values.adminOnly }}
+{{- if and (eq (.Values.faceMode | default "classic") "pubsub") (eq (.Values.queueBackend | default "rabbitmq") "rabbitmq") -}}
+{{- $rmq := .Values.rabbitmq | default dict -}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: rabbitmq
+spec:
+  type: {{ $rmq.serviceType | default "ClusterIP" }}
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: rabbitmq
+  ports:
+  - port: {{ $rmq.port | default 5672 }}
+    name: amqp
+    targetPort: amqp
+  - port: {{ $rmq.managementPort | default 15672 }}
+    name: management
+    targetPort: management
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: rabbitmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      buoyant.io/application: faces
+      faces.buoyant.io/component: rabbitmq
+  template:
+    metadata:
+      labels:
+        buoyant.io/application: faces
+        faces.buoyant.io/component: rabbitmq
+    spec:
+      containers:
+      - name: rabbitmq
+        image: {{ $rmq.image | default "rabbitmq:3-management" }}
+        imagePullPolicy: {{ .Values.defaultImagePullPolicy }}
+        ports:
+        - name: amqp
+          containerPort: 5672
+        - name: management
+          containerPort: 15672
+        env:
+        - name: RABBITMQ_DEFAULT_USER
+          value: {{ $rmq.user | default "faces" | quote }}
+        - name: RABBITMQ_DEFAULT_PASS
+          valueFrom:
+            secretKeyRef:
+              name: {{ $rmq.passwordSecret | default "faces-rabbitmq-secret" }}
+              key: password
+        resources:
+          limits:
+            ephemeral-storage: {{ $rmq.ephemeralStorageLimit | default "512Mi" }}
+        livenessProbe:
+          exec:
+            command:
+            - rabbitmq-diagnostics
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - rabbitmq-diagnostics
+            - check_port_connectivity
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 10
+{{- end }}
+{{- end }}

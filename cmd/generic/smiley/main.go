@@ -58,6 +58,7 @@ func main() {
 	}
 
 	server := faces.NewBaseHTTPServer(&sprv.BaseProvider)
+	sprv.RegisterChaosRoutes(server)
 
 	err := server.Start(fmt.Sprintf(":%d", *port))
 

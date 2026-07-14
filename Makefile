@@ -15,28 +15,67 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SHELL=bash
+SHELL = bash
+
+# Registry for Docker images. Override on the command line:
+#   REGISTRY=your.registry.io make push-pubsub
+REGISTRY ?= ghcr.io/buoyantio
+
+# Version used for both image tags and Helm chart packaging.
+# Defaults to the current git tag; set explicitly for release builds:
+#   VERSION=1.2.0 make push-pubsub
+#   VERSION=1.2.0 make chart
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+
+PUBLISHER_IMAGE  := $(REGISTRY)/faces-face-publisher:$(VERSION)
+SUBSCRIBER_IMAGE := $(REGISTRY)/faces-face-subscriber:$(VERSION)
+ADMIN_IMAGE      := $(REGISTRY)/faces-admin:$(VERSION)
+SMILEY_IMAGE     := $(REGISTRY)/faces-smiley:$(VERSION)
+COLOR_IMAGE      := $(REGISTRY)/faces-color:$(VERSION)
+FACE_IMAGE       := $(REGISTRY)/faces-face:$(VERSION)
+
+# Platforms for multi-arch push (buildx). Override to target a single arch:
+#   PLATFORMS=linux/amd64 make push-pubsub
+PLATFORMS ?= linux/amd64,linux/arm64
 
 help:
-	@echo "'make images' will do local builds of all the Docker images,"
-	@echo "without pushing them to a registry and therefore without creating"
-	@echo "multiarch manifests. This will leave you with images in the local"
-	@echo "Docker cache, tagged with version 'latest-{architecture}' (e.g."
-	@echo "'latest-arm64' and 'latest-amd64')."
+	@echo "=== Admin dashboard ================================================"
+	@echo "  make push-admin"
+	@echo "      Build and push the faces-admin image (multi-platform)."
+	@echo "      REGISTRY=your.registry.io VERSION=x.y.z make push-admin"
 	@echo ""
-	@echo "'VERSION=... make chart' will package up the Helm chart into"
-	@echo "'faces-chart-$$VERSION.tgz'. You must set VERSION in order to use"
-	@echo "this target."
+	@echo "=== Classic mode ==================================================="
+	@echo "  make images"
+	@echo "      Local Docker builds of all images (via goreleaser, no push)."
+	@echo "      Images are tagged 'latest-{arch}' in the local cache."
 	@echo ""
-	@echo "'HELM_REGISTRY=... VERSION=... make push-chart' will push the chart"
-	@echo "to the given HELM_REGISTRY. You must set both HELM_REGISTRY and VERSION"
-	@echo "in order to use this target."
+	@echo "  VERSION=1.0.0 make chart"
+	@echo "      Package the Helm chart into faces-chart-\$$VERSION.tgz."
 	@echo ""
-	@echo "'make proto' will regenerate Go code from protobuf definitions for"
-	@echo "the color workload. Requires protoc-gen-go to be installed."
+	@echo "  HELM_REGISTRY=oci://... VERSION=1.0.0 make push-chart"
+	@echo "      Push the packaged chart to an OCI Helm registry."
 	@echo ""
-	@echo "You can also 'make clean' to remove all the Docker-image stuff,"
-	@echo "or 'make clobber' to smite everything and completely start over."
+	@echo "  make proto"
+	@echo "      Regenerate Go gRPC code from pkg/color/color.proto."
+	@echo "      Requires protoc-gen-go."
+	@echo ""
+	@echo "=== Pub/Sub mode ===================================================="
+	@echo "  make docker-pubsub"
+	@echo "      Build publisher + subscriber images locally."
+	@echo ""
+	@echo "  make push-pubsub"
+	@echo "      Build and push both pub/sub images (multi-platform: amd64 + arm64)."
+	@echo "      Override with PLATFORMS=linux/amd64 to target a single arch."
+	@echo ""
+	@echo "  make helm-install-pubsub"
+	@echo "      helm upgrade --install in pubsub mode (requires KUBECONFIG)."
+	@echo ""
+	@echo "  Override registry/version for any pub/sub target:"
+	@echo "    REGISTRY=your.registry.io VERSION=1.0.0 make push-pubsub"
+	@echo ""
+	@echo "=== Maintenance ====================================================="
+	@echo "  make clean    Remove built chart tarballs and dist/ directory."
+	@echo "  make clobber  Alias for clean."
 .PHONY: help
 
 proto: pkg/color/color_grpc.pb.go pkg/color/color.pb.go
@@ -103,3 +142,96 @@ chart: faces-chart-$(VERSION).tgz
 # target (which we'll name "FORCE"), so that they are always
 # considered out-of-date by Make, but without being .PHONY themselves.
 .PHONY: FORCE
+
+# =============================================================================
+# Pub/Sub mode
+# =============================================================================
+
+.PHONY: docker-pubsub docker-publisher docker-subscriber push-pubsub \
+        helm-install-pubsub docker-admin push-admin push-smiley push-color push-face
+
+## Build both pub/sub images locally
+docker-pubsub: docker-publisher docker-subscriber
+
+## Build the publisher image only
+docker-publisher:
+	docker build \
+		-f Dockerfiles/Dockerfile.face-publisher \
+		-t $(PUBLISHER_IMAGE) \
+		.
+
+## Build the subscriber image only
+docker-subscriber:
+	docker build \
+		-f Dockerfiles/Dockerfile.face-subscriber \
+		-t $(SUBSCRIBER_IMAGE) \
+		.
+
+## Build and push both pub/sub images (multi-platform via buildx)
+## Builds directly to the registry — does not update the local Docker cache.
+push-pubsub:
+	docker buildx build \
+		--platform $(PLATFORMS) \
+		--push \
+		-f Dockerfiles/Dockerfile.face-publisher \
+		-t $(PUBLISHER_IMAGE) \
+		.
+	docker buildx build \
+		--platform $(PLATFORMS) \
+		--push \
+		-f Dockerfiles/Dockerfile.face-subscriber \
+		-t $(SUBSCRIBER_IMAGE) \
+		.
+
+## Build and push smiley image (includes HTTP PUT handler for admin emoji updates)
+push-smiley:
+	docker buildx build \
+		--platform $(PLATFORMS) \
+		--push \
+		-f Dockerfiles/Dockerfile.smiley \
+		-t $(SMILEY_IMAGE) \
+		.
+
+## Build and push color image (includes gRPC UpdateColor for admin color updates)
+push-color:
+	docker buildx build \
+		--platform $(PLATFORMS) \
+		--push \
+		-f Dockerfiles/Dockerfile.color \
+		-t $(COLOR_IMAGE) \
+		.
+
+## Build and push face image (classic mode; includes /chaos endpoint for runtime fault injection)
+push-face:
+	docker buildx build \
+		--platform $(PLATFORMS) \
+		--push \
+		-f Dockerfiles/Dockerfile.face \
+		-t $(FACE_IMAGE) \
+		.
+
+## Build the admin image locally (single platform)
+docker-admin:
+	docker build \
+		-f Dockerfiles/Dockerfile.faces-admin \
+		-t $(ADMIN_IMAGE) \
+		.
+
+## Build and push the admin image (multi-platform via buildx)
+push-admin:
+	docker buildx build \
+		--platform $(PLATFORMS) \
+		--push \
+		-f Dockerfiles/Dockerfile.faces-admin \
+		-t $(ADMIN_IMAGE) \
+		.
+
+
+## helm upgrade --install in pubsub mode (requires KUBECONFIG)
+helm-install-pubsub:
+	helm upgrade --install faces ./faces-chart \
+		--namespace faces \
+		--create-namespace \
+		--set faceMode=pubsub \
+		--set facePublisher.image=$(PUBLISHER_IMAGE) \
+		--set faceSubscriber.image=$(SUBSCRIBER_IMAGE)

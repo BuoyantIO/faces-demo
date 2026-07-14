@@ -1,0 +1,155 @@
+{{- if or .Values.facesAdmin.enabled (eq (.Values.faceMode | default "classic") "pubsub") }}
+{{- $rmq := .Values.rabbitmq | default dict -}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: faces-admin
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: faces-admin
+spec:
+  type: {{ .Values.facesAdmin.serviceType | default "ClusterIP" }}
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: faces-admin
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: faces-admin
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: faces-admin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      buoyant.io/application: faces
+      faces.buoyant.io/component: faces-admin
+  template:
+    metadata:
+      labels:
+        buoyant.io/application: faces
+        faces.buoyant.io/component: faces-admin
+    spec:
+      {{- if .Values.facesAdmin.rbac.enabled }}
+      serviceAccountName: faces-admin
+      {{- end }}
+      containers:
+      - name: faces-admin
+        image: {{ if .Values.facesAdmin.image }}{{ .Values.facesAdmin.image }}{{ else }}{{ .Values.facesAdmin.imageName }}:{{ .Values.facesAdmin.imageTag | default .Chart.AppVersion }}{{ end }}
+        imagePullPolicy: {{ .Values.facesAdmin.imagePullPolicy | default .Values.defaultImagePullPolicy }}
+        ports:
+        - name: http
+          containerPort: 8888
+        env:
+        - name: DATA_PATH
+          value: /app/data
+        - name: FACE_MODE
+          value: {{ .Values.faceMode | default "classic" | quote }}
+        - name: QUEUE_BACKEND
+          value: {{ .Values.queueBackend | default "rabbitmq" | quote }}
+        - name: SMILEY_SERVICE
+          value: {{ .Values.facesAdmin.smileyService | default "smiley" | quote }}
+        - name: COLOR_SERVICE
+          value: {{ .Values.facesAdmin.colorService | default "color" | quote }}
+        - name: GUI_SERVICE
+          value: {{ .Values.facesAdmin.guiService | default "faces-gui" | quote }}
+        - name: FACE_SERVICE
+          value: {{ .Values.facesAdmin.faceService | default "face" | quote }}
+        - name: PUBLISHER_SERVICE
+          value: {{ .Values.facesAdmin.publisherService | default "face-publisher" | quote }}
+        - name: SUBSCRIBER_SERVICE
+          value: {{ .Values.facesAdmin.subscriberService | default "face-subscriber" | quote }}
+        - name: PUBLISHER_HEADLESS_SERVICE
+          value: {{ .Values.facesAdmin.publisherHeadlessService | default "face-publisher-headless" | quote }}
+        - name: SUBSCRIBER_HEADLESS_SERVICE
+          value: {{ .Values.facesAdmin.subscriberHeadlessService | default "face-subscriber-headless" | quote }}
+        - name: SMILEY_HEADLESS_SERVICE
+          value: {{ .Values.facesAdmin.smileyHeadlessService | default "smiley-headless" | quote }}
+        - name: COLOR_HEADLESS_SERVICE
+          value: {{ .Values.facesAdmin.colorHeadlessService | default "color-headless" | quote }}
+        - name: POD_PORT
+          value: {{ .Values.facesAdmin.podPort | default "8000" | quote }}
+        {{- if (.Values.facesAdmin.auth).createSecret }}
+        - name: ADMIN_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: faces-admin-auth-secret
+              key: username
+        - name: ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: faces-admin-auth-secret
+              key: password
+        {{- end }}
+        {{- if eq (.Values.faceMode | default "classic") "pubsub" }}
+        - name: DB_HOST
+          value: {{ .Values.mysql.host | default "mysql" | quote }}
+        - name: DB_PORT
+          value: {{ .Values.mysql.port | default 3306 | quote }}
+        - name: DB_NAME
+          value: {{ .Values.mysql.database | default "faces" | quote }}
+        - name: DB_USER
+          value: {{ .Values.mysql.user | default "faces" | quote }}
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.mysql.passwordSecret | default "faces-mysql-secret" }}
+              key: password
+        {{- if eq (.Values.queueBackend | default "rabbitmq") "rabbitmq" }}
+        - name: RABBITMQ_HOST
+          value: {{ $rmq.host | default "rabbitmq" | quote }}
+        - name: RABBITMQ_MANAGEMENT_PORT
+          value: {{ $rmq.managementPort | default 15672 | quote }}
+        - name: RABBITMQ_USER
+          value: {{ $rmq.user | default "faces" | quote }}
+        - name: RABBITMQ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ $rmq.passwordSecret | default "faces-rabbitmq-secret" }}
+              key: password
+        - name: RABBITMQ_VHOST
+          value: {{ $rmq.vhost | default "/" | quote }}
+        - name: RABBITMQ_QUEUE
+          value: {{ $rmq.queueName | default "faces.queue" | quote }}
+        - name: RABBITMQ_MAX_QUEUE_DEPTH
+          value: {{ $rmq.maxQueueDepth | default 5000 | quote }}
+        {{- else }}
+        - name: REDIS_ADDRESS
+          value: {{ .Values.redis.address | default "redis:6379" | quote }}
+        - name: REDIS_QUEUE_KEY
+          value: {{ .Values.redis.queueKey | default "faces:queue" | quote }}
+        - name: REDIS_DB
+          value: {{ .Values.redis.db | default 0 | quote }}
+        - name: REDIS_MAX_QUEUE_DEPTH
+          value: {{ .Values.redis.maxQueueDepth | default 5000 | quote }}
+        {{- if .Values.redis.password }}
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.redis.passwordSecret | default "faces-redis-secret" }}
+              key: password
+        {{- end }}
+        {{- end }}
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          initialDelaySeconds: 3
+          periodSeconds: 10
+{{- end }}

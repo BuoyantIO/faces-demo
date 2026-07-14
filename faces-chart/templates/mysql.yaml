@@ -1,0 +1,115 @@
+{{- if not .Values.adminOnly }}
+{{- if and (eq (.Values.faceMode | default "classic") "pubsub") (.Values.mysql.enabled) -}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: mysql
+spec:
+  type: ClusterIP
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: mysql
+  ports:
+  - port: 3306
+    name: mysql
+    targetPort: mysql
+{{- if .Values.mysql.usePVC }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-data
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: mysql
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: {{ .Values.mysql.storageClass | default "standard" }}
+  resources:
+    requests:
+      storage: {{ .Values.mysql.storageSize | default "1Gi" }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      buoyant.io/application: faces
+      faces.buoyant.io/component: mysql
+  template:
+    metadata:
+      labels:
+        buoyant.io/application: faces
+        faces.buoyant.io/component: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: {{ .Values.mysql.image | default "mysql:8.0" }}
+        imagePullPolicy: {{ .Values.defaultImagePullPolicy }}
+        ports:
+        - name: mysql
+          containerPort: 3306
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.mysql.passwordSecret | default "faces-mysql-secret" }}
+              key: rootPassword
+        - name: MYSQL_DATABASE
+          value: {{ .Values.mysql.database | default "faces" | quote }}
+        - name: MYSQL_USER
+          value: {{ .Values.mysql.user | default "faces" | quote }}
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.mysql.passwordSecret | default "faces-mysql-secret" }}
+              key: password
+        resources:
+          limits:
+            ephemeral-storage: {{ .Values.mysql.ephemeralStorageLimit | default "1Gi" }}
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - 'mysqladmin ping -uroot -p"${MYSQL_ROOT_PASSWORD}" --silent'
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - 'mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "SELECT 1"'
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+        volumeMounts:
+        - name: mysql-data
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-data
+        {{- if .Values.mysql.usePVC }}
+        persistentVolumeClaim:
+          claimName: mysql-data
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+{{- end }}
+{{- end }}

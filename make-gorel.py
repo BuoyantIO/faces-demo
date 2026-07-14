@@ -100,6 +100,22 @@ BUILDS = [
           build_styles=[ BuildStyleGeneric("smiley"),
                          BuildStyleExternal("smiley"),
                          BuildStylePi("smiley") ]),
+    # Faces 3.0 pub/sub pipeline + admin portal. Publisher/subscriber are plain
+    # workloads; the admin carries its SPA assets and needs CA certs, so it has
+    # its own Dockerfile. Note the composed style for the admin: the source dir
+    # is cmd/generic/faces-admin but the image suffix must be plain "admin" so
+    # the image comes out as faces-admin (IMAGE_NAME + suffix), matching the
+    # chart and the Makefile push targets.
+    Build("face-publisher",
+          build_styles=[ BuildStyleGeneric("face-publisher") ]),
+    Build("face-subscriber",
+          build_styles=[ BuildStyleGeneric("face-subscriber") ]),
+    Build("faces-admin",
+          build_styles=[ BuildStyle("generic",
+                         [ ImageStyle("admin", "admin",
+                                      [ "--build-arg=WORKLOAD=faces-admin-workload" ]) ]) ],
+          extra_files=[ "assets/html/admin" ],
+    ),
 ]
 
 build_defs = {}

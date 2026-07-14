@@ -8,6 +8,11 @@ service ColorService {
   rpc Center (ColorRequest) returns (ColorResponse);
   rpc Edge (ColorRequest) returns (ColorResponse);
   rpc UpdateColor (ColorUpdate) returns (ColorUpdateResponse);
+
+  // Chaos injection via gRPC — keeps all color traffic on port 8000.
+  // No separate HTTP chaos sidecar required.
+  rpc GetChaos    (ChaosRequest) returns (ChaosState);
+  rpc UpdateChaos (ChaosState)   returns (ChaosState);
 }
 
 message ColorRequest {
@@ -29,4 +34,16 @@ message ColorUpdate {
 message ColorUpdateResponse {
   string which = 1;
   string color = 2;
+}
+
+// Empty request used by GetChaos — no import needed for a local empty message.
+message ChaosRequest {}
+
+message ChaosState {
+  int32           error_fraction = 1;
+  int32           latch_fraction = 2;
+  float           max_rate       = 3;
+  repeated int32  delay_buckets  = 4;
+  bool            latched        = 5;
+  bool            force_unlatch  = 6;
 }

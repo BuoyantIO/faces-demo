@@ -1,7 +1,29 @@
+{{- if not .Values.adminOnly }}
 {{- include "partials.backend"
     (dict "name" "smiley"
           "workload" "smiley"
           "root" .) }}
+{{- if .Values.smiley.enabled }}
+---
+# Headless service for per-pod targeting from faces-admin
+apiVersion: v1
+kind: Service
+metadata:
+  name: smiley-headless
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: smiley
+spec:
+  clusterIP: None
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component: smiley
+  ports:
+  - port: 8000
+    name: http
+    targetPort: http
+{{- end }}
 {{- include "partials.backend"
     (dict "name" "smiley2"
           "workload" "smiley"
@@ -10,3 +32,4 @@
     (dict "name" "smiley3"
           "workload" "smiley"
           "root" .) }}
+{{- end }}

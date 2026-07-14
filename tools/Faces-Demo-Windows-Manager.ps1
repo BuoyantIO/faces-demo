@@ -54,6 +54,14 @@
     Git URL of the faces-demo repo.
     Default: https://github.com/BuoyantIO/faces-demo.git
 
+.PARAMETER Branch
+    Git branch to build from. When set, the initial clone checks out this
+    branch and -UpdateRepo fast-forwards it from origin. When empty (the
+    default), the repo's default branch is used (main).
+    NOTE: linky image support in the admin portal requires workloads built
+    from the faces-demo-3.0 branch until it merges to main — pass
+    -Branch faces-demo-3.0 when installing workloads for that demo.
+
 .PARAMETER SourceRoot
     Directory where the repo is cloned. Default: C:\src
 
@@ -131,6 +139,7 @@ param(
     [int]$LogLines = 50,
 
     [string]$RepoUrl    = "https://github.com/BuoyantIO/faces-demo.git",
+    [string]$Branch     = "",
     [string]$SourceRoot = "C:\src",
     [string]$AppRoot    = "C:\faces-demo",
     [string]$LogRoot    = "C:\temp\faces-demo",
@@ -421,8 +430,12 @@ function Sync-Repo {
     if (-not (Test-Path (Join-Path $repoDir ".git"))) {
         Write-Step "Cloning faces-demo repository"
         Write-Log "Cloning $RepoUrl to $repoDir"
-        git clone --quiet $RepoUrl $repoDir
-        if ($LASTEXITCODE -ne 0) { throw "git clone failed (exit $LASTEXITCODE). Check network or -RepoUrl." }
+        if ($Branch) {
+            git clone --quiet --branch $Branch $RepoUrl $repoDir
+        } else {
+            git clone --quiet $RepoUrl $repoDir
+        }
+        if ($LASTEXITCODE -ne 0) { throw "git clone failed (exit $LASTEXITCODE). Check network, -RepoUrl, or -Branch." }
         Write-Ok "Repository cloned to $repoDir"
         Write-Log "Repository cloned"
     } else {
@@ -438,9 +451,20 @@ function Sync-Repo {
                 Write-Warn "git fetch failed - building from existing local source"
                 Write-Log  "git fetch failed, using local source" "WARN"
             } else {
-                git -C $repoDir merge --ff-only --quiet origin/main 2>&1 | Out-Null
-                if ($LASTEXITCODE -ne 0) {
-                    git -C $repoDir merge --ff-only --quiet origin/master 2>&1 | Out-Null
+                if ($Branch) {
+                    # Switch to (or stay on) the requested branch, then fast-forward it.
+                    git -C $repoDir checkout --quiet $Branch 2>&1 | Out-Null
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-Warn "Could not check out branch '$Branch' - building from existing local source"
+                        Write-Log  "git checkout $Branch failed, using local source" "WARN"
+                    } else {
+                        git -C $repoDir merge --ff-only --quiet origin/$Branch 2>&1 | Out-Null
+                    }
+                } else {
+                    git -C $repoDir merge --ff-only --quiet origin/main 2>&1 | Out-Null
+                    if ($LASTEXITCODE -ne 0) {
+                        git -C $repoDir merge --ff-only --quiet origin/master 2>&1 | Out-Null
+                    }
                 }
                 if ($LASTEXITCODE -eq 0) {
                     Write-Ok "Repository updated"
@@ -453,6 +477,13 @@ function Sync-Repo {
         } else {
             Write-Ok "Repository already cloned at $repoDir (use -UpdateRepo to pull latest)"
             Write-Log "Using existing local repository"
+            if ($Branch) {
+                $current = (git -C $repoDir rev-parse --abbrev-ref HEAD 2>$null)
+                if ($current -and $current -ne $Branch) {
+                    Write-Warn "Local clone is on branch '$current', not '$Branch' - pass -UpdateRepo to switch branches"
+                    Write-Log  "branch mismatch: on $current, requested $Branch" "WARN"
+                }
+            }
         }
     }
     return $repoDir

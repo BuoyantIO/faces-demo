@@ -1,3 +1,4 @@
+{{- if not .Values.adminOnly }}
 {{- $serviceType := .Values.gui.serviceType -}}
 {{- if .Values.ingress.enabled -}}
   {{- $serviceType = "LoadBalancer" -}}
@@ -209,4 +210,4 @@ spec:
           containerPort: 8000
         {{- include "partials.gui-resources" . }}
 
-{{- end }}
+{{- end }}{{- end }}
