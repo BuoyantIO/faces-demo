@@ -37,13 +37,20 @@ before:
 archives:
   - id: generic
     name_template: '{{ .ProjectName }}_generic_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
-    builds:
-      - generic-workload
+    # These are the build ids from make-gorel.py ("generic-<name>") —
+    # "generic-workload" was a stale pre-generator id that matched nothing.
+    # ("ids" is the current spelling; "builds" is deprecated.)
+    ids:
+      - generic-gui
+      - generic-load
+      - generic-face
       - generic-color
+      - generic-smiley
   - id: pi
     name_template: '{{ .ProjectName }}_pi_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
-    builds:
-      - pi
+    ids:
+      - pi-color
+      - pi-smiley
 
 changelog:
   sort: asc
@@ -121,6 +128,36 @@ builds:
   - linux
   id: pi-smiley
   main: ./cmd/pi/smiley
+- binary: face-publisher-workload
+  env:
+  - CGO_ENABLED=0
+  goarch:
+  - arm64
+  - amd64
+  goos:
+  - linux
+  id: generic-face-publisher
+  main: ./cmd/generic/face-publisher
+- binary: face-subscriber-workload
+  env:
+  - CGO_ENABLED=0
+  goarch:
+  - arm64
+  - amd64
+  goos:
+  - linux
+  id: generic-face-subscriber
+  main: ./cmd/generic/face-subscriber
+- binary: faces-admin-workload
+  env:
+  - CGO_ENABLED=0
+  goarch:
+  - arm64
+  - amd64
+  goos:
+  - linux
+  id: generic-faces-admin
+  main: ./cmd/generic/faces-admin
 docker_manifests:
 - create_flags:
   - --insecure
@@ -361,6 +398,56 @@ docker_manifests:
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-smiley:latest-arm64'
   name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-smiley:latest'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face-publisher:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face-publisher:{{ .Version }}-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face-publisher:{{ .Version
+    }}'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face-publisher:latest-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face-publisher:latest-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face-publisher:latest'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face-subscriber:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face-subscriber:{{ .Version }}-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face-subscriber:{{ .Version
+    }}'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face-subscriber:latest-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face-subscriber:latest-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face-subscriber:latest'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-admin:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-admin:{{ .Version }}-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-admin:{{ .Version }}'
+  push_flags:
+  - --insecure
+- create_flags:
+  - --insecure
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-admin:latest-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-admin:latest-amd64'
+  name_template: '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-admin:latest'
   push_flags:
   - --insecure
 dockers:
@@ -695,5 +782,81 @@ dockers:
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-smiley:{{ .Version }}-arm64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-smiley:latest-arm64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/arm64
+  - --build-arg=WORKLOAD=face-publisher-workload
+  dockerfile: Dockerfiles/Dockerfile.workload
+  goarch: arm64
+  goos: linux
+  ids:
+  - generic-face-publisher
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face-publisher:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face-publisher:latest-arm64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/amd64
+  - --build-arg=WORKLOAD=face-publisher-workload
+  dockerfile: Dockerfiles/Dockerfile.workload
+  goarch: amd64
+  goos: linux
+  ids:
+  - generic-face-publisher
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face-publisher:{{ .Version }}-amd64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face-publisher:latest-amd64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/arm64
+  - --build-arg=WORKLOAD=face-subscriber-workload
+  dockerfile: Dockerfiles/Dockerfile.workload
+  goarch: arm64
+  goos: linux
+  ids:
+  - generic-face-subscriber
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face-subscriber:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face-subscriber:latest-arm64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/amd64
+  - --build-arg=WORKLOAD=face-subscriber-workload
+  dockerfile: Dockerfiles/Dockerfile.workload
+  goarch: amd64
+  goos: linux
+  ids:
+  - generic-face-subscriber
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face-subscriber:{{ .Version }}-amd64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face-subscriber:latest-amd64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/arm64
+  - --build-arg=WORKLOAD=faces-admin-workload
+  dockerfile: Dockerfiles/Dockerfile.admin
+  extra_files:
+  - assets/html/admin
+  goarch: arm64
+  goos: linux
+  ids:
+  - generic-faces-admin
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-admin:{{ .Version }}-arm64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-admin:latest-arm64'
+  use: buildx
+- build_flag_templates:
+  - --platform=linux/amd64
+  - --build-arg=WORKLOAD=faces-admin-workload
+  dockerfile: Dockerfiles/Dockerfile.admin
+  extra_files:
+  - assets/html/admin
+  goarch: amd64
+  goos: linux
+  ids:
+  - generic-faces-admin
+  image_templates:
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-admin:{{ .Version }}-amd64'
+  - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-admin:latest-amd64'
   use: buildx
 

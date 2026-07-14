@@ -387,7 +387,7 @@ facesAdmin:
 
 facePublisher:
   image: ""                 # If set, overrides imageName/imageTag
-  imageName: ghcr.io/buoyantio/face-publisher
+  imageName: ghcr.io/buoyantio/faces-face-publisher
   imageTag: ""              # If not set, uses Chart.AppVersion
   imagePullPolicy: Always   # Always pull to pick up new pushes of the same tag
   replicas: 1
@@ -412,7 +412,7 @@ facePublisher:
 
 faceSubscriber:
   image: ""                 # If set, overrides imageName/imageTag
-  imageName: ghcr.io/buoyantio/face-subscriber
+  imageName: ghcr.io/buoyantio/faces-face-subscriber
   imageTag: ""              # If not set, uses Chart.AppVersion
   imagePullPolicy: Always   # Always pull to pick up new pushes of the same tag
   replicas: 1

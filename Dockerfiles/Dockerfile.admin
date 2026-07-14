@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#
+# SPDX-FileCopyrightText: 2025 Buoyant Inc.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright 2025 Buoyant Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.  You may obtain
+# a copy of the License at
+#
+#     http:#www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# goreleaser-style faces-admin image: copies the prebuilt binary plus the
+# admin SPA assets. alpine (not scratch) because the admin can call HTTPS
+# endpoints (e.g. emojivoto) and needs CA certificates.
+FROM alpine:3.19 AS final
+ARG WORKLOAD
+
+RUN apk add --no-cache ca-certificates
+
+# This is associated with the faces-demo repo.
+LABEL org.opencontainers.image.source=https://github.com/BuoyantIO/faces-demo
+
+# Copy the compiled binary from the builder stage into the final image
+COPY --chmod=0755 ${WORKLOAD} /workload
+
+# Also copy the admin SPA to be served.
+COPY assets/html/admin /app/data
+ENV DATA_PATH=/app/data
+
+EXPOSE 8888
+
+# Set the entrypoint to the compiled binary
+ENTRYPOINT ["/workload"]

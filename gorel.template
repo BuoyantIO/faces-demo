@@ -37,13 +37,20 @@ before:
 archives:
   - id: generic
     name_template: '{{ .ProjectName }}_generic_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
-    builds:
-      - generic-workload
+    # These are the build ids from make-gorel.py ("generic-<name>") —
+    # "generic-workload" was a stale pre-generator id that matched nothing.
+    # ("ids" is the current spelling; "builds" is deprecated.)
+    ids:
+      - generic-gui
+      - generic-load
+      - generic-face
       - generic-color
+      - generic-smiley
   - id: pi
     name_template: '{{ .ProjectName }}_pi_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
-    builds:
-      - pi
+    ids:
+      - pi-color
+      - pi-smiley
 
 changelog:
   sort: asc
