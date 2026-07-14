@@ -34,17 +34,6 @@ before:
     # Make the chart as part of the build process.
     - make VERSION={{ .Version }} chart
 
-archives:
-  - id: generic
-    name_template: '{{ .ProjectName }}_generic_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
-    builds:
-      - generic-workload
-      - generic-color
-  - id: pi
-    name_template: '{{ .ProjectName }}_pi_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
-    builds:
-      - pi
-
 changelog:
   sort: asc
   filters:
@@ -52,6 +41,44 @@ changelog:
       - "^docs:"
       - "^test:"
 
+archives:
+- allow_different_binary_count: true
+  builds:
+  - generic-color-linux
+  - generic-face-linux
+  - generic-gui-linux
+  - generic-load-linux
+  - generic-smiley-linux
+  files:
+  - none*
+  id: generic-linux
+  name_template: '{{ .ProjectName }}_generic_{{ .Version }}_linux_{{ .Arch }}{{ with
+    .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64
+    "v1") }}{{ .Amd64 }}{{ end }}'
+- allow_different_binary_count: true
+  builds:
+  - generic-color-windows
+  - generic-face-windows
+  - generic-gui-windows
+  - generic-load-windows
+  - generic-smiley-windows
+  files:
+  - none*
+  format: zip
+  id: generic-windows
+  name_template: '{{ .ProjectName }}_generic_{{ .Version }}_windows_{{ .Arch }}{{
+    with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64
+    "v1") }}{{ .Amd64 }}{{ end }}'
+- allow_different_binary_count: true
+  builds:
+  - pi-color-linux
+  - pi-smiley-linux
+  files:
+  - none*
+  id: pi-linux
+  name_template: '{{ .ProjectName }}_pi_{{ .Version }}_linux_{{ .Arch }}{{ with .Arm
+    }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1")
+    }}{{ .Amd64 }}{{ end }}'
 builds:
 - binary: gui-workload
   env:
@@ -61,7 +88,17 @@ builds:
   - amd64
   goos:
   - linux
-  id: generic-gui
+  id: generic-gui-linux
+  main: ./cmd/generic/gui
+- binary: gui-workload
+  env:
+  - CGO_ENABLED=0
+  goarch:
+  - arm64
+  - amd64
+  goos:
+  - windows
+  id: generic-gui-windows
   main: ./cmd/generic/gui
 - binary: load-workload
   env:
@@ -71,7 +108,17 @@ builds:
   - amd64
   goos:
   - linux
-  id: generic-load
+  id: generic-load-linux
+  main: ./cmd/generic/load
+- binary: load-workload
+  env:
+  - CGO_ENABLED=0
+  goarch:
+  - arm64
+  - amd64
+  goos:
+  - windows
+  id: generic-load-windows
   main: ./cmd/generic/load
 - binary: face-workload
   env:
@@ -81,7 +128,17 @@ builds:
   - amd64
   goos:
   - linux
-  id: generic-face
+  id: generic-face-linux
+  main: ./cmd/generic/face
+- binary: face-workload
+  env:
+  - CGO_ENABLED=0
+  goarch:
+  - arm64
+  - amd64
+  goos:
+  - windows
+  id: generic-face-windows
   main: ./cmd/generic/face
 - binary: color-workload
   env:
@@ -91,7 +148,17 @@ builds:
   - amd64
   goos:
   - linux
-  id: generic-color
+  id: generic-color-linux
+  main: ./cmd/generic/color
+- binary: color-workload
+  env:
+  - CGO_ENABLED=0
+  goarch:
+  - arm64
+  - amd64
+  goos:
+  - windows
+  id: generic-color-windows
   main: ./cmd/generic/color
 - binary: color-workload
   env:
@@ -100,7 +167,7 @@ builds:
   - arm64
   goos:
   - linux
-  id: pi-color
+  id: pi-color-linux
   main: ./cmd/pi/color
 - binary: smiley-workload
   env:
@@ -110,7 +177,17 @@ builds:
   - amd64
   goos:
   - linux
-  id: generic-smiley
+  id: generic-smiley-linux
+  main: ./cmd/generic/smiley
+- binary: smiley-workload
+  env:
+  - CGO_ENABLED=0
+  goarch:
+  - arm64
+  - amd64
+  goos:
+  - windows
+  id: generic-smiley-windows
   main: ./cmd/generic/smiley
 - binary: smiley-workload
   env:
@@ -119,7 +196,7 @@ builds:
   - arm64
   goos:
   - linux
-  id: pi-smiley
+  id: pi-smiley-linux
   main: ./cmd/pi/smiley
 docker_manifests:
 - create_flags:
@@ -373,7 +450,7 @@ dockers:
   goarch: arm64
   goos: linux
   ids:
-  - generic-gui
+  - generic-gui-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}-arm64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest-arm64'
@@ -387,7 +464,7 @@ dockers:
   goarch: amd64
   goos: linux
   ids:
-  - generic-gui
+  - generic-gui-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:{{ .Version }}-amd64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-gui:latest-amd64'
@@ -399,7 +476,7 @@ dockers:
   goarch: arm64
   goos: linux
   ids:
-  - generic-load
+  - generic-load-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-load:{{ .Version }}-arm64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-load:latest-arm64'
@@ -411,7 +488,7 @@ dockers:
   goarch: amd64
   goos: linux
   ids:
-  - generic-load
+  - generic-load-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-load:{{ .Version }}-amd64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-load:latest-amd64'
@@ -423,7 +500,7 @@ dockers:
   goarch: arm64
   goos: linux
   ids:
-  - generic-face
+  - generic-face-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face:{{ .Version }}-arm64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face:latest-arm64'
@@ -435,7 +512,7 @@ dockers:
   goarch: amd64
   goos: linux
   ids:
-  - generic-face
+  - generic-face-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face:{{ .Version }}-amd64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-face:latest-amd64'
@@ -448,7 +525,7 @@ dockers:
   goarch: arm64
   goos: linux
   ids:
-  - generic-face
+  - generic-face-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-face:{{ .Version }}-arm64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-face:latest-arm64'
@@ -461,7 +538,7 @@ dockers:
   goarch: amd64
   goos: linux
   ids:
-  - generic-face
+  - generic-face-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-face:{{ .Version }}-amd64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-face:latest-amd64'
@@ -474,7 +551,7 @@ dockers:
   goarch: arm64
   goos: linux
   ids:
-  - generic-face
+  - generic-face-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-face:{{ .Version }}-arm64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-face:latest-arm64'
@@ -487,7 +564,7 @@ dockers:
   goarch: amd64
   goos: linux
   ids:
-  - generic-face
+  - generic-face-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-face:{{ .Version }}-amd64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-face:latest-amd64'
@@ -499,7 +576,7 @@ dockers:
   goarch: arm64
   goos: linux
   ids:
-  - generic-color
+  - generic-color-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:{{ .Version }}-arm64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:latest-arm64'
@@ -511,7 +588,7 @@ dockers:
   goarch: amd64
   goos: linux
   ids:
-  - generic-color
+  - generic-color-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:{{ .Version }}-amd64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-color:latest-amd64'
@@ -524,7 +601,7 @@ dockers:
   goarch: arm64
   goos: linux
   ids:
-  - generic-color
+  - generic-color-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-color:{{ .Version }}-arm64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-color:latest-arm64'
@@ -537,7 +614,7 @@ dockers:
   goarch: amd64
   goos: linux
   ids:
-  - generic-color
+  - generic-color-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-color:{{ .Version }}-amd64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-color:latest-amd64'
@@ -550,7 +627,7 @@ dockers:
   goarch: arm64
   goos: linux
   ids:
-  - generic-color
+  - generic-color-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-color:{{ .Version }}-arm64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-color:latest-arm64'
@@ -563,7 +640,7 @@ dockers:
   goarch: amd64
   goos: linux
   ids:
-  - generic-color
+  - generic-color-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-color:{{ .Version }}-amd64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-color:latest-amd64'
@@ -576,7 +653,7 @@ dockers:
   goarch: arm64
   goos: linux
   ids:
-  - pi-color
+  - pi-color-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-color:{{ .Version }}-arm64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-color:latest-arm64'
@@ -589,7 +666,7 @@ dockers:
   goarch: arm64
   goos: linux
   ids:
-  - pi-color
+  - pi-color-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-color:{{ .Version }}-arm64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-color:latest-arm64'
@@ -601,7 +678,7 @@ dockers:
   goarch: arm64
   goos: linux
   ids:
-  - generic-smiley
+  - generic-smiley-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-smiley:{{ .Version }}-arm64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-smiley:latest-arm64'
@@ -613,7 +690,7 @@ dockers:
   goarch: amd64
   goos: linux
   ids:
-  - generic-smiley
+  - generic-smiley-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-smiley:{{ .Version }}-amd64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-smiley:latest-amd64'
@@ -626,7 +703,7 @@ dockers:
   goarch: arm64
   goos: linux
   ids:
-  - generic-smiley
+  - generic-smiley-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-smiley:{{ .Version }}-arm64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-smiley:latest-arm64'
@@ -639,7 +716,7 @@ dockers:
   goarch: amd64
   goos: linux
   ids:
-  - generic-smiley
+  - generic-smiley-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-smiley:{{ .Version }}-amd64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-external-smiley:latest-amd64'
@@ -652,7 +729,7 @@ dockers:
   goarch: arm64
   goos: linux
   ids:
-  - generic-smiley
+  - generic-smiley-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-smiley:{{ .Version }}-arm64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-smiley:latest-arm64'
@@ -665,7 +742,7 @@ dockers:
   goarch: amd64
   goos: linux
   ids:
-  - generic-smiley
+  - generic-smiley-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-smiley:{{ .Version }}-amd64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-external-smiley:latest-amd64'
@@ -678,7 +755,7 @@ dockers:
   goarch: arm64
   goos: linux
   ids:
-  - pi-smiley
+  - pi-smiley-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-smiley:{{ .Version }}-arm64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-pi-smiley:latest-arm64'
@@ -691,7 +768,7 @@ dockers:
   goarch: arm64
   goos: linux
   ids:
-  - pi-smiley
+  - pi-smiley-linux
   image_templates:
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-smiley:{{ .Version }}-arm64'
   - '{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}-bel-pi-smiley:latest-arm64'
