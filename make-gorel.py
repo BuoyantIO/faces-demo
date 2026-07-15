@@ -21,6 +21,7 @@ import sys
 
 import yaml
 
+OSES = [ "linux", "windows" ]
 ARCHITECTURES = [ "arm64", "amd64" ]
 
 class ImageStyle:
@@ -30,8 +31,9 @@ class ImageStyle:
         self.build_args = build_args
 
 class BuildStyle:
-    def __init__(self, name, image_styles, architectures=ARCHITECTURES):
+    def __init__(self, name, image_styles, oses=OSES, architectures=ARCHITECTURES):
         self.name = name
+        self.oses = oses
         self.architectures = architectures
         self.image_styles = image_styles
 
@@ -58,7 +60,9 @@ def BuildStyleExternal(name):
                         ImageStyle(f"bel-external-{name}", "bel-external-workload",
                                    [ "--build-arg=EXTERNAL_BASE={{ .Env.BEL_EXTERNAL_BASE }}",
                                      "--build-arg=WORKLOAD=%s-workload" % name ]),
-                      ])
+                      ],
+                      oses = [ "linux" ])
+
 
 def BuildStylePi(name):
     return BuildStyle("pi",
@@ -70,7 +74,8 @@ def BuildStylePi(name):
                                    [ "--build-arg=EXTERNAL_BASE={{ .Env.BEL_EXTERNAL_BASE }}",
                                      "--build-arg=WORKLOAD=%s-workload" % name ]),
                       ],
-                      architectures=[ "arm64" ])
+                      architectures=[ "arm64" ],
+                      oses = [ "linux" ])
 
 class Build:
     def __init__(self,
@@ -105,24 +110,36 @@ BUILDS = [
 build_defs = {}
 docker_defs = []
 manifest_defs = []
+archive_info = {
+    "generic-linux": {},
+    "generic-windows": {},
+    "pi-linux": {},
+}
+archive_defs = []
 
 for build in BUILDS:
     for build_style in build.build_styles:
         build_name = build.name
         style_name = build_style.name
 
-        build_id = f"{style_name}-{build_name}"
+        for os in list(build_style.oses):
+            build_id = f"{style_name}-{build_name}-{os}"
 
-        build_def = {
-            "id": build_id,
-            "main": f"./cmd/{style_name}/{build_name}",
-            "binary": f"{build_name}-workload",
-            "env": [ "CGO_ENABLED=0" ],
-            "goos": [ "linux" ],
-            "goarch": list(build_style.architectures),
-        }
+            build_def = {
+                "id": build_id,
+                "main": f"./cmd/{style_name}/{build_name}",
+                "binary": f"{build_name}-workload",
+                "env": [ "CGO_ENABLED=0" ],
+                "goos": [ os ],
+                "goarch": list(build_style.architectures),
+            }
 
-        build_defs[build_id] = build_def
+            build_defs[build_id] = build_def
+
+            # print(f"# {build_name} {style_name} {list(build_style.oses)}")
+            # print(f"# {build_name} {style_name} {os}: {build_def}")
+            archive_id = f"{style_name}-{os}"
+            archive_info[archive_id][build_id] = True
 
         for image in build_style.image_styles:
             dockerfile = f"Dockerfiles/Dockerfile.{image.dockerfile}"
@@ -144,6 +161,8 @@ for build in BUILDS:
 
                 if image.build_args:
                     build_flags.extend(image.build_args)
+
+                build_id = f"{style_name}-{build_name}-linux"
 
                 docker_def = {
                     "use": "buildx",
@@ -180,10 +199,40 @@ for build in BUILDS:
             manifest_defs.append(current_manifest_def)
             manifest_defs.append(latest_manifest_def)
 
+# print("#")
+
+for archive_name, build_ids in archive_info.items():
+    archive_id = archive_name
+    os = "linux"
+
+    if "-" in archive_name:
+        archive_id, os = archive_name.split("-")
+
+    name_template = '{{ .ProjectName }}_%s_{{ .Version }}_%s_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
+    name_template = name_template % (archive_id, os)
+
+    build_ids = sorted(archive_info[archive_name].keys())
+    # print(f"# {archive_id}-{os}: {build_ids}")
+
+    archive_def = {
+        "id": archive_name,
+        "name_template": name_template,
+        "builds": build_ids,
+        "files": [ "none*" ],
+        "allow_different_binary_count": True,
+    }
+
+    # Windows archives should be zip format
+    if os == "windows":
+        archive_def["format"] = "zip"
+
+    archive_defs.append(archive_def)
+
 gorel = {
     "builds": list(build_defs.values()),
     "dockers": docker_defs,
     "docker_manifests": manifest_defs,
+    "archives": archive_defs,
 }
 
 print(sys.stdin.read())

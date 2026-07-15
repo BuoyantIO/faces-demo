@@ -34,17 +34,6 @@ before:
     # Make the chart as part of the build process.
     - make VERSION={{ .Version }} chart
 
-archives:
-  - id: generic
-    name_template: '{{ .ProjectName }}_generic_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
-    builds:
-      - generic-workload
-      - generic-color
-  - id: pi
-    name_template: '{{ .ProjectName }}_pi_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
-    builds:
-      - pi
-
 changelog:
   sort: asc
   filters:
