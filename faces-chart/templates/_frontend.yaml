@@ -75,6 +75,24 @@
             "which" "gui") -}}
 {{- end -}}
 
+{{- define "partials.mcp-image" -}}
+  {{- include "partials.frontend-image"
+      (dict "root" .
+            "which" "mcp") -}}
+{{- end -}}
+
+{{- define "partials.mcp-affinityclause" -}}
+  {{- include "partials.frontend-affinityclause"
+      (dict "root" .
+            "which" "mcp") -}}
+{{- end -}}
+
+{{- define "partials.mcp-resources" -}}
+  {{- include "partials.frontend-resources"
+      (dict "root" .
+            "which" "mcp") -}}
+{{- end -}}
+
 {{- define "partials.face-image" -}}
   {{- include "partials.frontend-image"
       (dict "root" .

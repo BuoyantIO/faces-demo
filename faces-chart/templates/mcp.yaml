@@ -1,0 +1,192 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: faces-mcp
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: frontend
+    faces.buoyant.io/component: faces-mcp
+spec:
+  type: {{ .Values.mcp.serviceType }}
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: frontend
+    faces.buoyant.io/component: faces-mcp
+  ports:
+  - port: 80
+    name: http
+    targetPort: http
+{{- if .Values.rollouts.enabled }}
+  {{- $strategy := .Values.rollouts.strategy | default "canary" -}}
+  {{- if eq $strategy "canary" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: faces-mcp{{ .Values.rollouts.canary.serviceSuffix.canary | default "-canary" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: frontend
+    faces.buoyant.io/component: faces-mcp
+spec:
+  type: ClusterIP
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: frontend
+    faces.buoyant.io/component: faces-mcp
+  ports:
+  - port: 80
+    name: http
+    targetPort: http
+  {{- else if eq $strategy "blueGreen" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: faces-mcp{{ .Values.rollouts.blueGreen.serviceSuffix.preview | default "-preview" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: frontend
+    faces.buoyant.io/component: faces-mcp
+spec:
+  type: ClusterIP
+  selector:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: frontend
+    faces.buoyant.io/component: faces-mcp
+  ports:
+  - port: 80
+    name: http
+    targetPort: http
+  {{- end }}
+{{- end }}
+
+{{- if .Values.rollouts.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: faces-mcp
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: frontend
+    faces.buoyant.io/component: faces-mcp
+spec:
+  replicas: {{ get .Values.mcp "replicas" | default .Values.defaultReplicas }}
+  revisionHistoryLimit: {{ .Values.rollouts.revisionHistoryLimit | default 5 }}
+  progressDeadlineSeconds: {{ .Values.rollouts.progressDeadlineSeconds | default 600 }}
+  selector:
+    matchLabels:
+      buoyant.io/application: faces
+      faces.buoyant.io/component-type: frontend
+      faces.buoyant.io/component: faces-mcp
+  strategy:
+    {{- if eq (.Values.rollouts.strategy | default "canary") "canary" }}
+    canary:
+      maxSurge: {{ .Values.rollouts.maxSurge | default 1 }}
+      maxUnavailable: {{ .Values.rollouts.maxUnavailable | default 0 }}
+      {{- $tr := .Values.rollouts.canary.trafficRouting | default dict -}}
+      {{- $provider := (hasKey $tr "provider") | ternary $tr.provider "" -}}
+      {{- $plugin := (hasKey $tr "plugin") | ternary $tr.plugin dict -}}
+      {{- $pluginName := (hasKey $plugin "name") | ternary $plugin.name "" -}}
+      {{- if and $provider $pluginName }}
+        {{- fail "rollouts.canary.trafficRouting: choose EITHER 'provider' OR 'plugin.name', not both" -}}
+      {{- end }}
+
+      {{- if eq $provider "smi" }}
+      stableService: faces-mcp
+      canaryService: {{ printf "faces-mcp%s" (.Values.rollouts.canary.serviceSuffix.canary | default "-canary") | quote }}
+      trafficRouting: { smi: {} }
+      {{- end }}
+
+      {{- if .Values.rollouts.canary.mcp.steps }}
+      steps:
+      {{ toYaml .Values.rollouts.canary.mcp.steps | nindent 8 }}
+      {{- end }}
+
+    {{- else }}
+    blueGreen:
+      activeService: faces-mcp
+      previewService: {{ printf "faces-mcp%s" (.Values.rollouts.blueGreen.serviceSuffix.preview | default "-preview") | quote }}
+      autoPromotionEnabled: {{ .Values.rollouts.blueGreen.autoPromotionEnabled | default false }}
+      {{- if hasKey .Values.rollouts.blueGreen "autoPromotionSeconds" }}
+      autoPromotionSeconds: {{ .Values.rollouts.blueGreen.autoPromotionSeconds }}
+      {{- end }}
+    {{- end }}
+  template:
+    metadata:
+      labels:
+        buoyant.io/application: faces
+        faces.buoyant.io/component-type: frontend
+        faces.buoyant.io/component: faces-mcp
+    spec:
+      {{ include "partials.mcp-affinityclause" . }}
+      containers:
+      - name: faces-mcp
+        image: {{ include "partials.mcp-image" . }}
+        imagePullPolicy: {{ get .Values.mcp "imagePullPolicy" | default .Values.defaultImagePullPolicy }}
+        env:
+        {{- if .Values.whisperAddress }}
+        - name: WHISPER_ADDRESS
+          value: {{ .Values.whisperAddress | quote }}
+        {{- if .Values.whisperNode }}
+        - name: WHISPER_NODE_NUMBER
+          value: {{ .Values.whisperNode | quote }}
+        {{- end }}
+        {{- end }}
+        ports:
+        - name: http
+          containerPort: 8000
+        {{- include "partials.mcp-resources" . }}
+{{- else }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: faces-mcp
+  namespace: {{ .Release.Namespace }}
+  labels:
+    buoyant.io/application: faces
+    faces.buoyant.io/component-type: frontend
+    faces.buoyant.io/component: faces-mcp
+spec:
+  replicas: {{ get .Values.mcp "replicas"
+               | default .Values.defaultReplicas }}
+  selector:
+    matchLabels:
+      buoyant.io/application: faces
+      faces.buoyant.io/component-type: frontend
+      faces.buoyant.io/component: faces-mcp
+  template:
+    metadata:
+      labels:
+        buoyant.io/application: faces
+        faces.buoyant.io/component-type: frontend
+        faces.buoyant.io/component: faces-mcp
+    spec:
+      {{ include "partials.mcp-affinityclause" . }}
+      containers:
+      - name: faces-mcp
+        image: {{ include "partials.mcp-image" . }}
+        imagePullPolicy: {{ get .Values.mcp "imagePullPolicy"
+                            | default .Values.defaultImagePullPolicy }}
+        env:
+        {{- if .Values.whisperAddress }}
+        - name: WHISPER_ADDRESS
+          value: {{ .Values.whisperAddress | quote }}
+        {{- if .Values.whisperNode }}
+        - name: WHISPER_NODE_NUMBER
+          value: {{ .Values.whisperNode | quote }}
+        {{- end }}
+        {{- end }}
+        ports:
+        - name: http
+          containerPort: 3000
+        {{- include "partials.mcp-resources" . }}
+
+{{- end }}
