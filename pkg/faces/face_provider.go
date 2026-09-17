@@ -39,6 +39,9 @@ type FaceProvider struct {
 	BaseProvider
 	smileyService string
 	colorService  string
+	colorConn     *grpc.ClientConn
+	colorClient   color.ColorServiceClient
+	colorConnErr  error
 }
 
 type FaceResponse struct {
@@ -103,6 +106,16 @@ func NewFaceProviderFromEnvironment() *FaceProvider {
 
 	fprv.Infof("Face: smileyService http://%s", fprv.smileyService)
 	fprv.Infof("Face: colorService grpc://%s", fprv.colorService)
+
+	fprv.colorConn, fprv.colorConnErr = grpc.NewClient(
+		fprv.colorService,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if fprv.colorConnErr == nil {
+		fprv.colorClient = color.NewColorServiceClient(fprv.colorConn)
+	} else {
+		fprv.Warnf("couldn't create gRPC client for %s: %s", fprv.colorService, fprv.colorConnErr)
+	}
 
 	return fprv
 }
@@ -194,26 +207,17 @@ func (fprv *FaceProvider) makeSmileyRequest(prvReq *ProviderRequest) *FaceRespon
 }
 
 func (fprv *FaceProvider) makeColorRequest(prvReq *ProviderRequest) *FaceResponse {
-	opts := []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	}
-
-	conn, err := grpc.NewClient(fprv.colorService, opts...)
-
-	if err != nil {
+	if fprv.colorConnErr != nil {
 		return &FaceResponse{
 			statusCode: http.StatusInternalServerError,
-			data:       fmt.Sprintf("couldn't connect to %s: %s", fprv.colorService, err),
+			data:       fmt.Sprintf("couldn't connect to %s: %s", fprv.colorService, fprv.colorConnErr),
 		}
 	}
-
-	defer conn.Close()
-
-	client := color.NewColorServiceClient(conn)
 
 	// Anything linked to this variable will transmit request headers.
 	md := metadata.New(map[string]string{"x-faces-user": prvReq.user})
 	ctx := metadata.NewOutgoingContext(context.Background(), md)
+	var err error
 
 	colorReq := &color.ColorRequest{
 		Row:    int32(prvReq.row),
@@ -225,9 +229,9 @@ func (fprv *FaceProvider) makeColorRequest(prvReq *ProviderRequest) *FaceRespons
 	fprv.Debugf("gRPC starting (%s) %s", prvReq.InfoStr(), fprv.colorService)
 
 	if prvReq.subrequest == "center" {
-		colorResp, err = client.Center(ctx, colorReq)
+		colorResp, err = fprv.colorClient.Center(ctx, colorReq)
 	} else {
-		colorResp, err = client.Edge(ctx, colorReq)
+		colorResp, err = fprv.colorClient.Edge(ctx, colorReq)
 	}
 
 	if err != nil {
